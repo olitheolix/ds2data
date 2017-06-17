@@ -12,8 +12,8 @@ through a 3D space scene.
 
 The meta data for the flight is in `flightpath/meta.pickle`. It contains, among
 other things, the screen position of each cube in each frame. The
-`draw_bboxes.py` shows how to use this information to draw bounding boxes the
-cubes in the images.
+`draw_bboxes.py` shows how to use this information to draw bounding boxes
+around all cubes.
 
 | Original Scene               | After `draw_bboxes.py`      |
 | ---------------------------- | --------------------------- |
@@ -21,18 +21,17 @@ cubes in the images.
 
 
 # Installation
-Just download and unpack the `ds2.tar.gz` file and use it in your ML model.
-
-In case you wonder, all images were created by
-the [PyHorde](https://github.com/olitheolix/pyhorde) sister project which
-uses [Horde3D](http://www.horde3d.org/) to render the scene.
+Download the [dataset](ds2.tar.gz) and use it in your ML model as you see fit.
 
 # License
 The data set and code are available under the Apache Software License 2.0.
 
 # Disclaimer
 The numeral textures are royalty free images
-from [PixaBay](https://pixabay.com/en/photos/?hp=&image_type=&cat=&min_width=&min_height=&q=counting+math+numbers+numerals+funny&order=popular).
+from
+[PixaBay](https://pixabay.com/en/photos/?hp=&image_type=&cat=&min_width=&min_height=&q=counting+math+numbers+numerals+funny&order=popular).
+The rendered images were created with
+[PyHorde](https://github.com/olitheolix/pyhorde).
 
 
 # Feeback
