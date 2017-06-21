@@ -1,8 +1,8 @@
-import time
-import itertools
+import tflogger
 import data_loader
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 
 def weights(shape, name=None):
@@ -24,7 +24,6 @@ def createNetwork(dims, num_classes):
 
     # Auxiliary placeholders.
     learn_rate = tf.placeholder(tf.float32, name='learn_rate')
-    tf.placeholder(tf.float32, name='f32')
 
     # Convert the input into the shape of an image.
     x_img = tf.reshape(x_in, [-1, width, height, depth])
@@ -65,6 +64,7 @@ def createNetwork(dims, num_classes):
     # Optimisation.
     cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=dense2, labels=y_in)
     cost = tf.reduce_mean(cost, name='cost')
+    tf.summary.scalar('cost', cost)
     opt = tf.train.AdamOptimizer(learning_rate=learn_rate).minimize(cost)
 
     # Predictor.
@@ -77,116 +77,90 @@ def createNetwork(dims, num_classes):
     return opt
 
 
-def validateAll(sess, ds, batch_size, tb, step):
-    # Run the entire test set and compute the overall accuracy.
-    dset = 'test'
+def validateAll(sess, ds, batch_size, dset):
+    """Return number of correct and total features.
+
+    NOTE: this method will modify the data offset inside `ds`.
+
+    Args:
+        sess: Tensorflow session
+        ds (DataSet): handle to data set
+        batch_size (int): for testing the network
+        dset (str): must be {'dset', 'train'}
+    """
     ds.reset(dset)
     g = tf.get_default_graph().get_tensor_by_name
     features, labels = g('x_in:0'), g('y_in:0')
 
-    total = num_batches = cor_tot = cor_avg = 0
-    while True:
-        x, y, _ = ds.nextBatch(batch_size, dset=dset)
-        if len(y) == 0:
-            break
+    correct = total = 0
+    x, y, _ = ds.nextBatch(batch_size, dset=dset)
+    while len(y) > 0:
         total += len(y)
-        num_batches += 1
-        fd = {features: x, labels: y}
-        cor_tot += sess.run(g('corTot:0'), feed_dict=fd)
-        cor_avg += sess.run(g('corAvg:0'), feed_dict=fd)
-
-    cor_avg /= num_batches
-
-    tb_writer, tb_avg = tb['writer'], tb['corAvgTest']
-    acc = sess.run(tb_avg, feed_dict={g('f32:0'): cor_avg})
-    tb_writer.add_summary(acc, step)
-
-    s = '\rEpoch {:2d}: Accuracy={:3.1f}%  ({} / {})'
-    print(s.format(step, 100 * cor_tot / total, cor_tot, total))
-    return cor_tot, total
+        correct += sess.run(g('corTot:0'), feed_dict={features: x, labels: y})
+        x, y, _ = ds.nextBatch(batch_size, dset=dset)
+    ds.reset(dset)
+    return correct, total
 
 
-def trainEpoch(sess, ds, batch_size, optimiser, tb, epoch, step):
+def computeLearningRate(lr_min, lr_max, acc):
+    # Return learning rate based on `acc`.
+    k = (10 / 3) * (lr_min - lr_max)
+    d = lr_min - k
+    return np.clip(k * acc + d, lr_min, lr_max)
+
+
+def logAccuracy(sess, ds, batch_size, epoch, log):
+    """ Print the current accuracy for _all_ training/test data."""
+    correct, total = validateAll(sess, ds, batch_size, 'test')
+    rat = 100 * (correct / total)
+    status = f'      Test {rat:4.1f}% ({correct: 5,} / {total: 5,})'
+    log.f32('acc_test', epoch, rat)
+
+    correct, total = validateAll(sess, ds, batch_size, 'train')
+    rat = 100 * (correct / total)
+    status += f'        Train {rat:4.1f}% ({correct: 5,} / {total: 5,})'
+    log.f32('acc_train', epoch, rat)
+
+    print(f'Epoch {epoch}: ' + status)
+
+
+def trainEpoch(sess, ds, batch_size, optimiser, log, epoch):
+    """Train the network for one full epoch.
+
+    Returns:
+        (int): number of batches until data was exhausted.
+    """
     g = tf.get_default_graph().get_tensor_by_name
-    x_in, y_in = g('x_in:0'), g('y_in:0')
-    learn_rate, f32, corAvg = g('learn_rate:0'), g('f32:0'), g('corAvg:0')
-
-    # Log the cost during training.
-    tb_writer, tb_cost, tb_acc = tb['writer'], tb['costTrain'], tb['corAvgTrain']
-    tb_lrate = tb['lrate']
+    x_in, y_in, learn_rate = g('x_in:0'), g('y_in:0'), g('learn_rate:0')
+    cost = g('cost:0')
 
     # Validate the performance on the entire test data set.
-    cor_tot, total = validateAll(sess, ds, batch_size, tb, epoch)
+    cor_tot, total = validateAll(sess, ds, batch_size, 'test')
 
-    # Adjust the learning rate based on the test accuracy.
-    slow, fast = 1E-5, 1E-4
-    k = (10 / 3) * (slow - fast)
-    d = slow - k
-    x = cor_tot / total
-    lrate = np.clip(k * x + d, 1E-5, 1E-4)
-    del cor_tot, total, k, x, d, slow, fast
+    lrate = computeLearningRate(1E-5, 1E-4, cor_tot / total)
 
-    # Train an entire epoch.
-    t0 = 0
+    # Train for one full epoch.
     ds.reset('train')
     while ds.posInEpoch('train') < ds.lenOfEpoch('train'):
-        # Request data batch and compile feed_dict.
+        # Fetch data.
         x, y, _ = ds.nextBatch(batch_size, dset='train')
         fd = {x_in: x, y_in: y, learn_rate: lrate}
 
-        # Log metrics and update the terminal output every 2 seconds.
-        if time.time() - t0 > 2:
-            per = ds.posInEpoch('train') / ds.lenOfEpoch('train')
-            print(f'\rEpoch {epoch+1:2d}: {100 * per:.0f}%', end='', flush=True)
-
-            tb_writer.add_summary(sess.run(tb_cost, feed_dict=fd), step)
-            acc = sess.run(corAvg, feed_dict=fd)
-            tb_writer.add_summary(sess.run(tb_acc, feed_dict={f32: acc}), step)
-            tb_writer.add_summary(sess.run(tb_lrate, feed_dict={f32: lrate}), step)
-
-            t0 = time.time()
-            step += 1
-
-        # Optimise network.
+        # Optimise.
         sess.run(optimiser, feed_dict=fd)
 
-    return step
-
-
-def weightToImage(weights):
-    h, w, d, c = weights.shape
-    n = int(np.sqrt(d * c))
-    if n * n < d * c:
-        n += 1
-
-    boundary = 1
-    dx, dy = w + boundary, h + boundary
-    img = np.zeros((1, dy * n, dx * n, 1), np.uint8)
-    it = itertools.product(range(c), range(d))
-    minval, maxval = np.min(weights), np.max(weights)
-    for i, j in itertools.product(range(n), range(n)):
-        b, a = next(it, (None, None))
-        if a is None:
-            return img
-
-        x0, x1 = i * dx, (i + 1) * dx
-        y0, y1 = j * dy, (j + 1) * dy
-        x1, y1 = x1 - boundary, y1 - boundary
-
-        reg = weights[:, :, a, b]
-        reg = (reg - minval) / maxval
-        img[0, y0:y1, x0:x1, 0] = (255 * reg).astype(np.uint8)
-    return img
+        # Track the cost of current batch, as well as the number of batches.
+        log.f32('Cost', epoch, sess.run(cost, feed_dict=fd))
 
 
 def main():
     # Start TF and let it dump its log messages to the terminal.
     sess = tf.Session()
+    print()
 
     batch_size = 16
 
     # Load the data.
-    #ds = dataset.DS2(train=0.8, N=None, labels={'0', '1'})
     ds = data_loader.DS2(train=0.8, N=None)
     ds.summary()
     dims = ds.imageDimensions()
@@ -194,86 +168,43 @@ def main():
 
     # Build the network graph.
     opt = createNetwork(dims, num_classes)
-
-    # Collect all Tensorboard related handles and summaries.
-    g = tf.get_default_graph().get_tensor_by_name
-    tb = {
-        'writer': tf.summary.FileWriter('/tmp/tf/', sess.graph),
-        'corAvgTest': tf.summary.scalar('Accuracy-Test', g('f32:0')),
-        'corAvgTrain': tf.summary.scalar('Accuracy-Training', g('f32:0')),
-        'costTrain': tf.summary.scalar('Cost-Training', g('cost:0')),
-        'lrate': tf.summary.scalar('Learning Rate', g('f32:0')),
-    }
     sess.run(tf.global_variables_initializer())
 
-    # Convert the initial weight tensor to an image. Then create a placeholder
-    # variable with the same dimensions. We will use that variable to log the
-    # weights later on.
-    tmp = weightToImage(sess.run(g('c1_W:0')))
-    img_w1 = tf.placeholder(tf.uint8, tmp.shape)
-    tb_w1 = tf.summary.image('Weights Layer 1', img_w1, max_outputs=1)
-    tmp = weightToImage(sess.run(g('c2_W:0')))
-    img_w2 = tf.placeholder(tf.uint8, tmp.shape)
-    tb_w2 = tf.summary.image('Weights Layer 2', img_w2, max_outputs=1)
-    del tmp
+    tflog = tflogger.TFLogger(sess)
+    # model_saver = tf.train.Saver()
+    # log_writer = tf.summary.FileWriter('/tmp/tf/', sess.graph),
 
-    saver = tf.train.Saver()
-    if False:
-        saver.restore(sess, "/tmp/model.ckpt")
-        g = tf.get_default_graph().get_tensor_by_name
-        pred, features = g('pred:0'), g('x_in:0')
-
-        from PIL import Image
-        img = Image.open('delme.jpg')
-        img = np.array(img)
-        img = img.astype(np.float32) / 255
-        img = np.rollaxis(img, 2, 0)
-        ds.reset()
-
-        correct = 0
-        for row in range(10):
-            y_true = row
-            print(f'\nReal label: {y_true}')
-            for col in range(10):
-                ofs_x, ofs_y = 0, 0
-                x0, y0 = ofs_x + col * 150, ofs_y + row * 150
-                x1, y1 = x0 + 128, y0 + 128
-                x = img[:, y0:y1, x0:x1].flatten()
-                x = np.expand_dims(x, 0)
-
-                out = sess.run(pred, feed_dict={features: x})
-                res = []
-                for idx, val in enumerate(out[0]):
-                    s = f'{idx}:{int(100 * val):3d}'
-                    s = s + '*' if idx == y_true else s
-                    res.append(s)
-                if np.argmax(out[0]) == y_true:
-                    correct += 1
-                print(str.join('  ', res))
-        print(f'Correct: {correct}')
-        return
+    # tb_summary = tf.summary.merge_all()
+    # tb_writer = tf.summary.FileWriter('/tmp/tf/', sess.graph)
 
     # Train the network for several epochs.
+    print()
     try:
-        step = 0
-
-        for epoch in range(50):
-            # Log the current weights.
-            img1 = weightToImage(sess.run(g('c1_W:0')))
-            img2 = weightToImage(sess.run(g('c2_W:0')))
-            tb_data = sess.run(tb_w1, feed_dict={img_w1: img1})
-            tb['writer'].add_summary(tb_data, epoch)
-            tb_data = sess.run(tb_w2, feed_dict={img_w2: img2})
-            tb['writer'].add_summary(tb_data, epoch)
-
-            # Train the model.
-            step = trainEpoch(sess, ds, batch_size, opt, tb, epoch, step)
-            saver.save(sess, "/tmp/model.ckpt")
-
-        validateAll(sess, ds, batch_size, tb, epoch + 1)
+        cost = []
+        for epoch in range(3):
+            logAccuracy(sess, ds, batch_size, epoch, tflog)
+            trainEpoch(sess, ds, batch_size, opt, tflog, epoch)
+            # saver.save(sess, "/tmp/model.ckpt")
     except KeyboardInterrupt:
-        # Validate the performance on the entire test data set.
-        validateAll(sess, ds, batch_size, tb, epoch)
+        pass
+
+    # Print accuracy after last training cycle.
+    logAccuracy(sess, ds, batch_size, epoch + 1, tflog)
+
+    cost = [v for k, v in sorted(tflog.data['f32']['Cost'].items())]
+    acc_trn = [v for k, v in sorted(tflog.data['f32']['acc_train'].items())]
+    acc_tst = [v for k, v in sorted(tflog.data['f32']['acc_test'].items())]
+
+    plt.figure()
+    plt.plot(np.concatenate(cost))
+
+    plt.figure()
+    acc_trn = np.concatenate(acc_trn)
+    acc_tst = np.concatenate(acc_tst)
+    acc = np.vstack([acc_trn, acc_tst]).T
+    plt.plot(acc)
+
+    plt.show()
 
 
 if __name__ == '__main__':
