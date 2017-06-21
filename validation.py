@@ -1,3 +1,6 @@
+"""
+Load the most recent network data and produce performance plots.
+"""
 import os
 import glob
 import model
@@ -36,31 +39,6 @@ def validateAll(sess, ds, batch_size, dset):
     return correct, total
 
 
-def plotWrongClassifications(meta, num_cols):
-    font = dict(color='white', alpha=0.5, size=16, weight='normal')
-
-    if len(meta) % num_cols == 0:
-        num_rows = len(meta) // num_cols
-    else:
-        num_rows = len(meta) // num_cols + 1
-
-    plt.figure(figsize=(3 * num_cols, 3 * num_rows))
-    gs1 = gridspec.GridSpec(num_rows, num_cols)
-    gs1.update(wspace=0.01, hspace=0.01)
-
-    for i, (x, yt, yc, uuid) in enumerate(meta):
-        ax = plt.subplot(gs1[i])
-        plt.imshow(x)
-        plt.axis('off')
-        ax.set_aspect('equal')
-        plt.text(
-            0.05, 0.05, f'T: {yt}\nP: {yc}',
-            fontdict=font, transform=ax.transAxes,
-            bbox=dict(facecolor='white', alpha=0.5), color='black',
-            horizontalalignment='left', verticalalignment='bottom')
-    return plt
-
-
 def gatherWrongClassifications(sess, ds, batch_size, dset):
     """ Return every incorrectly classified image.
 
@@ -95,7 +73,52 @@ def gatherWrongClassifications(sess, ds, batch_size, dset):
     return meta
 
 
+def plotWrongClassifications(meta, num_cols):
+    """ Plot mislabelled images in `meta` in a grid with `num_cols`.
+
+    The `meta` list must be the output of `gatherWrongClassifications`.
+
+    Args:
+        meta (list): output of `gatherWrongClassifications`
+        num_cols (int): arrange the images with that many columns
+
+    Returns:
+        Matplotlib figure handle.
+    """
+    # Parameters for the overlays that will state true/predicted label.
+    font = dict(color='white', alpha=0.5, size=16, weight='normal')
+
+    # Determine how many rows we will need to arrange all images.
+    if len(meta) % num_cols == 0:
+        num_rows = len(meta) // num_cols
+    else:
+        num_rows = len(meta) // num_cols + 1
+
+    # Set up the plot grid.
+    plt.figure(figsize=(3 * num_cols, 3 * num_rows))
+    gs1 = gridspec.GridSpec(num_rows, num_cols)
+    gs1.update(wspace=0.01, hspace=0.01)
+
+    # Plot each image and place a text label to state the true/predicted label.
+    for i, (x, yt, yc, uuid) in enumerate(meta):
+        ax = plt.subplot(gs1[i])
+        plt.imshow(x)
+        plt.axis('off')
+        ax.set_aspect('equal')
+        plt.text(
+            0.05, 0.05, f'T: {yt}\nP: {yc}',
+            fontdict=font, transform=ax.transAxes,
+            bbox=dict(facecolor='white', alpha=0.5), color='black',
+            horizontalalignment='left', verticalalignment='bottom')
+    return plt
+
+
 def loadLatestModelAndLogData(sess):
+    """Load TF model and return content of TFLogger instance.
+
+    Returns:
+        (dict): the log data that was saved alongside the tensorflow variables.
+    """
     # Find the most recent checkpoint file.
     dst_dir = os.path.dirname(os.path.abspath(__file__))
     dst_dir = os.path.join(dst_dir, 'saved')
@@ -125,11 +148,11 @@ def loadLatestModelAndLogData(sess):
 def main():
     # Start TF and let it dump its log messages to the terminal.
     sess = tf.Session()
-    print()
 
     # Load the data.
     conf = dict(size=(32, 32), col_fmt='RGB')
     ds = data_loader.DS2(train=0.8, N=None, seed=0, conf=conf)
+    print()
     ds.printSummary()
 
     # Build and initialise the network graph.
@@ -146,6 +169,7 @@ def main():
     acc_trn = [v for k, v in sorted(logdata['f32']['acc_train'].items())]
     acc_tst = [v for k, v in sorted(logdata['f32']['acc_test'].items())]
 
+    # Options for saving Matplotlib figures.
     opts = dict(dpi=100, transparent=True, bbox_inches='tight')
 
     # Temporary Matplotlib settings to produce plots that work on the Blog.
@@ -156,7 +180,7 @@ def main():
         'legend.facecolor': 'white'
     }
 
-    # Show the cost over batches.
+    # Show the training cost over batches.
     with plt.rc_context(rc):
         plt.figure()
         plt.plot(np.concatenate(cost))
@@ -181,7 +205,7 @@ def main():
         plt.title('Accuracy in Percent', color='white')
         plt.savefig('/tmp/accuracy.png', **opts)
 
-    # Show some mis-labelled images.
+    # Show some of the mislabelled images.
     meta = gatherWrongClassifications(sess, ds, batch_size=16, dset='test')
     h = plotWrongClassifications(meta[:16], 4)
     h.savefig('/tmp/wrong.png', **opts)
