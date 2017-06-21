@@ -28,8 +28,9 @@ def plotWrongClassifications(meta):
         plt.axis('off')
         ax.set_aspect('equal')
         plt.text(
-            0.05, 0.05, f'True: {yt}\nPred: {yc}',
+            0.05, 0.05, f'T: {yt}\nP: {yc}',
             fontdict=font, transform=ax.transAxes,
+            bbox=dict(facecolor='white', alpha=0.5), color='black',
             horizontalalignment='left', verticalalignment='bottom')
     return plt
 
