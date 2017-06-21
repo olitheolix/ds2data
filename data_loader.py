@@ -214,6 +214,14 @@ class DataSet:
 
 
 class DS2(DataSet):
+    """ Specifically load the DS2 data set.
+
+    The parameters in the `conf` dictionary that is passed to the super class
+    have the following meaning:
+
+    `size` (tuple): the desired (width, height) of each image.
+    `colour_format` (str): passed directly to Pillow, eg 'RGB', or 'L'.
+    """
     def loadRawData(self, labels, N):
         # Original attributes of the images in the DS2 dataset.
         col_fmt = 'RGB'
