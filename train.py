@@ -66,7 +66,7 @@ def main():
     sess = tf.Session()
     print()
 
-    batch_size = 16
+    batch_size, num_epochs = 16, 1000
 
     # Load the data.
     conf = dict(size=(32, 32), col_fmt='RGB')
@@ -90,17 +90,17 @@ def main():
     # Compile file name for saved model.
     d = datetime.datetime.now()
     ts = f'{d.year}-{d.month:02d}-{d.day:02d}'
-    ts += f'-{d.hour:02d}-{d.minute:02d}-{d.second:02d}'
+    ts += f'-{d.hour:02d}:{d.minute:02d}:{d.second:02d}'
     fname_tf = os.path.join(dst_dir, f'model-{ts}.ckpt')
     fname_log = os.path.join(dst_dir, f'log-{ts}.pickle')
     del d, ts
 
     # Train the network for several epochs.
-    print()
-    best = -1
+    print(f'\nWill train for {num_epochs} epochs')
     try:
         # Train the model for several epochs.
-        for epoch in range(1):
+        best = -1
+        for epoch in range(num_epochs):
             # Determine the accuracy for test- and training set. Save the
             # model if its test accuracy sets a new record.
             _, accuracy_tst = logAccuracy(sess, ds, batch_size, epoch, tflog)
