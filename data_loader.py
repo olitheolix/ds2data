@@ -53,12 +53,16 @@ class DataSet:
         self.ofs = {k: 0 for k in self.handles}
         self.reset()
 
-    def summary(self):
+    def printSummary(self):
+        print('Data Set Summary:')
         for dset in self.handles:
-            print(f'{dset}: {len(self.handles[dset]):,} samples')
+            name = dset.capitalize()
+            print(f'  {name:10}: {len(self.handles[dset]):,} samples')
         tmp = [_[1] for _ in sorted(self.label2name.items())]
         tmp = str.join(', ', tmp)
-        print('Labels: {}'.format(tmp))
+        d, h, w = self.image_dims
+        print(f'  Labels    : {tmp}')
+        print(f'  Dimensions: {d} x {h} x {w}')
 
     def reset(self, dset=None):
         if dset is None:
@@ -202,7 +206,7 @@ class DataSet:
                 name = label2name[label]
                 x.append(i * np.ones(np.prod(dims), np.uint8))
                 y.append(label)
-                meta.append(MetaData(filename=f'file_{i}', label=label, name=name))
+                meta.append(MetaData(f'file_{i}', label, name))
         x = np.array(x, np.uint8)
         y = np.array(y, np.int32)
         return x, y, dims, label2name, meta
@@ -247,7 +251,7 @@ class DS2(DataSet):
 
                 all_labels.append(label_mr)
                 all_features.append(img)
-                meta.append(MetaData(filename=fname, label=label_mr, name=label_hr))
+                meta.append(MetaData(fname, label_mr, label_hr))
         all_features = np.array(all_features, np.uint8)
         all_labels = np.array(all_labels, np.int32)
         return all_features, all_labels, dims, label2name, meta
