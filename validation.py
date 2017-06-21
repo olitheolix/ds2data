@@ -145,19 +145,37 @@ def main():
     acc_trn = [v for k, v in sorted(logdata['f32']['acc_train'].items())]
     acc_tst = [v for k, v in sorted(logdata['f32']['acc_test'].items())]
 
+    opts = dict(dpi=100, transparent=True, bbox_inches='tight')
+
+    # Show the cost.
     plt.figure()
     plt.plot(np.concatenate(cost))
+    plt.grid()
+    plt.title('Cost')
+    plt.xlabel('Batch')
+    plt.ylim(0, plt.ylim()[1])
+    plt.savefig('/tmp/cost.png', **opts)
 
+    # Show the test- and training accuracy.
     plt.figure()
     acc_trn = np.concatenate(acc_trn)
     acc_tst = np.concatenate(acc_tst)
-    acc = np.vstack([acc_trn, acc_tst]).T
-    plt.plot(acc)
+    plt.plot(acc_trn, label='Traning Data')
+    plt.plot(acc_tst, label='Test Data')
+    plt.xlabel('Epoch')
+    plt.ylabel('Percent')
+    plt.ylim(0, 100)
+    plt.grid()
+    plt.legend(loc='best')
+    plt.title('Accuracy in Percent')
+    plt.savefig('/tmp/accuracy.png', **opts)
 
-    meta = gatherWrongClassifications(sess, ds, batch_size, 'test')
+    # Find some images that could not be classified and plot them.
+    meta = gatherWrongClassifications(sess, ds, batch_size=16, dset='test')
     h = plotWrongClassifications(meta[:40])
+    h.savefig('/tmp/wrong.png', **opts)
 
-    h.savefig('/tmp/delme.png', dpi=100, transparent=True, bbox_inches='tight')
+    # Show the figures on screen.
     plt.show()
 
 
