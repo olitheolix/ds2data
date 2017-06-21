@@ -175,16 +175,17 @@ def plotWrongClassifications(meta):
 def logAccuracy(sess, ds, batch_size, epoch, log):
     """ Print the current accuracy for _all_ training/test data."""
     correct, total = validateAll(sess, ds, batch_size, 'test')
-    rat = 100 * (correct / total)
-    status = f'      Test {rat:4.1f}% ({correct: 5,} / {total: 5,})'
-    log.f32('acc_test', epoch, rat)
+    rat_tst = 100 * (correct / total)
+    status = f'      Test {rat_tst:4.1f}% ({correct: 5,} / {total: 5,})'
+    log.f32('acc_test', epoch, rat_tst)
 
     correct, total = validateAll(sess, ds, batch_size, 'train')
-    rat = 100 * (correct / total)
-    status += f'        Train {rat:4.1f}% ({correct: 5,} / {total: 5,})'
-    log.f32('acc_train', epoch, rat)
+    rat_trn = 100 * (correct / total)
+    status += f'        Train {rat_trn:4.1f}% ({correct: 5,} / {total: 5,})'
+    log.f32('acc_train', epoch, rat_trn)
 
     print(f'Epoch {epoch}: ' + status)
+    return rat_trn, rat_tst
 
 
 def trainEpoch(sess, ds, batch_size, optimiser, log, epoch):
@@ -234,48 +235,52 @@ def main():
     sess.run(tf.global_variables_initializer())
 
     tflog = tflogger.TFLogger(sess)
-    # model_saver = tf.train.Saver()
-    # log_writer = tf.summary.FileWriter('/tmp/tf/', sess.graph),
+    model_saver = tf.train.Saver()
 
-    # tb_summary = tf.summary.merge_all()
-    # tb_writer = tf.summary.FileWriter('/tmp/tf/', sess.graph)
+    if False:
+        # Train the network for several epochs.
+        print()
+        best = -1
+        try:
+            # Train the model for several epochs.
+            for epoch in range(1):
+                # Determine the accuracy for test- and training set. Save the
+                # model if its test accuracy sets a new record.
+                _, accuracy_tst = logAccuracy(sess, ds, batch_size, epoch, tflog)
+                if accuracy_tst > best:
+                    model_saver.save(sess, 'model.ckpt')
+                    best = accuracy_tst
 
-    # Train the network for several epochs.
-    print()
-    try:
-        cost = []
-        for epoch in range(1):
-            logAccuracy(sess, ds, batch_size, epoch, tflog)
-            trainEpoch(sess, ds, batch_size, opt, tflog, epoch)
-            # saver.save(sess, "/tmp/model.ckpt")
-    except KeyboardInterrupt:
-        pass
+                # Train the model for a full epoch.
+                trainEpoch(sess, ds, batch_size, opt, tflog, epoch)
+        except KeyboardInterrupt:
+            pass
 
-    # Print accuracy after last training cycle.
-    logAccuracy(sess, ds, batch_size, epoch + 1, tflog)
+        # Print accuracy after last training cycle.
+        logAccuracy(sess, ds, batch_size, epoch + 1, tflog)
+        tflog.save('/tmp/tflog.log')
+    else:
+        model_saver.restore(sess, 'model.ckpt')
+        logdata = pickle.load(open('/tmp/tflog.log', 'rb'))
 
-    tflog.save('/tmp/tflog.log')
-    del tflog
-    logdata = pickle.load(open('/tmp/tflog.log', 'rb'))
+        cost = [v for k, v in sorted(logdata['f32']['Cost'].items())]
+        acc_trn = [v for k, v in sorted(logdata['f32']['acc_train'].items())]
+        acc_tst = [v for k, v in sorted(logdata['f32']['acc_test'].items())]
 
-    cost = [v for k, v in sorted(logdata['f32']['Cost'].items())]
-    acc_trn = [v for k, v in sorted(logdata['f32']['acc_train'].items())]
-    acc_tst = [v for k, v in sorted(logdata['f32']['acc_test'].items())]
+        plt.figure()
+        plt.plot(np.concatenate(cost))
 
-    plt.figure()
-    plt.plot(np.concatenate(cost))
+        plt.figure()
+        acc_trn = np.concatenate(acc_trn)
+        acc_tst = np.concatenate(acc_tst)
+        acc = np.vstack([acc_trn, acc_tst]).T
+        plt.plot(acc)
 
-    plt.figure()
-    acc_trn = np.concatenate(acc_trn)
-    acc_tst = np.concatenate(acc_tst)
-    acc = np.vstack([acc_trn, acc_tst]).T
-    plt.plot(acc)
+        meta = gatherWrongClassifications(sess, ds, batch_size, 'test')
+        h = plotWrongClassifications(meta[:40])
 
-    meta = gatherWrongClassifications(sess, ds, batch_size, 'test')
-    h = plotWrongClassifications(meta[:40])
-
-    h.savefig('/tmp/delme.png', dpi=100, transparent=True, bbox_inches='tight')
-    plt.show()
+        h.savefig('/tmp/delme.png', dpi=100, transparent=True, bbox_inches='tight')
+        plt.show()
 
 
 if __name__ == '__main__':
