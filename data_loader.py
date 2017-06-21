@@ -257,11 +257,4 @@ class DS2(DataSet):
         return all_features, all_labels, dims, label2name, meta
 
 
-def main():
-    ds = DS2(train=0.8, N=None, labels={''})
-    ds.summary()
-#    ds.show(0)
-
-
-if __name__ == '__main__':
-    main()
+        return all_features, all_labels, dims, label2name, meta
