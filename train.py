@@ -69,7 +69,8 @@ def main():
     batch_size = 16
 
     # Load the data.
-    ds = data_loader.DS2(train=0.8, N=None, seed=0)
+    conf = dict(size=(32, 32), col_fmt='RGB')
+    ds = data_loader.DS2(train=0.8, N=None, seed=0, conf=conf)
     ds.printSummary()
     dims = ds.imageDimensions()
     num_classes = len(ds.classNames())
