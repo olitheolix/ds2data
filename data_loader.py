@@ -277,15 +277,18 @@ class DS2(DataSet):
     def loadRawData(self, labels, N):
         # Original attributes of the images in the DS2 dataset.
         col_fmt = 'RGB'
-        width, height = 128, 128
+        width, height, depth = 128, 128, 3
 
         if 'size' in self.conf:
             width, height = self.conf['size']
-        if 'colour_format' in self.conf:
-            col_fmt = self.conf.get['colour_format']
+        if 'col_fmt' in self.conf:
+            assert self.conf['col_fmt'].upper() in {'RGB', 'L'}
+            col_fmt = self.conf['col_fmt'].upper()
+            if col_fmt == 'L':
+                depth = 1
 
         # The size of the returned images.
-        dims = (3, height, width)
+        dims = (depth, height, width)
 
         # The data set contains 11 labels: ten digits (0-9), and 'background'.
         label2name = {_: str(_) for _ in range(10)}
@@ -310,20 +313,27 @@ class DS2(DataSet):
             del ftype, ext
 
             for i, fname in enumerate(fnames[:N]):
-                # Convert to correct colour format, then resize.
+                # Convert to correct colour format and resize.
                 img = Image.open(fname)
                 img = img.convert(col_fmt)
                 if img.size != (width, height):
                     img = img.resize((width, height), Image.BILINEAR)
 
-                # Store the flattened image alongside its label.
+                # We work in NumPy from now on.
                 img = np.array(img, np.uint8)
+
+                # Insert a dummy dimension for grayscale (2d images).
+                if img.ndim == 2:
+                    img = np.expand_dims(img, axis=2)
+
+                # Move the colour dimension to the front, ie convert a
+                # (height x width x cols) image to (cols x height x width).
                 assert img.shape == (dims[1], dims[2], dims[0])
                 img = np.rollaxis(img, 2, 0)
-    #            img = np.expand_dims(np.mean(img, axis=0), axis=0)
                 assert img.shape == dims
-                img = img.flatten()
 
+                # Store the flattened image alongside its label and meta data.
+                img = img.flatten()
                 all_labels.append(label_mr)
                 all_features.append(img)
                 meta.append(MetaData(fname, label_mr, label_hr))

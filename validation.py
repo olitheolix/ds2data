@@ -58,19 +58,37 @@ def gatherWrongClassifications(sess, ds, batch_size, dset):
     g = tf.get_default_graph().get_tensor_by_name
     features, labels = g('x_in:0'), g('y_in:0')
 
+    # Reset the data set and get the first batch.
     ds.reset(dset)
     dim = ds.imageDimensions()
     x, y, uuid = ds.nextBatch(batch_size, dset=dset)
 
+    # Predict every image in every batch and filter out those that were mislabelled.
     meta = []
     while len(y) > 0:
         tmp = sess.run(g('pred-argmax:0'), feed_dict={features: x, labels: y})
         for i in range(len(y)):
-            if y[i] != tmp[i]:
-                img = np.reshape(x[i], dim)
-                img = np.rollaxis(img, 0, 3)
-                meta.append((img, y[i], tmp[i], uuid[i]))
+            # Skip this image if it was correctly labelled.
+            if y[i] == tmp[i]:
+                continue
+
+            # Convert the flat image into the 3D matrix that the network saw,
+            # ie (depth, height, width). Then roll the axes because the
+            # Matplotlib needs the colour dimension last, ie (height, width,
+            # depth).
+            img = np.reshape(x[i], dim)
+            img = np.rollaxis(img, 0, 3)
+
+            # Remove the colour dimensions for grayscale images.
+            if img.shape[2] == 1:
+                img = img[:, :, 0]
+
+            # Store the image, correct label, predicted label, and feature id.
+            meta.append((img, y[i], tmp[i], uuid[i]))
+
+        # Get the next batch and repeat.
         x, y, uuid = ds.nextBatch(batch_size, dset=dset)
+
     ds.reset(dset)
     return meta
 
@@ -104,7 +122,8 @@ def plotWrongClassifications(meta, num_cols):
     # Plot each image and place a text label to state the true/predicted label.
     for i, (x, yt, yc, uuid) in enumerate(meta):
         ax = plt.subplot(gs1[i])
-        plt.imshow(x)
+        cmap = 'gray' if x.ndim == 2 else None
+        plt.imshow(x, cmap=cmap)
         plt.axis('off')
         ax.set_aspect('equal')
         plt.text(
