@@ -9,32 +9,6 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 
-def plotWrongClassifications(meta):
-    font = dict(color='white', alpha=0.5, size=16, weight='normal')
-
-    num_cols = 10
-    if len(meta) % num_cols == 0:
-        num_rows = len(meta) // num_cols
-    else:
-        num_rows = len(meta) // num_cols + 1
-
-    plt.figure(figsize=(3 * num_cols, 3 * num_rows))
-    gs1 = gridspec.GridSpec(num_rows, num_cols)
-    gs1.update(wspace=0.01, hspace=0.01)
-
-    for i, (x, yt, yc, uuid) in enumerate(meta):
-        ax = plt.subplot(gs1[i])
-        plt.imshow(x)
-        plt.axis('off')
-        ax.set_aspect('equal')
-        plt.text(
-            0.05, 0.05, f'T: {yt}\nP: {yc}',
-            fontdict=font, transform=ax.transAxes,
-            bbox=dict(facecolor='white', alpha=0.5), color='black',
-            horizontalalignment='left', verticalalignment='bottom')
-    return plt
-
-
 def validateAll(sess, ds, batch_size, dset):
     """Return number of correct and total features.
 
@@ -60,6 +34,31 @@ def validateAll(sess, ds, batch_size, dset):
 
     ds.reset(dset)
     return correct, total
+
+
+def plotWrongClassifications(meta, num_cols):
+    font = dict(color='white', alpha=0.5, size=16, weight='normal')
+
+    if len(meta) % num_cols == 0:
+        num_rows = len(meta) // num_cols
+    else:
+        num_rows = len(meta) // num_cols + 1
+
+    plt.figure(figsize=(3 * num_cols, 3 * num_rows))
+    gs1 = gridspec.GridSpec(num_rows, num_cols)
+    gs1.update(wspace=0.01, hspace=0.01)
+
+    for i, (x, yt, yc, uuid) in enumerate(meta):
+        ax = plt.subplot(gs1[i])
+        plt.imshow(x)
+        plt.axis('off')
+        ax.set_aspect('equal')
+        plt.text(
+            0.05, 0.05, f'T: {yt}\nP: {yc}',
+            fontdict=font, transform=ax.transAxes,
+            bbox=dict(facecolor='white', alpha=0.5), color='black',
+            horizontalalignment='left', verticalalignment='bottom')
+    return plt
 
 
 def gatherWrongClassifications(sess, ds, batch_size, dset):
@@ -174,7 +173,7 @@ def main():
 
     # Find some images that could not be classified and plot them.
     meta = gatherWrongClassifications(sess, ds, batch_size=16, dset='test')
-    h = plotWrongClassifications(meta[:40])
+    h = plotWrongClassifications(meta[:16], 4)
     h.savefig('/tmp/wrong.png', **opts)
 
     # Show the figures on screen.
