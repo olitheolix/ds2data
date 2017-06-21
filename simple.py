@@ -1,3 +1,4 @@
+import pickle
 import tflogger
 import data_loader
 import numpy as np
@@ -243,7 +244,7 @@ def main():
     print()
     try:
         cost = []
-        for epoch in range(3):
+        for epoch in range(1):
             logAccuracy(sess, ds, batch_size, epoch, tflog)
             trainEpoch(sess, ds, batch_size, opt, tflog, epoch)
             # saver.save(sess, "/tmp/model.ckpt")
@@ -253,18 +254,22 @@ def main():
     # Print accuracy after last training cycle.
     logAccuracy(sess, ds, batch_size, epoch + 1, tflog)
 
-    cost = [v for k, v in sorted(tflog.data['f32']['Cost'].items())]
-    acc_trn = [v for k, v in sorted(tflog.data['f32']['acc_train'].items())]
-    acc_tst = [v for k, v in sorted(tflog.data['f32']['acc_test'].items())]
+    tflog.save('/tmp/tflog.log')
+    del tflog
+    logdata = pickle.load(open('/tmp/tflog.log', 'rb'))
 
-    # plt.figure()
-    # plt.plot(np.concatenate(cost))
+    cost = [v for k, v in sorted(logdata['f32']['Cost'].items())]
+    acc_trn = [v for k, v in sorted(logdata['f32']['acc_train'].items())]
+    acc_tst = [v for k, v in sorted(logdata['f32']['acc_test'].items())]
 
-    # plt.figure()
-    # acc_trn = np.concatenate(acc_trn)
-    # acc_tst = np.concatenate(acc_tst)
-    # acc = np.vstack([acc_trn, acc_tst]).T
-    # plt.plot(acc)
+    plt.figure()
+    plt.plot(np.concatenate(cost))
+
+    plt.figure()
+    acc_trn = np.concatenate(acc_trn)
+    acc_tst = np.concatenate(acc_tst)
+    acc = np.vstack([acc_trn, acc_tst]).T
+    plt.plot(acc)
 
     meta = gatherWrongClassifications(sess, ds, batch_size, 'test')
     h = plotWrongClassifications(meta[:40])
