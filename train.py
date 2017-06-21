@@ -1,4 +1,6 @@
+import os
 import model
+import datetime
 import tflogger
 import validation
 import data_loader
@@ -79,6 +81,19 @@ def main():
     tflog = tflogger.TFLogger(sess)
     model_saver = tf.train.Saver()
 
+    # Ensure the directory for the checkpoint files exists.
+    dst_dir = os.path.dirname(os.path.abspath(__file__))
+    dst_dir = os.path.join(dst_dir, 'saved')
+    os.makedirs(dst_dir, exist_ok=True)
+
+    # Compile file name for saved model.
+    d = datetime.datetime.now()
+    ts = f'{d.year}-{d.month:02d}-{d.day:02d}'
+    ts += f'-{d.hour:02d}-{d.minute:02d}-{d.second:02d}'
+    fname_tf = os.path.join(dst_dir, f'model-{ts}.ckpt')
+    fname_log = os.path.join(dst_dir, f'log-{ts}.pickle')
+    del d, ts
+
     # Train the network for several epochs.
     print()
     best = -1
@@ -89,7 +104,7 @@ def main():
             # model if its test accuracy sets a new record.
             _, accuracy_tst = logAccuracy(sess, ds, batch_size, epoch, tflog)
             if accuracy_tst > best:
-                model_saver.save(sess, 'model.ckpt')
+                model_saver.save(sess, fname_tf)
                 best = accuracy_tst
 
             # Train the model for a full epoch.
@@ -99,7 +114,7 @@ def main():
 
     # Print accuracy after last training cycle.
     logAccuracy(sess, ds, batch_size, epoch + 1, tflog)
-    tflog.save('/tmp/tflog.log')
+    tflog.save(fname_log)
 
 
 if __name__ == '__main__':
