@@ -1,6 +1,18 @@
+""" Log values.
+
+The purpose of this convenience class is make logging simpler. Instead of
+passing variables or arrays around, only a single instance of TFLogger is
+required. To log a value, used
+
+>> log = TFLogger()
+>> log.f32(name='foo', step=1, value=10.5)
+
+This will create a new Tensorboard variable and log it. Furthermore, all values
+are accessible in the `log.data` structure, for instance
+`log.data['f32']['foo']` in the previous example.
+"""
 import pickle
 import collections
-import numpy as np
 import tensorflow as tf
 
 
@@ -20,6 +32,7 @@ class TFLogger:
         self.summary = {}
 
     def f32(self, name, step, value):
+        """Log the variable."""
         ph = self.placeholder['f32']
         if name not in self.summary:
             self.summary[name] = tf.summary.scalar(name, ph)
@@ -32,35 +45,6 @@ class TFLogger:
         data = self.sess.run(self.summary[name], feed_dict={ph: value})
         self.log_writer.add_summary(data, step)
 
-    def filter(self, name, step, img):
-        ph = self.placeholder['img']
-        if name not in self.summary:
-            self.summary[name] = tf.summary.image(name, ph, max_outputs=1)
-
-        data = self.sess.run(self.summary[name], feed_dict={ph: img})
-        self.log_writer.add_summary(data, step)
-
     def save(self, fname):
+        """Save a pickled version of the data to `fname`."""
         pickle.dump(self.data, open(fname, 'wb'))
-
-
-def main():
-    # Start TF and let it dump its log messages to the terminal.
-    sess = tf.Session()
-    sess.run(tf.global_variables_initializer())
-
-    log = TFLogger(sess)
-    for step in range(10):
-        img = np.eye(2)
-        img = np.expand_dims(img, axis=2)
-        img = np.expand_dims(img, axis=0)
-        img = img.astype(np.uint8)
-        log.f32('foox1', step, 1 * step)
-        log.f32('foox2', step, 2 * step)
-        log.filter('img2x2', step, step * 20 * img)
-
-    print(log.data['f32']['foox2'])
-
-
-if __name__ == '__main__':
-    main()
