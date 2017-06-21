@@ -148,30 +148,40 @@ def main():
 
     opts = dict(dpi=100, transparent=True, bbox_inches='tight')
 
-    # Show the cost.
-    plt.figure()
-    plt.plot(np.concatenate(cost))
-    plt.grid()
-    plt.title('Cost')
-    plt.xlabel('Batch')
-    plt.ylim(0, plt.ylim()[1])
-    plt.savefig('/tmp/cost.png', **opts)
+    # Temporary Matplotlib settings to produce plots that work on the Blog.
+    rc = {
+        'axes.edgecolor': 'white', 'xtick.color': 'white',
+        'ytick.color': 'white', 'figure.facecolor': 'gray',
+        'axes.labelcolor': 'green', 'axes.facecolor': 'black',
+        'legend.facecolor': 'white'
+    }
 
-    # Show the test- and training accuracy.
-    plt.figure()
-    acc_trn = np.concatenate(acc_trn)
-    acc_tst = np.concatenate(acc_tst)
-    plt.plot(acc_trn, label='Traning Data')
-    plt.plot(acc_tst, label='Test Data')
-    plt.xlabel('Epoch')
-    plt.ylabel('Percent')
-    plt.ylim(0, 100)
-    plt.grid()
-    plt.legend(loc='best')
-    plt.title('Accuracy in Percent')
-    plt.savefig('/tmp/accuracy.png', **opts)
+    # Show the cost over batches.
+    with plt.rc_context(rc):
+        plt.figure()
+        plt.plot(np.concatenate(cost))
+        plt.grid()
+        plt.title('Cost', color='white')
+        plt.xlabel('Batch', color='white')
+        plt.ylim(0, plt.ylim()[1])
+        plt.savefig('/tmp/cost.png', **opts)
 
-    # Find some images that could not be classified and plot them.
+    # Test- and training accuracy over epochs.
+    with plt.rc_context(rc):
+        plt.figure()
+        acc_trn = np.concatenate(acc_trn)
+        acc_tst = np.concatenate(acc_tst)
+        plt.plot(acc_trn, label='Traning Data')
+        plt.plot(acc_tst, label='Test Data')
+        plt.xlabel('Epoch', color='white')
+        plt.ylabel('Percent', color='white')
+        plt.ylim(0, 100)
+        plt.grid()
+        plt.legend(loc='best')
+        plt.title('Accuracy in Percent', color='white')
+        plt.savefig('/tmp/accuracy.png', **opts)
+
+    # Show some mis-labelled images.
     meta = gatherWrongClassifications(sess, ds, batch_size=16, dset='test')
     h = plotWrongClassifications(meta[:16], 4)
     h.savefig('/tmp/wrong.png', **opts)
