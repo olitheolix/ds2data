@@ -10,9 +10,10 @@ MetaData = collections.namedtuple('MetaData', 'filename label name')
 
 
 class DataSet:
-    def __init__(self, train=0.8, seed=None, labels=all, N=None):
+    def __init__(self, train=0.8, seed=None, labels=all, N=None, conf=None):
         assert 0 <= train <= 1
         self.train = train
+        self.conf = conf or {}
         if seed is not None:
             np.random.seed(seed)
 
@@ -214,19 +215,32 @@ class DataSet:
 
 class DS2(DataSet):
     def loadRawData(self, labels, N):
-        dims = (3, 128, 128)
-        dims = (3, 32, 32)
+        # Original attributes of the images in the DS2 dataset.
+        col_fmt = 'RGB'
+        width, height = 128, 128
 
-        # The data set contains 10 labels (one for each digit, like MNIST).
+        if 'size' in self.conf:
+            width, height = self.conf['size']
+        if 'colour_format' in self.conf:
+            col_fmt = self.conf.get['colour_format']
+
+        # The size of the returned images.
+        dims = (3, height, width)
+
+        # The data set contains 11 labels: ten digits (0-9), and 'background'.
         label2name = {_: str(_) for _ in range(10)}
         label2name[len(label2name)] = 'background'
+
+        # Reduce the label set as specified by `labels` argument.
         labels = set(label2name.values()) if labels is all else set(labels)
         assert labels.intersection(set(label2name.values())) == labels
         label2name = {k: v for k, v in label2name.items() if v in labels}
 
+        # Location to data folder.
         data_path = os.path.dirname(os.path.abspath(__file__))
         data_path = os.path.join(data_path, 'data', 'training')
 
+        # Iterate over all labels. Each label must reside in its own directory.
         all_labels, all_features, meta = [], [], []
         for label_mr, label_hr in sorted(label2name.items()):
             ftype = f'{data_path}/{label_mr:02d}/*.'
@@ -238,8 +252,9 @@ class DS2(DataSet):
             for i, fname in enumerate(fnames[:N]):
                 # Convert to correct colour format, then resize.
                 img = Image.open(fname)
-                img = img.convert('RGB')
-                img = img.resize((dims[2], dims[1]), Image.BILINEAR)
+                img = img.convert(col_fmt)
+                if img.size != (width, height):
+                    img = img.resize((width, height), Image.BILINEAR)
 
                 # Store the flattened image alongside its label.
                 img = np.array(img, np.uint8)
@@ -252,9 +267,9 @@ class DS2(DataSet):
                 all_labels.append(label_mr)
                 all_features.append(img)
                 meta.append(MetaData(fname, label_mr, label_hr))
+
+        # Ensure that everything is a proper NumPy array.
         all_features = np.array(all_features, np.uint8)
         all_labels = np.array(all_labels, np.int32)
-        return all_features, all_labels, dims, label2name, meta
-
 
         return all_features, all_labels, dims, label2name, meta
