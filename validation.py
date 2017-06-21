@@ -128,8 +128,8 @@ def main():
     print()
 
     # Load the data.
-    ds = data_loader.DS2(train=0.8, N=None)
-    ds.summary()
+    ds = data_loader.DS2(train=0.8, N=None, seed=0)
+    ds.printSummary()
 
     # Build and initialise the network graph.
     model.createNetwork(ds.imageDimensions(), len(ds.classNames()))
