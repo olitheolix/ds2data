@@ -1,3 +1,5 @@
+""" A uniform interface to request images.
+"""
 import os
 import glob
 import collections
@@ -10,6 +12,19 @@ MetaData = collections.namedtuple('MetaData', 'filename label name')
 
 
 class DataSet:
+    """ Provide images in a unified manner.
+
+    This is an API class to split and supply images in a randomised fashion.
+    Sub-classes must overload the `loadRawData` to load the images of interest.
+
+    Args:
+        train (float): ratio of training and test data.
+        seed (int): seed for random generator
+        labels (list): Either `all` or a sub-set of labels.
+        N (int): limit the number of entries for each label to N images.
+        conf (dict): custom parameters to configure the sub-classes. This base
+            class does not use it.
+    """
     def __init__(self, train=0.8, seed=None, labels=all, N=None, conf=None):
         assert 0 <= train <= 1
         self.train = train
@@ -37,10 +52,12 @@ class DataSet:
         # Convert the flattened images to floating point vectors.
         x = np.array(x, np.float32) / 255
 
+        # Remap the labels if the are do not form a [0, 1, 2, ...] sequence.
         label2name, y = self.remapLabels(label2name, y)
         if N is not None:
             x, y, meta = self.limitSampleSize(x, y, meta, N)
 
+        # Store the pre-processed labels.
         self.meta = meta
         self.features = x
         self.labels = y
@@ -55,6 +72,7 @@ class DataSet:
         self.reset()
 
     def printSummary(self):
+        """Print a summary to screen."""
         print('Data Set Summary:')
         for dset in self.handles:
             name = dset.capitalize()
@@ -66,6 +84,14 @@ class DataSet:
         print(f'  Dimensions: {d} x {h} x {w}')
 
     def reset(self, dset=None):
+        """Reset the epoch for `dset`.
+
+        After this, a call to getNextBatch will start served images from the
+        start of the epoch again.
+
+        Args:
+            dset (str): either 'test' or 'train'. If None, both will be reset.
+        """
         if dset is None:
             self.ofs = {k: 0 for k in self.ofs}
         else:
@@ -73,27 +99,39 @@ class DataSet:
             self.ofs[dset] = 0
 
     def classNames(self):
+        """ Return the machine/human readable labels"""
         return dict(self.label2name)
 
     def lenOfEpoch(self, dset):
+        """Return number of `dset` images in a full epoch."""
         assert dset in self.handles, f'Unknown data set <{dset}>'
         return len(self.handles[dset])
 
     def posInEpoch(self, dset):
+        """Return position in current `dset` epoch."""
         assert dset in self.ofs, f'Unknown data set <{dset}>'
         return self.ofs[dset]
 
     def imageDimensions(self):
+        """Return image dimensions, eg (3, 64, 64)"""
         return np.array(self.image_dims, np.uint32)
 
     def limitSampleSize(self, x, y, meta, N):
+        """Remove all classes except those in `keep_labels`
+
+        NOTE: This operation is irreversible. To recover the original sample
+        you must instantiate the class anew.
+        """
         assert len(x) == len(y)
         N = int(np.clip(N, 0, len(y)))
         if N == 0:
             return x[:0], y[:0], meta[:0]
 
+        # Determine how many images there are for each label, and cap it at N.
         cnt = collections.Counter(y.tolist())
         cnt = {k: min(N, v) for k, v in cnt.items()}
+
+        # Allocate the array that will hold the reduced feature/label/meta set.
         num_out = sum(cnt.values())
         dim_x = list(x.shape)
         dim_x[0] = num_out
@@ -101,21 +139,28 @@ class DataSet:
         y_out = np.zeros(num_out, y.dtype)
         m_out = [None] * num_out
 
+        # Remove all labels for which we have no features to begin with (ie.
+        # this is a lousy data set).
         for v in cnt:
             if cnt[v] == 0:
                 del cnt[v]
 
+        # Loop over the features until we reach the correct quota for each label.
         out_idx, in_idx = 0, -1
         while len(cnt) > 0:
             in_idx += 1
+
+            # Skip if we do not need any more features with this label.
             label = y[in_idx]
             if label not in cnt:
                 continue
 
+            # Reduce the quota for this label.
             cnt[label] -= 1
             if cnt[label] == 0:
                 del cnt[label]
 
+            # Add the feature/label/metadata to the new pool.
             x_out[out_idx] = x[in_idx]
             y_out[out_idx] = y[in_idx]
             m_out[out_idx] = meta[in_idx]
@@ -123,7 +168,7 @@ class DataSet:
         return x_out, y_out, m_out
 
     def remapLabels(self, label2name, y):
-        """Remove all classes except those in `keep_labels`
+        """Ensure the labels are [0, 1, 2, ...] without gaps.
 
         NOTE: This operation is irreversible. To recover the original sample
         you must instantiate the class anew.
@@ -144,6 +189,7 @@ class DataSet:
         return label2name, y
 
     def show(self, handle=0):
+        """Plot the image with id `handle`."""
         assert 0 <= handle < len(self.handles)
 
         m_label = self.labels[handle]
@@ -157,6 +203,12 @@ class DataSet:
         plt.show()
 
     def nextBatch(self, N, dset):
+        """Return next batch of `N` from `dset`.
+
+        If fewer than `N` features are left in the epoch, than return those.
+        Will return empty lists if no more images are left in the epoch. Call
+        `reset` to reset the epoch.
+        """
         assert N >= 0
         assert dset in self.handles, f'Unknown data set <{dset}>'
 
