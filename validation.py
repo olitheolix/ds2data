@@ -13,7 +13,7 @@ import matplotlib.gridspec as gridspec
 
 
 def validateAll(sess, ds, batch_size, dset):
-    """Return number of correct and total features.
+    """ Return number of correct and total features.
 
     NOTE: this method will modify the data offset inside `ds`.
 
@@ -26,9 +26,11 @@ def validateAll(sess, ds, batch_size, dset):
     g = tf.get_default_graph().get_tensor_by_name
     features, labels = g('x_in:0'), g('y_in:0')
 
+    # Reset the data set and get the first batch.
     ds.reset(dset)
     x, y, _ = ds.nextBatch(batch_size, dset=dset)
 
+    # Predict and compare the labels for all images in the set.
     correct = total = 0
     while len(y) > 0:
         total += len(y)

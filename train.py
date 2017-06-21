@@ -1,3 +1,5 @@
+""" Train the DNN model and save weights and log data to saved/ folder.
+"""
 import os
 import model
 import datetime
@@ -9,15 +11,16 @@ import numpy as np
 import tensorflow as tf
 
 
-def computeLearningRate(lr_min, lr_max, acc):
-    # Return learning rate based on `acc`.
-    k = (10 / 3) * (lr_min - lr_max)
-    d = lr_min - k
-    return np.clip(k * acc + d, lr_min, lr_max)
+def logAccuracy(sess, ds, batch_size, log, epoch):
+    """ Print and return the accuracy for _all_ training/test data.
 
-
-def logAccuracy(sess, ds, batch_size, epoch, log):
-    """ Print the current accuracy for _all_ training/test data."""
+    Args:
+        sess: Tensorflow session
+        ds: handle to DataSet instance.
+        batch_size (int): batch size
+        log (TFLogger): instantiated TFLogger
+        epoch (int): current epoch
+    """
     correct, total = validation.validateAll(sess, ds, batch_size, 'test')
     rat_tst = 100 * (correct / total)
     status = f'      Test {rat_tst:4.1f}% ({correct: 5,} / {total: 5,})'
@@ -32,11 +35,19 @@ def logAccuracy(sess, ds, batch_size, epoch, log):
     return rat_trn, rat_tst
 
 
-def trainEpoch(sess, ds, batch_size, optimiser, log, epoch):
+def trainEpoch(sess, ds, batch_size, log, epoch, optimiser):
     """Train the network for one full epoch.
 
+    Args:
+        sess: Tensorflow session
+        ds: handle to DataSet instance.
+        batch_size (int): batch size
+        log (TFLogger): instantiated TFLogger
+        epoch (int): current epoch
+        optimiser: the optimiser node in graph.
+
     Returns:
-        (int): number of batches until data was exhausted.
+        None
     """
     g = tf.get_default_graph().get_tensor_by_name
     x_in, y_in, learn_rate = g('x_in:0'), g('y_in:0'), g('learn_rate:0')
@@ -45,7 +56,8 @@ def trainEpoch(sess, ds, batch_size, optimiser, log, epoch):
     # Validate the performance on the entire test data set.
     cor_tot, total = validation.validateAll(sess, ds, batch_size, 'test')
 
-    lrate = computeLearningRate(1E-5, 1E-4, cor_tot / total)
+    # Adjust the learning rate according to the accuracy.
+    lrate = np.interp(cor_tot / total, [0.0, 0.5, 1.0], [1E-4, 1E-4, 1E-5])
 
     # Train for one full epoch.
     ds.reset('train')
@@ -66,7 +78,7 @@ def main():
     sess = tf.Session()
     print()
 
-    batch_size, num_epochs = 16, 1000
+    batch_size, num_epochs = 16, 1
 
     # Load the data.
     conf = dict(size=(32, 32), col_fmt='RGB')
@@ -79,7 +91,7 @@ def main():
     opt = model.createNetwork(dims, num_classes)
     sess.run(tf.global_variables_initializer())
 
-    tflog = tflogger.TFLogger(sess)
+    log = tflogger.TFLogger(sess)
     model_saver = tf.train.Saver()
 
     # Ensure the directory for the checkpoint files exists.
@@ -103,19 +115,19 @@ def main():
         for epoch in range(num_epochs):
             # Determine the accuracy for test- and training set. Save the
             # model if its test accuracy sets a new record.
-            _, accuracy_tst = logAccuracy(sess, ds, batch_size, epoch, tflog)
+            _, accuracy_tst = logAccuracy(sess, ds, batch_size, log, epoch)
             if accuracy_tst > best:
                 model_saver.save(sess, fname_tf)
                 best = accuracy_tst
 
             # Train the model for a full epoch.
-            trainEpoch(sess, ds, batch_size, opt, tflog, epoch)
+            trainEpoch(sess, ds, batch_size, log, epoch, opt)
     except KeyboardInterrupt:
         pass
 
     # Print accuracy after last training cycle.
-    logAccuracy(sess, ds, batch_size, epoch + 1, tflog)
-    tflog.save(fname_log)
+    logAccuracy(sess, ds, batch_size, log, epoch + 1)
+    log.save(fname_log)
 
 
 if __name__ == '__main__':

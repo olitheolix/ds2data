@@ -1,17 +1,31 @@
+"""
+Build a DNN with two convolution layers and one dense layer.
+"""
 import tensorflow as tf
 
 
 def weights(shape, name=None):
+    """Convenience function to construct weight tensors."""
     init = tf.truncated_normal(stddev=0.1, shape=shape, dtype=tf.float32)
     return tf.Variable(init, name=name)
 
 
 def bias(shape, name=None):
+    """Convenience function to construct bias tensors."""
     init = tf.constant(value=0.0, shape=shape, dtype=tf.float32)
     return tf.Variable(init, name=name)
 
 
 def createNetwork(dims, num_classes):
+    """ Build DNN and return optimisation node.
+
+    Args:
+        dims (list): depth, width, height of the input
+        num_classes (int): number of output neurons
+
+    Returns:
+        Tensorflow node that corresponds to the cost optimiser.
+    """
     depth, width, height = dims.tolist()
 
     # Features/labels.
