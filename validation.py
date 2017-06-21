@@ -1,3 +1,5 @@
+import os
+import glob
 import model
 import pickle
 import data_loader
@@ -93,26 +95,52 @@ def gatherWrongClassifications(sess, ds, batch_size, dset):
     return meta
 
 
+def loadLatestModelAndLogData(sess):
+    # Find the most recent checkpoint file.
+    dst_dir = os.path.dirname(os.path.abspath(__file__))
+    dst_dir = os.path.join(dst_dir, 'saved')
+    fnames = glob.glob(f'{dst_dir}/model-*.ckpt.meta')
+
+    if len(fnames) == 0:
+        print(f'Could not find any saved models in {dst_dir}')
+        return None
+
+    # To find the most recent files we merely need to sort them because all
+    # names contain a timestamp string of the form 'yyyy-mm-dd-hh-mm-ss'.
+    fnames.sort()
+    fname = fnames[-1]
+
+    # Extract just the time stamp. To do that, first strip off the trailing
+    # '.ckpt.meta' (ten characters long), then slice out the time stamp (19
+    # characters long).
+    ts = fname[:-10][-19:]
+
+    print(f'Loading dataset from {ts}')
+    tf.train.Saver().restore(sess, f'{dst_dir}/model-{ts}.ckpt')
+    logdata = pickle.load(open(f'{dst_dir}/log-{ts}.pickle', 'rb'))
+
+    return logdata
+
+
 def main():
     # Start TF and let it dump its log messages to the terminal.
     sess = tf.Session()
     print()
 
-    batch_size = 16
-
     # Load the data.
     ds = data_loader.DS2(train=0.8, N=None)
     ds.summary()
-    dims = ds.imageDimensions()
-    num_classes = len(ds.classNames())
 
-    # Build the network graph.
-    model.createNetwork(dims, num_classes)
+    # Build and initialise the network graph.
+    model.createNetwork(ds.imageDimensions(), len(ds.classNames()))
     sess.run(tf.global_variables_initializer())
 
-    tf.train.Saver().restore(sess, 'model.ckpt')
-    logdata = pickle.load(open('/tmp/tflog.log', 'rb'))
+    # Restore the weights and fetch the log data.
+    logdata = loadLatestModelAndLogData(sess)
+    if logdata is None:
+        return
 
+    # Extract the cost and training/test accuracies from the log data.
     cost = [v for k, v in sorted(logdata['f32']['Cost'].items())]
     acc_trn = [v for k, v in sorted(logdata['f32']['acc_train'].items())]
     acc_tst = [v for k, v in sorted(logdata['f32']['acc_test'].items())]
