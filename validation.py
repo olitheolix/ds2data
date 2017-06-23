@@ -172,7 +172,7 @@ def main():
 
     # Load the data.
     conf = dict(size=(32, 32), col_fmt='RGB')
-    ds = data_loader.DS2(train=0.8, N=None, seed=0, conf=conf)
+    ds = data_loader.DS2(train=1.0, N=None, seed=0, conf=conf)
     print()
     ds.printSummary()
 
@@ -184,6 +184,11 @@ def main():
     logdata = loadLatestModelAndLogData(sess)
     if logdata is None:
         return
+
+    # Assess performance on entire data set.
+    correct, total = validateAll(sess, ds, batch_size=50, dset='train')
+    rat = 100 * (correct / total)
+    print(f'Accuracy: {rat:.1f}  ({correct:,} / {total:,})')
 
     # Extract the cost and training/test accuracies from the log data.
     cost = [v for k, v in sorted(logdata['f32']['Cost'].items())]
@@ -227,7 +232,7 @@ def main():
         plt.savefig('/tmp/accuracy.png', **opts)
 
     # Show some of the mislabelled images.
-    meta = gatherWrongClassifications(sess, ds, batch_size=16, dset='test')
+    meta = gatherWrongClassifications(sess, ds, batch_size=16, dset='train')
     h = plotWrongClassifications(meta[:16], 4)
     h.savefig('/tmp/wrong.png', **opts)
 
