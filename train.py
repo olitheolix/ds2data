@@ -108,7 +108,7 @@ def main():
     del d, ts
 
     # Train the network for several epochs.
-    print(f'\nWill train for {num_epochs} epochs')
+    print(f'\nWill train for {num_epochs:,} epochs')
     try:
         # Train the model for several epochs.
         best = -1
