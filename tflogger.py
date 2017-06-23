@@ -29,6 +29,7 @@ class TFLogger:
             'f32': tf.placeholder(tf.float32, name='tflogger_f32'),
         }
         self.data = {}
+        self.step = {}
         self.summary = {}
 
     def f32(self, name, step, value):
@@ -38,8 +39,13 @@ class TFLogger:
             self.summary[name] = tf.summary.scalar(name, ph)
             if 'f32' not in self.data:
                 self.data['f32'] = {}
+                self.step['f32'] = {}
             self.data['f32'][name] = collections.defaultdict(list)
+            self.step['f32'][name] = 0
 
+        if step is None:
+            step = self.step['f32'][name]
+            self.step['f32'][name] += 1
         self.data['f32'][name][step].append(value)
 
         data = self.sess.run(self.summary[name], feed_dict={ph: value})
