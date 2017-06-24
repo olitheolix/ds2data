@@ -118,7 +118,7 @@ def bias(shape, name=None):
 #     return opt
 
 
-def netConv2Maxpool(x_img, num_classes, dense_N=32):
+def netConv2Maxpool(x_img, num_classes, num_dense=32):
     """ Build DNN and return optimisation node.
 
     The mode comprises 2 convolution layers and one dense layer.
@@ -170,17 +170,17 @@ def netConv2Maxpool(x_img, num_classes, dense_N=32):
         conv2_flat = tf.reshape(conv2_pool, [-1, width * height * num_filters])
 
         # Dense Layer
-        # Shape: [-1, 64 * 16 * 16] ---> [-1, dense_N]
-        bd = bias([dense_N], 'bd')
-        Wd = weights([width * height * num_filters, dense_N], 'Wd')
+        # Shape: [-1, 64 * 16 * 16] ---> [-1, num_dense]
+        bd = bias([num_dense], 'bd')
+        Wd = weights([width * height * num_filters, num_dense], 'Wd')
         dense = tf.nn.relu(tf.matmul(conv2_flat, Wd) + bd)
 
         # Apply dropout.
         dense_drop = tf.nn.dropout(dense, keep_prob=kp)
 
         # Output Layer
-        # Shape: [-1, dense_N) ---> [-1, num_labels]
-        W_out, b_out = weights([dense_N, num_classes]), bias([num_classes])
+        # Shape: [-1, num_dense) ---> [-1, num_labels]
+        W_out, b_out = weights([num_dense, num_classes]), bias([num_classes])
         return tf.matmul(dense_drop, W_out) + b_out
 
 
