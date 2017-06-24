@@ -10,23 +10,25 @@ import data_loader
 import numpy as np
 import tensorflow as tf
 
+from config import NetConf
 
-def logAccuracy(sess, ds, batch_size, log, epoch):
+
+def logAccuracy(sess, ds, conf, log, epoch):
     """ Print and return the accuracy for _all_ training/test data.
 
     Args:
         sess: Tensorflow session
         ds: handle to DataSet instance.
-        batch_size (int): batch size
+        conf (tuple): NetConf instance.
         log (TFLogger): instantiated TFLogger
         epoch (int): current epoch
     """
-    correct, total = validation.validateAll(sess, ds, batch_size, 'test')
+    correct, total = validation.validateAll(sess, ds, conf.batch_size, 'test')
     rat_tst = 100 * (correct / total)
     status = f'      Test {rat_tst:4.1f}% ({correct: 5,} / {total: 5,})'
     log.f32('acc_test', epoch, rat_tst)
 
-    correct, total = validation.validateAll(sess, ds, batch_size, 'train')
+    correct, total = validation.validateAll(sess, ds, conf.batch_size, 'train')
     rat_trn = 100 * (correct / total)
     status += f'        Train {rat_trn:4.1f}% ({correct: 5,} / {total: 5,})'
     log.f32('acc_train', epoch, rat_trn)
@@ -35,13 +37,13 @@ def logAccuracy(sess, ds, batch_size, log, epoch):
     return rat_trn, rat_tst
 
 
-def trainEpoch(sess, ds, batch_size, log, epoch, optimiser):
+def trainEpoch(sess, ds, conf, log, epoch, optimiser):
     """Train the network for one full epoch.
 
     Args:
         sess: Tensorflow session
         ds: handle to DataSet instance.
-        batch_size (int): batch size
+        conf (tuple): NetConf instance.
         log (TFLogger): instantiated TFLogger
         epoch (int): current epoch
         optimiser: the optimiser node in graph.
@@ -54,7 +56,7 @@ def trainEpoch(sess, ds, batch_size, log, epoch, optimiser):
     cost = tf.get_default_graph().get_tensor_by_name('inference/cost:0')
 
     # Validate the performance on the entire test data set.
-    cor_tot, total = validation.validateAll(sess, ds, batch_size, 'test')
+    cor_tot, total = validation.validateAll(sess, ds, conf.batch_size, 'test')
 
     # Adjust the learning rate according to the accuracy.
     lrate = np.interp(cor_tot / total, [0.0, 0.3, 1.0], [1E-3, 1E-4, 1E-5])
@@ -63,7 +65,7 @@ def trainEpoch(sess, ds, batch_size, log, epoch, optimiser):
     ds.reset('train')
     while ds.posInEpoch('train') < ds.lenOfEpoch('train'):
         # Fetch data, compile feed dict, and run optimiser.
-        x, y, _ = ds.nextBatch(batch_size, dset='train')
+        x, y, _ = ds.nextBatch(conf.batch_size, dset='train')
         fd = {x_in: x, y_in: y, learn_rate: lrate}
         sess.run(optimiser, feed_dict=fd)
 
@@ -76,12 +78,14 @@ def main():
     sess = tf.Session()
     print()
 
-    batch_size, num_epochs = 16, 10000
+    num_epochs = 10000
 
-    # Load the data.
-    conf = dict(size=(32, 32), col_fmt='RGB', seed=0)
-    conf = dict(size=(64, 64), col_fmt='L', seed=0)
-    conf = dict(size=(32, 32), col_fmt='L', seed=0)
+    # Network configuration.
+    conf = NetConf(
+        width=32, height=32, colour='L', seed=0, num_trans_regions=20,
+        num_dense=32, keep_net=0.9, keep_trans=0.9, batch_size=16
+    )
+
     ds = data_loader.DS2(train=0.8, N=None, seed=0, conf=conf)
     ds.printSummary()
     dims = ds.imageDimensions()
@@ -92,14 +96,10 @@ def main():
     y_in = tf.placeholder(tf.int32, [None], name='y_in')
 
     # Add transformer network.
-    use_transformer = True
-    if use_transformer:
-        x_pre = model.spatialTransformer(x_in, num_regions=20)
-    else:
-        x_pre = x_in
+    x_pre = model.spatialTransformer(x_in, num_regions=conf.num_trans_regions)
 
     # Build model and inference nodes.
-    model_out = model.netConv2Maxpool(x_pre, num_classes, dense_N=32)
+    model_out = model.netConv2Maxpool(x_pre, num_classes, num_dense=conf.num_dense)
     model.inference(model_out, y_in)
 
     lr = tf.placeholder(tf.float32, name='learn_rate')
@@ -147,18 +147,18 @@ def main():
         for epoch in range(num_epochs):
             # Determine the accuracy for test- and training set. Save the
             # model if its test accuracy sets a new record.
-            _, accuracy_tst = logAccuracy(sess, ds, batch_size, log, epoch)
+            _, accuracy_tst = logAccuracy(sess, ds, conf, log, epoch)
             if accuracy_tst > best:
                 model_saver.save(sess, fname_tf)
                 best = accuracy_tst
 
             # Train the model for a full epoch.
-            trainEpoch(sess, ds, batch_size, log, epoch, opt)
+            trainEpoch(sess, ds, conf, log, epoch, opt)
     except KeyboardInterrupt:
         pass
 
     # Print accuracy after last training cycle.
-    logAccuracy(sess, ds, batch_size, log, epoch + 1)
+    logAccuracy(sess, ds, conf, log, epoch + 1)
     log.save(fname_log)
 
 

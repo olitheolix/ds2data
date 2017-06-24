@@ -302,20 +302,18 @@ class DS2(DataSet):
     def loadRawData(self, labels, N):
         # Original attributes of the images in the DS2 dataset.
         col_fmt = 'RGB'
-        chan, height, width = 3, 128, 128
 
-        if 'size' in self.conf:
-            width, height = self.conf['size']
-        if 'col_fmt' in self.conf:
-            assert self.conf['col_fmt'].upper() in {'RGB', 'L'}
-            col_fmt = self.conf['col_fmt'].upper()
-            if col_fmt == 'L':
-                chan = 1
+        width = self.conf.width or 128
+        height = self.conf.height or 128
+        col_fmt = self.conf.colour or 'RGB'
+        col_fmt = col_fmt.upper()
+        assert col_fmt in {'RGB', 'L'}
+        chan = 1 if col_fmt == 'L' else 3
 
         # The size of the returned images.
         dims = (chan, height, width)
 
-        # The data set contains 11 labels: ten digits (0-9), and 'background'.
+        # The data set contains 11 labels: ten digits (0-9) and 'background'.
         label2name = {_: str(_) for _ in range(10)}
         label2name[len(label2name)] = 'background'
 
