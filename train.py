@@ -78,15 +78,14 @@ def main():
     sess = tf.Session()
     print()
 
-    num_epochs = 10000
-
     # Network configuration.
     conf = NetConf(
         width=32, height=32, colour='L', seed=0, num_trans_regions=20,
-        num_dense=32, keep_net=0.9, keep_trans=0.9, batch_size=16
+        num_dense=32, keep_net=0.9, keep_trans=0.9, batch_size=16,
+        epochs=2, train=0.8, sample_size=None
     )
 
-    ds = data_loader.DS2(train=0.8, N=None, seed=0, conf=conf)
+    ds = data_loader.DS2(conf=conf)
     ds.printSummary()
     dims = ds.imageDimensions()
     chan, height, width = dims.tolist()
@@ -140,11 +139,11 @@ def main():
         sess.run(tf.get_variable('keep_prob').assign(1.0))
 
     # Train the network for several epochs.
-    print(f'\nWill train for {num_epochs:,} epochs')
+    print(f'\nWill train for {conf.epochs:,} epochs')
     try:
         # Train the model for several epochs.
         best = -1
-        for epoch in range(num_epochs):
+        for epoch in range(conf.epochs):
             # Determine the accuracy for test- and training set. Save the
             # model if its test accuracy sets a new record.
             _, accuracy_tst = logAccuracy(sess, ds, conf, log, epoch)

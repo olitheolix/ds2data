@@ -193,9 +193,10 @@ def main():
     # Load the data.
     conf = NetConf(
         width=32, height=32, colour='L', seed=0, num_trans_regions=20,
-        num_dense=32, keep_net=0.9, keep_trans=0.9, batch_size=16
+        num_dense=32, keep_net=0.9, keep_trans=0.9, batch_size=16,
+        epochs=10000, train=0.8, sample_size=None
     )
-    ds = data_loader.DS2(train=1.0, N=None, seed=0, conf=conf)
+    ds = data_loader.DS2(conf=conf)
     chan, height, width = ds.imageDimensions().tolist()
     num_classes = len(ds.classNames())
     print()
