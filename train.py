@@ -10,10 +10,6 @@ import data_loader
 import numpy as np
 import tensorflow as tf
 
-import matplotlib.pyplot as plt
-from IPython import embed
-
-
 
 def logAccuracy(sess, ds, batch_size, log, epoch):
     """ Print and return the accuracy for _all_ training/test data.
@@ -94,7 +90,6 @@ def main():
 
     x_in = tf.placeholder(tf.float32, [None, chan, height, width], name='x_in')
     y_in = tf.placeholder(tf.int32, [None], name='y_in')
-    assert (chan, height, width) == (1, 32, 32)
 
     # Auxiliary placeholders.
     learn_rate = tf.placeholder(tf.float32, name='learn_rate')
