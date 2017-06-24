@@ -92,7 +92,7 @@ class TestDataset:
         assert ds.posInEpoch('test') == 0
         assert isinstance(x, np.ndarray) and isinstance(y, np.ndarray)
         assert isinstance(handles, np.ndarray)
-        assert x.shape == (1, 2 * 2 * 1) and x.dtype == np.float32
+        assert x.shape == (1, 1, 2, 2) and x.dtype == np.float32
         assert y.shape == (1, ) and y.dtype == np.int32
         assert handles.shape == (1,) and handles.dtype == np.int64
 
@@ -104,7 +104,7 @@ class TestDataset:
 
         # Another query must yield nothing because the epoch is exhausted.
         x, y, _ = ds.nextBatch(1, 'train')
-        assert np.array_equal(x, np.zeros((0, 4)))
+        assert np.array_equal(x, np.zeros((0, 1, 2, 2)))
         assert np.array_equal(y, [])
         assert len(_) == 0
 

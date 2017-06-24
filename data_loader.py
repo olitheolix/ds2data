@@ -14,8 +14,12 @@ MetaData = collections.namedtuple('MetaData', 'filename label name')
 class DataSet:
     """ Provide images in a unified manner.
 
-    This is an API class to split and supply images in a randomised fashion.
+    This is an API class to load images and split them into randomised training
+    and test sets. It also provides a convenient way to supply batches of data.
+
     Sub-classes must overload the `loadRawData` to load the images of interest.
+
+    All images are provide in Tensorflow's NCWH format.
 
     Args:
         train (float): ratio of training and test data.
@@ -36,20 +40,31 @@ class DataSet:
         # method depends on the dataset in question.
         x, y, dims, label2name, meta = self.loadRawData(labels, N)
         assert len(x) == len(y) == len(meta)
+
+        # Images must have three dimensions. The second and third dimensions
+        # correspond to the height and width, respectively, whereas the first
+        # dimensions corresponds to the colour channels and must be either 1
+        # (gray scale) or 3 (RGB).
         dims = np.array(dims, np.uint32)
         assert len(dims) == 3 and dims.shape[0] in [1, 3]
         self.image_dims = dims
 
-        # Sanity checks.
+        # Sanity checks: all images must be NumPy arrays.
         assert isinstance(x, np.ndarray)
         assert isinstance(y, np.ndarray)
         assert x.dtype == np.uint8, x.dtype
         assert y.dtype == np.int32, y.dtype
-        assert x.ndim == 2 and y.ndim == 1
-        assert x.shape[0] == y.shape[0]
-        assert x.shape[1] == np.prod(self.image_dims)
 
-        # Convert the flattened images to floating point vectors.
+        # Sanity check: images must be a 4-D tensor, and there must be as many
+        # labels as there are features (images).
+        assert x.ndim == 4 and y.ndim == 1
+        assert x.shape[0] == y.shape[0]
+
+        # Sanity check: to comply with the NCHW format, the second to fourth
+        # dimension must match the `dims` returned by `loadRawData`.
+        assert all(x.shape[1:] == self.image_dims)
+
+        # Convert the images from uint8 to to floating point.
         x = np.array(x, np.float32) / 255
 
         # Remap the labels if the are do not form a [0, 1, 2, ...] sequence.
@@ -236,11 +251,21 @@ class DataSet:
         return img
 
     def loadRawData(self, labels, N):
-        """Return feature and label vector.
+        """Return feature and label vector for data set of choice.
 
         NOTE: sub-classes must implement this method themselves.
+
+        Returns:
+            features: UInt8 Array[N:chan:height:width]
+                All images in NCHW format
+            labels: Int32 Array[N]
+                The corresponding labels for `features`.
+            dims: Array[4]
+                redundant
+            label2name: dict[int:str]
+                A LUT to translate one-hot labels to human readable string
         """
-        # This base class uses 2x2 images.
+        # This base class uses 2x2 gray scale images.
         dims = (1, 2, 2)
 
         # Compile a dict that maps numeric labels to human readable ones.
@@ -257,7 +282,7 @@ class DataSet:
             label = i % 3
             if label in label2name:
                 name = label2name[label]
-                x.append(i * np.ones(np.prod(dims), np.uint8))
+                x.append(i * np.ones(dims, np.uint8))
                 y.append(label)
                 meta.append(MetaData(f'file_{i}', label, name))
         x = np.array(x, np.uint8)
@@ -277,7 +302,7 @@ class DS2(DataSet):
     def loadRawData(self, labels, N):
         # Original attributes of the images in the DS2 dataset.
         col_fmt = 'RGB'
-        width, height, depth = 128, 128, 3
+        chan, height, width = 3, 128, 128
 
         if 'size' in self.conf:
             width, height = self.conf['size']
@@ -285,10 +310,10 @@ class DS2(DataSet):
             assert self.conf['col_fmt'].upper() in {'RGB', 'L'}
             col_fmt = self.conf['col_fmt'].upper()
             if col_fmt == 'L':
-                depth = 1
+                chan = 1
 
         # The size of the returned images.
-        dims = (depth, height, width)
+        dims = (chan, height, width)
 
         # The data set contains 11 labels: ten digits (0-9), and 'background'.
         label2name = {_: str(_) for _ in range(10)}
@@ -327,13 +352,12 @@ class DS2(DataSet):
                     img = np.expand_dims(img, axis=2)
 
                 # Move the colour dimension to the front, ie convert a
-                # (height x width x cols) image to (cols x height x width).
-                assert img.shape == (dims[1], dims[2], dims[0])
-                img = np.rollaxis(img, 2, 0)
-                assert img.shape == dims
+                # (height x width x chan) image to (chan x height x width).
+                assert img.shape == (height, width, chan)
+                img = np.transpose(img, [2, 0, 1])
+                assert img.shape == dims == (chan, height, width)
 
                 # Store the flattened image alongside its label and meta data.
-                img = img.flatten()
                 all_labels.append(label_mr)
                 all_features.append(img)
                 meta.append(MetaData(fname, label_mr, label_hr))
