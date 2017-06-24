@@ -3,6 +3,8 @@
 import os
 import json
 import model
+import textwrap
+import argparse
 import datetime
 import tflogger
 import validation
@@ -12,6 +14,52 @@ import numpy as np
 import tensorflow as tf
 
 from config import NetConf
+
+
+def parseCmdline():
+    """Parse the command line arguments."""
+    description = textwrap.dedent('''\
+        Train a 2-layer convolutional network on DS2Data.
+        Usage examples:
+          train.py --width 32 --height 32 --colour rgb
+          train.py --colour gray
+    ''')
+
+    # Create a parser and program description.
+    parser = argparse.ArgumentParser(
+        description=description,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    padd = parser.add_argument
+
+    # Add the command line options.
+    padd('--width', metavar='', type=int, default=None, help='Width')
+    padd('--height', metavar='', type=int, default=None, help='height')
+    padd('--colour', metavar='', type=str, default='gray',
+         choices=['rgb', 'gray'], help='Must be [rgb, gray] (default is "gray")')
+    padd('--num-dense', metavar='', type=int, default=64,
+         help='Number of Neurons in dense layer')
+    padd('--num-sptr', metavar='', type=int, default=0,
+         help='Number of spatial transformer regions (0 to deactivate, default)')
+    padd('--batch-size', metavar='', type=int, default=16, help='Batch size')
+    padd('--num-epochs', metavar='', type=int, default=3,
+         help='Number of epochs until training stops')
+    padd('--keep-model', metavar='', type=float, default=0.9,
+         help='Probability to keep neurons connected in classifier network')
+    padd('--keep-spt', metavar='', type=float, default=0.9,
+         help='Probability to keep neurons connected in transformer network')
+    padd('--train-rat', metavar='', type=float, default=0.8,
+         help='Training ratio, eg 0.8 to use 80%% of all samples for training')
+    padd('--num-samples', metavar='N', type=int, default=None,
+         help='Reduce data set to N samples for each label (default: use all)')
+    padd('--seed', metavar='', type=int, default=None,
+         help='Seed value for random number generator')
+
+    # Parse the actual arguments.
+    args = parser.parse_args()
+    args.colour = 'RGB' if args.colour.upper() == 'RGB' else 'L'
+    conf = {field: getattr(args, field) for field in NetConf._fields}
+    return NetConf(**conf)
 
 
 def logAccuracy(sess, ds, conf, log, epoch):
@@ -116,11 +164,10 @@ def main():
         num_dense=32, keep_model=0.9, keep_spt=0.9, batch_size=16,
         num_epochs=2, train_rat=0.8, num_samples=None
     )
+    conf = parseCmdline()
 
     # Load data set and dump some info about it into the terminal.
     ds = data_loader.DS2(conf)
-    print()
-    ds.printSummary()
     chan, height, width = ds.imageDimensions().tolist()
     num_classes = len(ds.classNames())
 
@@ -140,9 +187,11 @@ def main():
     opt = tf.train.AdamOptimizer(learning_rate=lr).minimize(cost)
     del lr
 
-    # Initialise the session and graph.
+    # Initialise the session and graph. Then dump some info into the terminal.
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
+    print()
+    ds.printSummary()
 
     # Initialise Logger and Tensorflow Saver.
     log = tflogger.TFLogger(sess)
