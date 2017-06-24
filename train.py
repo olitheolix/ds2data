@@ -1,6 +1,7 @@
 """ Train the DNN model and save weights and log data to saved/ folder.
 """
 import os
+import json
 import model
 import datetime
 import tflogger
@@ -73,11 +74,42 @@ def trainEpoch(sess, ds, conf, log, epoch, optimiser):
         log.f32('Cost', None, sess.run(cost, feed_dict=fd))
 
 
-def main():
-    # Start TF and let it dump its log messages to the terminal.
-    sess = tf.Session()
-    print()
+def saveState(sess, conf, log, saver):
+    """Save the configuration, Tensorflow model, and log data to disk."""
+    # Ensure the directory for the checkpoint files exists.
+    dst_dir = os.path.dirname(os.path.abspath(__file__))
+    dst_dir = os.path.join(dst_dir, 'saved')
+    os.makedirs(dst_dir, exist_ok=True)
 
+    # Compile time stamp.
+    d = datetime.datetime.now()
+    ts = f'{d.year}-{d.month:02d}-{d.day:02d}'
+    ts += f'-{d.hour:02d}:{d.minute:02d}:{d.second:02d}'
+
+    # File names with time stamp.
+    fname_meta = f'_meta.json'
+    fname_log = f'log-{ts}.pickle'
+    fname_ckpt = f'model-{ts}.ckpt'
+    del d
+
+    # Load meta data.
+    try:
+        meta = json.loads(open(fname_meta, 'r').read())
+    except FileNotFoundError:
+        meta = {}
+
+    # Save the Tensorflow model.
+    saver.save(sess, os.path.join(dst_dir, fname_ckpt))
+
+    # Save the log data (and only the log data, not the entire class).
+    log.save(os.path.join(dst_dir, fname_log))
+
+    # Update the meta information.
+    meta[ts] = {'conf': conf._asdict(), 'checkpoint': fname_ckpt, 'log': fname_log}
+    open(os.path.join(dst_dir, fname_meta), 'w').write(json.dumps(meta))
+
+
+def main():
     # Network configuration.
     conf = NetConf(
         width=32, height=32, colour='L', seed=0, num_trans_regions=20,
@@ -85,53 +117,36 @@ def main():
         epochs=2, train=0.8, sample_size=None
     )
 
-    ds = data_loader.DS2(conf=conf)
+    # Load data set and dump some info about it into the terminal.
+    ds = data_loader.DS2(conf)
+    print()
     ds.printSummary()
-    dims = ds.imageDimensions()
-    chan, height, width = dims.tolist()
+    chan, height, width = ds.imageDimensions().tolist()
     num_classes = len(ds.classNames())
 
+    # Input variables.
     x_in = tf.placeholder(tf.float32, [None, chan, height, width], name='x_in')
     y_in = tf.placeholder(tf.int32, [None], name='y_in')
 
-    # Add transformer network.
+    # Compile the network as specified in `conf`.
     x_pre = model.spatialTransformer(x_in, num_regions=conf.num_trans_regions)
-
-    # Build model and inference nodes.
     model_out = model.netConv2Maxpool(x_pre, num_classes, num_dense=conf.num_dense)
     model.inference(model_out, y_in)
+    del x_in, y_in, chan, height, width, num_classes
 
+    # Create optimiser.
     lr = tf.placeholder(tf.float32, name='learn_rate')
     cost = tf.get_default_graph().get_tensor_by_name('inference/cost:0')
     opt = tf.train.AdamOptimizer(learning_rate=lr).minimize(cost)
     del lr
 
-    # Initialise the graph.
+    # Initialise the session and graph.
+    sess = tf.Session()
     sess.run(tf.global_variables_initializer())
 
     # Initialise Logger and Tensorflow Saver.
     log = tflogger.TFLogger(sess)
-    model_saver = tf.train.Saver()
-
-    # Ensure the directory for the checkpoint files exists.
-    dst_dir = os.path.dirname(os.path.abspath(__file__))
-    dst_dir = os.path.join(dst_dir, 'saved')
-    os.makedirs(dst_dir, exist_ok=True)
-
-    # Compile file name for saved model.
-    d = datetime.datetime.now()
-    ts = f'{d.year}-{d.month:02d}-{d.day:02d}'
-    ts += f'-{d.hour:02d}:{d.minute:02d}:{d.second:02d}'
-    fname_tf = os.path.join(dst_dir, f'model-{ts}.ckpt')
-    fname_log = os.path.join(dst_dir, f'log-{ts}.pickle')
-    fname_meta = os.path.join(dst_dir, f'meta.pickle')
-    del d, ts
-
-    # if os.path.exists(fname_meta):
-    #     meta = pickle.load(open(fname, 'rb'))
-    # else:
-    #     meta = {}
-    # meta[ts] = {'conf': conf}
+    saver = tf.train.Saver()
 
     with tf.variable_scope('model', reuse=True):
         sess.run(tf.get_variable('keep_prob').assign(1.0))
@@ -148,7 +163,6 @@ def main():
             # model if its test accuracy sets a new record.
             _, accuracy_tst = logAccuracy(sess, ds, conf, log, epoch)
             if accuracy_tst > best:
-                model_saver.save(sess, fname_tf)
                 best = accuracy_tst
 
             # Train the model for a full epoch.
@@ -156,9 +170,9 @@ def main():
     except KeyboardInterrupt:
         pass
 
-    # Print accuracy after last training cycle.
+    # Save results.
     logAccuracy(sess, ds, conf, log, epoch + 1)
-    log.save(fname_log)
+    saveState(sess, conf, log, saver)
 
 
 if __name__ == '__main__':

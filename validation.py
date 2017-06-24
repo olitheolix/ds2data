@@ -2,7 +2,8 @@
 Load the most recent network data and produce performance plots.
 """
 import os
-import glob
+import sys
+import json
 import model
 import pickle
 import data_loader
@@ -155,76 +156,46 @@ def plotWrongClassifications(meta, num_cols):
 
 
 def loadLatestModelAndLogData(sess):
-    """Load TF model and return content of TFLogger instance.
+    """Find most recent training result and return its parameters.
 
     Returns:
-        (dict): the log data that was saved alongside the tensorflow variables.
+        conf: NetConf
+            The network configuration
+        log: dict
+            The data from the saved TFlogger instance.
+        fname_chkpt:
+            Name of checkpoint file for Tensorflow.
     """
-    # Find the most recent checkpoint file.
+    # Open the meta file.
     dst_dir = os.path.dirname(os.path.abspath(__file__))
     dst_dir = os.path.join(dst_dir, 'saved')
-    fnames = glob.glob(f'{dst_dir}/model-*.ckpt.meta')
+    fname_meta = os.path.join(dst_dir, '_meta.json')
+    try:
+        meta = json.loads(open(fname_meta, 'r').read())
+    except FileNotFoundError:
+        print(f'\nError: Cannot open {fname_meta}')
+        sys.exit(1)
 
-    if len(fnames) == 0:
-        print(f'Could not find any saved models in {dst_dir}')
-        return None
+    # The JSON file contains a dictionary. The keys of that dictionary are
+    # time stamps. Here we get the most recent entry.
+    latest = list(sorted(meta.keys()))
+    ts = latest[-1]
+    latest = meta[ts]
 
-    # To find the most recent files we merely need to sort them because all
-    # names contain a timestamp string of the form 'yyyy-mm-dd-hh-mm-ss'.
-    fnames.sort()
-    fname = fnames[-1]
+    # File names of log- and checkpoint files.
+    fname_log = latest['log']
+    fname_ckpt = latest['checkpoint']
 
-    # Extract just the time stamp. To do that, first strip off the trailing
-    # '.ckpt.meta' (ten characters long), then slice out the time stamp (19
-    # characters long).
-    ts = fname[:-10][-19:]
-
+    # Unpack the configuration and log data.
     print(f'Loading dataset from {ts}')
-    tf.train.Saver().restore(sess, f'{dst_dir}/model-{ts}.ckpt')
-    logdata = pickle.load(open(f'{dst_dir}/log-{ts}.pickle', 'rb'))
+    conf = NetConf(**latest['conf'])
+    log = pickle.load(open(f'{dst_dir}/{fname_log}', 'rb'))
 
-    return logdata
+    return conf, log, f'{dst_dir}/{fname_ckpt}'
 
 
-def main():
-    # Start TF and let it dump its log messages to the terminal.
-    sess = tf.Session()
-
-    # Load the data.
-    conf = NetConf(
-        width=32, height=32, colour='L', seed=0, num_trans_regions=20,
-        num_dense=32, keep_net=0.9, keep_trans=0.9, batch_size=16,
-        epochs=10000, train=0.8, sample_size=None
-    )
-    ds = data_loader.DS2(conf=conf)
-    chan, height, width = ds.imageDimensions().tolist()
-    num_classes = len(ds.classNames())
-    print()
-    ds.printSummary()
-
-    x_in = tf.placeholder(tf.float32, [None, chan, height, width], name='x_in')
-    y_in = tf.placeholder(tf.int32, [None], name='y_in')
-
-    # Add transformer network.
-    x_pre = model.spatialTransformer(x_in, num_regions=conf.num_trans_regions)
-
-    # Build model and inference nodes. Then initialise the graph.
-    model_out = model.netConv2Maxpool(x_pre, num_classes, num_dense=conf.num_dense)
-    model.inference(model_out, y_in)
-    sess.run(tf.global_variables_initializer())
-    del x_in, y_in
-
-    # Restore the weights and fetch the log data.
-    logdata = loadLatestModelAndLogData(sess)
-    if logdata is None:
-        return
-
-    # Assess performance on entire data set.
-    correct, total = validateAll(sess, ds, batch_size=50, dset='train')
-    rat = 100 * (correct / total)
-    print(f'Accuracy: {rat:.1f}  ({correct:,} / {total:,})')
-
-    # Extract the cost and training/test accuracies from the log data.
+def visualiseResults(sess, conf, ds, logdata):
+    """Produce figures"""
     cost = [v for k, v in sorted(logdata['f32']['Cost'].items())]
     acc_trn = [v for k, v in sorted(logdata['f32']['acc_train'].items())]
     acc_tst = [v for k, v in sorted(logdata['f32']['acc_test'].items())]
@@ -269,6 +240,43 @@ def main():
     meta = gatherWrongClassifications(sess, ds, batch_size=16, dset='train')
     h = plotWrongClassifications(meta[:16], 4)
     h.savefig('/tmp/wrong.png', **opts)
+
+
+def main():
+    # Restore the weights and fetch the log data.
+    sess = tf.Session()
+    conf, logdata, chkpt = loadLatestModelAndLogData(sess)
+
+    # Load the data set.
+    ds = data_loader.DS2(conf)
+    num_classes = len(ds.classNames())
+    chan, height, width = ds.imageDimensions().tolist()
+
+    # Dump some stats into the terminal.
+    print()
+    ds.printSummary()
+
+    # Input variables.
+    x_in = tf.placeholder(tf.float32, [None, chan, height, width], name='x_in')
+    y_in = tf.placeholder(tf.int32, [None], name='y_in')
+
+    # Compile the network as specified in `conf`.
+    x_pre = model.spatialTransformer(x_in, num_regions=conf.num_trans_regions)
+    model_out = model.netConv2Maxpool(x_pre, num_classes, num_dense=conf.num_dense)
+    model.inference(model_out, y_in)
+    del x_in, y_in, chan, height, width, num_classes
+
+    # Initialise the graph.
+    sess.run(tf.global_variables_initializer())
+    tf.train.Saver().restore(sess, chkpt)
+
+    # Assess the accuracy on entire data set.
+    correct, total = validateAll(sess, ds, batch_size=50, dset='train')
+    rat = 100 * (correct / total)
+    print(f'Accuracy: {rat:.1f}  ({correct:,} / {total:,})')
+
+    # Extract the cost and training/test accuracies from the log data.
+    visualiseResults(sess, conf, ds, logdata)
 
     # Show the figures on screen.
     plt.show()
