@@ -212,8 +212,8 @@ def visualiseResults(sess, conf, ds, logdata):
     }
 
     c = conf
-    kn, kt = int(100 * c.keep_net), int(100 * c.keep_trans)
-    pre = f'/tmp/w{c.width}h{c.height}-dense{c.num_dense}-stn{c.num_trans_regions}'
+    kn, kt = int(100 * c.keep_model), int(100 * c.keep_spt)
+    pre = f'/tmp/w{c.width}h{c.height}-dense{c.num_dense}-stn{c.num_sptr}'
     pre += f'-knet{kn}-ktrans{kt}-'
     # Show the training cost over batches.
     with plt.rc_context(rc):
@@ -267,7 +267,7 @@ def main():
     y_in = tf.placeholder(tf.int32, [None], name='y_in')
 
     # Compile the network as specified in `conf`.
-    x_pre = model.spatialTransformer(x_in, num_regions=conf.num_trans_regions)
+    x_pre = model.spatialTransformer(x_in, num_regions=conf.num_sptr)
     model_out = model.netConv2Maxpool(x_pre, num_classes, num_dense=conf.num_dense)
     model.inference(model_out, y_in)
     del x_in, y_in, chan, height, width, num_classes

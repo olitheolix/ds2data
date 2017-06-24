@@ -3,6 +3,6 @@ import collections
 
 NetConf = collections.namedtuple(
     'NetConf',
-    'width height colour seed num_trans_regions num_dense keep_net keep_trans '
-    'batch_size epochs train sample_size'
+    'width height colour seed num_sptr num_dense keep_model keep_spt '
+    'batch_size num_epochs train_rat num_samples'
 )

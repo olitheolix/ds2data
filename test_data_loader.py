@@ -16,16 +16,16 @@ class TestDataset:
 
     def setup_method(self, method):
         self.defaults = NetConf(
-            width=32, height=32, colour='L', seed=0, num_trans_regions=20,
-            num_dense=32, keep_net=0.9, keep_trans=0.9, batch_size=16,
-            epochs=10000, train=0.8, sample_size=None
+            width=32, height=32, colour='L', seed=0, num_sptr=20,
+            num_dense=32, keep_model=0.9, keep_spt=0.9, batch_size=16,
+            num_epochs=10000, train_rat=0.8, num_samples=None
         )
 
     def teardown_method(self, method):
         pass
 
     def test_basic(self):
-        conf = self.defaults._replace(train=0.8)
+        conf = self.defaults._replace(train_rat=0.8)
         ds = data_loader.DataSet(conf)
         assert ds.lenOfEpoch('train') == 8
         assert ds.lenOfEpoch('test') == 2
@@ -38,18 +38,18 @@ class TestDataset:
         assert ds.classNames() == {0: '0', 1: '1', 2: '2'}
 
     def test_change_training_size(self):
-        conf = self.defaults._replace(train=1.0)
+        conf = self.defaults._replace(train_rat=1.0)
         ds = data_loader.DataSet(conf)
         assert ds.lenOfEpoch('train') == 10
         assert ds.lenOfEpoch('test') == 0
 
-        conf = self.defaults._replace(train=0.0)
+        conf = self.defaults._replace(train_rat=0.0)
         ds = data_loader.DataSet(conf)
         assert ds.lenOfEpoch('train') == 0
         assert ds.lenOfEpoch('test') == 10
 
     def test_limitSampleSize(self):
-        conf = self.defaults._replace(train=1.0, sample_size=10)
+        conf = self.defaults._replace(train_rat=1.0, num_samples=10)
         ds = data_loader.DataSet(conf)
 
         for i in range(1, 5):
@@ -72,24 +72,24 @@ class TestDataset:
     def test_limit_dataset_size(self):
         # We only have 3-4 features per label, which means asking for 10 will
         # do nothing.
-        conf = self.defaults._replace(train=1.0, sample_size=10)
+        conf = self.defaults._replace(train_rat=1.0, num_samples=10)
         ds = data_loader.DataSet(conf)
         assert ds.lenOfEpoch('train') == 10
 
         # Now there must be exactly 1 feature for each of the three labels,
         # which means a total of 3 features in the data_loader.
-        conf = self.defaults._replace(train=1.0, sample_size=1)
+        conf = self.defaults._replace(train_rat=1.0, num_samples=1)
         ds = data_loader.DataSet(conf)
         assert ds.lenOfEpoch('train') == 3
 
     def test_basic_err(self):
         with pytest.raises(AssertionError):
-            data_loader.DataSet(self.defaults._replace(train=-1.0))
+            data_loader.DataSet(self.defaults._replace(train_rat=-1.0))
         with pytest.raises(AssertionError):
-            data_loader.DataSet(self.defaults._replace(train=1.1))
+            data_loader.DataSet(self.defaults._replace(train_rat=1.1))
 
     def test_nextBatch(self):
-        ds = data_loader.DataSet(self.defaults._replace(train=0.8))
+        ds = data_loader.DataSet(self.defaults._replace(train_rat=0.8))
 
         # Basic parameters.
         assert ds.lenOfEpoch('train') == 8
@@ -121,7 +121,7 @@ class TestDataset:
         assert len(_) == 0
 
     def test_nextBatch_reset(self):
-        ds = data_loader.DataSet(self.defaults._replace(train=0.8))
+        ds = data_loader.DataSet(self.defaults._replace(train_rat=0.8))
 
         ds.nextBatch(2, 'train')
         assert ds.posInEpoch('train') == 2
@@ -148,7 +148,7 @@ class TestDataset:
         assert ds.posInEpoch('test') == 0
 
     def test_nextBatch_invalid(self):
-        ds = data_loader.DataSet(self.defaults._replace(train=0.8))
+        ds = data_loader.DataSet(self.defaults._replace(train_rat=0.8))
 
         # Invalid value for N.
         with pytest.raises(AssertionError):

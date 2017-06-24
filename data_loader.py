@@ -33,10 +33,10 @@ class DataSet:
             PIL image format. Must be 'L' or 'RGB'.
         conf.seed (int):
             Seed for Numpy random generator.
-        conf.train (float): 0.0-1.0
+        conf.train_rat (float): 0.0-1.0
             Ratio of samples to put aside for training. For example, 0.8 means 80%
             of all samples will be in the training set, and 20% in the test set.
-        conf.sample_size (int):
+        conf.num_samples (int):
             Number of samples to use for each label. Use all if set to None.
     """
     def __init__(self, conf):
@@ -49,8 +49,8 @@ class DataSet:
             np.random.seed(conf.seed)
 
         # Backup the training/test ratio for later and sanity check it.
-        self.train = conf.train if conf.train is not None else 0.8
-        assert 0 <= conf.train <= 1
+        self.train = conf.train_rat if conf.train_rat is not None else 0.8
+        assert 0 <= self.train <= 1
 
         # Load the features and labels. The actual implementation of that
         # method depends on the dataset in question.
@@ -84,7 +84,7 @@ class DataSet:
         x = np.array(x, np.float32) / 255
 
         # Limit the number of samples for each label.
-        N = conf.sample_size
+        N = conf.num_samples
         if N is not None:
             x, y, meta = self.limitSampleSize(x, y, meta, N)
 
@@ -292,7 +292,7 @@ class DS2(DataSet):
     """
     def loadRawData(self):
         # Original attributes of the images in the DS2 dataset.
-        N = self.conf.sample_size
+        N = self.conf.num_samples
         col_fmt = 'RGB'
 
         width = self.conf.width or 128

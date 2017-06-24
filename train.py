@@ -112,9 +112,9 @@ def saveState(sess, conf, log, saver):
 def main():
     # Network configuration.
     conf = NetConf(
-        width=32, height=32, colour='L', seed=0, num_trans_regions=20,
-        num_dense=32, keep_net=0.9, keep_trans=0.9, batch_size=16,
-        epochs=2, train=0.8, sample_size=None
+        width=32, height=32, colour='L', seed=0, num_sptr=20,
+        num_dense=32, keep_model=0.9, keep_spt=0.9, batch_size=16,
+        num_epochs=2, train_rat=0.8, num_samples=None
     )
 
     # Load data set and dump some info about it into the terminal.
@@ -129,7 +129,7 @@ def main():
     y_in = tf.placeholder(tf.int32, [None], name='y_in')
 
     # Compile the network as specified in `conf`.
-    x_pre = model.spatialTransformer(x_in, num_regions=conf.num_trans_regions)
+    x_pre = model.spatialTransformer(x_in, num_regions=conf.num_sptr)
     model_out = model.netConv2Maxpool(x_pre, num_classes, num_dense=conf.num_dense)
     model.inference(model_out, y_in)
     del x_in, y_in, chan, height, width, num_classes
@@ -154,11 +154,11 @@ def main():
         sess.run(tf.get_variable('keep_prob').assign(1.0))
 
     # Train the network for several epochs.
-    print(f'\nWill train for {conf.epochs:,} epochs')
+    print(f'\nWill train for {conf.num_epochs:,} epochs')
     try:
         # Train the model for several epochs.
         best = -1
-        for epoch in range(conf.epochs):
+        for epoch in range(conf.num_epochs):
             # Determine the accuracy for test- and training set. Save the
             # model if its test accuracy sets a new record.
             _, accuracy_tst = logAccuracy(sess, ds, conf, log, epoch)
