@@ -184,6 +184,18 @@ def netConv2Maxpool(x_img, num_classes, dense_N=32):
         return tf.matmul(dense_drop, W_out) + b_out
 
 
+def inference(model_out, y_in):
+    with tf.name_scope('inference'):
+        pred = tf.nn.softmax(model_out, name='pred')
+        pred = tf.argmax(pred, 1, name='pred-argmax')
+        pred = tf.equal(tf.cast(pred, tf.int32), y_in, name='corInd')
+        tf.reduce_sum(tf.cast(pred, tf.int32), name='corTot')
+        tf.reduce_mean(tf.cast(pred, tf.float32), name='corAvg')
+
+        costfun = tf.nn.sparse_softmax_cross_entropy_with_logits
+        tf.reduce_mean(costfun(logits=model_out, labels=y_in), name='cost')
+
+
 def fooTrans(x_img, num_regions, keep_prob):
     assert len(x_img.shape) == 4
     _, chan, height, width = x_img.shape.as_list()

@@ -51,7 +51,7 @@ def trainEpoch(sess, ds, batch_size, log, epoch, optimiser):
     """
     g = tf.get_default_graph().get_tensor_by_name
     x_in, y_in, learn_rate = g('x_in:0'), g('y_in:0'), g('learn_rate:0')
-    cost = g('cost:0')
+    cost = tf.get_default_graph().get_tensor_by_name('inference/cost:0')
 
     # Validate the performance on the entire test data set.
     cor_tot, total = validation.validateAll(sess, ds, batch_size, 'test')
@@ -94,30 +94,24 @@ def main():
     # Auxiliary placeholders.
     learn_rate = tf.placeholder(tf.float32, name='learn_rate')
 
-    # Build the network graph.
+    # Add transformer network.
     use_transformer = False
     if use_transformer:
         x_pre = model.fooTrans(x_in, keep_prob=0.9, num_regions=20)
     else:
         x_pre = x_in
 
-    dense2 = model.netConv2Maxpool(x_pre, num_classes, dense_N=32)
+    # Build model and inference nodes.
+    model_out = model.netConv2Maxpool(x_pre, num_classes, dense_N=32)
+    model.inference(model_out, y_in)
 
-    # Optimisation.
-    cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=dense2, labels=y_in)
-    cost = tf.reduce_mean(cost, name='cost')
-    tf.summary.scalar('cost', cost)
+    cost = tf.get_default_graph().get_tensor_by_name('inference/cost:0')
     opt = tf.train.AdamOptimizer(learning_rate=learn_rate).minimize(cost)
 
-    # Predictor.
-    pred = tf.nn.softmax(dense2, name='pred')
-    pred = tf.argmax(pred, 1, name='pred-argmax')
-    pred = tf.equal(tf.cast(pred, tf.int32), y_in, name='corInd')
-    tf.reduce_sum(tf.cast(pred, tf.int32), name='corTot')
-    tf.reduce_mean(tf.cast(pred, tf.float32), name='corAvg')
-
+    # Initialise the graph.
     sess.run(tf.global_variables_initializer())
 
+    # Initialise Logger and Tensorflow Saver.
     log = tflogger.TFLogger(sess)
     model_saver = tf.train.Saver()
 
