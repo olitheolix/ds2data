@@ -190,7 +190,7 @@ def main():
     # Initialise the session and graph. Then dump some info into the terminal.
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
-    print()
+    print(f'\nConfiguration: {conf}\n')
     ds.printSummary()
 
     # Initialise Logger and Tensorflow Saver.
