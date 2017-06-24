@@ -134,7 +134,8 @@ def netConv2Maxpool(x_img, num_classes, dense_N=32):
     _, chan, height, width = x_img.shape.as_list()
 
     # Convenience: shared arguments for bias variable, conv2d, and max-pool.
-    bias_shape = [64, 1, 1]
+    num_filters = 64
+    bias_shape = [num_filters, 1, 1]
     pool_pad = mp_stride = [1, 1, 2, 2]
     convpool_opts = dict(padding='SAME', data_format='NCHW')
 
@@ -144,39 +145,41 @@ def netConv2Maxpool(x_img, num_classes, dense_N=32):
         # should lower the value during the training phase.
         kp = tf.get_variable('keep_prob', initializer=tf.constant(1.0), trainable=False)
 
+        # Examples dimensions assume 128x128 RGB images.
         # Convolution Layer #1
-        # Shape: [-1, 128, 128, 3] ---> [-1, 64, 64, 32]
-        # Kernel: 5x5  Pool: 2x2
-        W1, b1 = weights([5, 5, chan, 64], 'W1'), bias(bias_shape, 'b1')
+        # Shape: [-1, 3, 128, 128] ---> [-1, 64, 64, 64]
+        # Kernel: 5x5  Features: 64 Pool: 2x2
+        W1, b1 = weights([5, 5, chan, num_filters], 'W1'), bias(bias_shape, 'b1')
         conv1 = tf.nn.conv2d(x_img, W1, [1, 1, 1, 1], **convpool_opts)
         conv1 = tf.nn.relu(conv1 + b1)
         conv1_pool = tf.nn.max_pool(conv1, pool_pad, mp_stride, **convpool_opts)
         width, height = width // 2, height // 2
 
         # Convolution Layer #2
-        # Shape: [-1, 64, 64, 64] ---> [-1, 32, 32, 64]
-        # Kernel: 5x5  Pool: 2x2
-        W2, b2 = weights([5, 5, 64, 64], 'W2'), bias(bias_shape, 'b2')
+        # Shape: [-1, 64, 64, 64] ---> [-1, 64, 32, 32]
+        # Kernel: 5x5  Features: 64 Pool: 2x2
+        W2, b2 = weights([5, 5, num_filters, num_filters], 'W2'), bias(bias_shape, 'b2')
         conv2 = tf.nn.conv2d(conv1_pool, W2, [1, 1, 1, 1], **convpool_opts)
         conv2 = tf.nn.relu(conv2 + b2)
         conv2_pool = tf.nn.max_pool(conv2, pool_pad, mp_stride, **convpool_opts)
         width, height = width // 2, height // 2
 
         # Flatten data.
-        # Shape: [-1, 16, 16, 64] ---> [-1, 16 * 16 * 64]
-        conv2_flat = tf.reshape(conv2_pool, [-1, width * height * 64])
+        # Shape: [-1, 64, 16, 16] ---> [-1, 64 * 16 * 16]
+        # Features: 64
+        conv2_flat = tf.reshape(conv2_pool, [-1, width * height * num_filters])
 
-        # Dense Layer #1
-        # Shape [-1, 16 * 16 * 64] ---> [-1, 128]
+        # Dense Layer
+        # Shape: [-1, 64 * 16 * 16] ---> [-1, dense_N]
         bd = bias([dense_N], 'bd')
-        Wd = weights([width * height * 64, dense_N], 'Wd')
+        Wd = weights([width * height * num_filters, dense_N], 'Wd')
         dense = tf.nn.relu(tf.matmul(conv2_flat, Wd) + bd)
 
         # Apply dropout.
         dense_drop = tf.nn.dropout(dense, keep_prob=kp)
 
-        # Dense Layer #2 (decision)
-        # Shape: [-1, 128) ---> [-1, 10]
+        # Output Layer
+        # Shape: [-1, dense_N) ---> [-1, num_labels]
         W_out, b_out = weights([dense_N, num_classes]), bias([num_classes])
         return tf.matmul(dense_drop, W_out) + b_out
 
