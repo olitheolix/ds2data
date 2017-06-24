@@ -213,7 +213,7 @@ def visualiseResults(sess, conf, ds, logdata):
 
     c = conf
     kn, kt = int(100 * c.keep_model), int(100 * c.keep_spt)
-    pre = f'/tmp/w{c.width}h{c.height}-dense{c.num_dense}-stn{c.num_sptr}'
+    pre = f'/tmp/w{c.width}h{c.height}-{c.colour}-dense{c.num_dense}-stn{c.num_sptr}'
     pre += f'-knet{kn}-ktrans{kt}-'
     # Show the training cost over batches.
     with plt.rc_context(rc):
