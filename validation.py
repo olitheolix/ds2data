@@ -276,12 +276,12 @@ def main():
     sess.run(tf.global_variables_initializer())
     tf.train.Saver().restore(sess, chkpt)
 
-    # Assess the accuracy on entire data set.
+    # Assess the accuracy on entire data set and print it into the terminal.
     correct, total = validateAll(sess, ds, batch_size=50, dset='train')
     rat = 100 * (correct / total)
     print(f'Accuracy: {rat:.1f}  ({correct:,} / {total:,})')
 
-    # Extract the cost and training/test accuracies from the log data.
+    # Create the plots.
     visualiseResults(sess, conf, ds, logdata)
 
     # Show the figures on screen.
