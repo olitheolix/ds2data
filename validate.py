@@ -258,10 +258,6 @@ def main():
     num_classes = len(ds.classNames())
     chan, height, width = ds.imageDimensions().tolist()
 
-    # Dump some stats into the terminal.
-    print()
-    ds.printSummary()
-
     # Input variables.
     x_in = tf.placeholder(tf.float32, [None, chan, height, width], name='x_in')
     y_in = tf.placeholder(tf.int32, [None], name='y_in')
