@@ -2,6 +2,8 @@ import pytest
 import data_loader
 import numpy as np
 
+from config import NetConf
+
 
 class TestDataset:
     @classmethod
@@ -13,13 +15,18 @@ class TestDataset:
         pass
 
     def setup_method(self, method):
-        pass
+        self.defaults = NetConf(
+            width=32, height=32, colour='L', seed=0, num_trans_regions=20,
+            num_dense=32, keep_net=0.9, keep_trans=0.9, batch_size=16,
+            epochs=10000, train=0.8, sample_size=None
+        )
 
     def teardown_method(self, method):
         pass
 
     def test_basic(self):
-        ds = data_loader.DataSet(train=0.8)
+        conf = self.defaults._replace(train=0.8)
+        ds = data_loader.DataSet(conf)
         assert ds.lenOfEpoch('train') == 8
         assert ds.lenOfEpoch('test') == 2
         assert ds.posInEpoch('train') == 0
@@ -31,16 +38,19 @@ class TestDataset:
         assert ds.classNames() == {0: '0', 1: '1', 2: '2'}
 
     def test_change_training_size(self):
-        ds = data_loader.DataSet(train=1)
+        conf = self.defaults._replace(train=1.0)
+        ds = data_loader.DataSet(conf)
         assert ds.lenOfEpoch('train') == 10
         assert ds.lenOfEpoch('test') == 0
 
-        ds = data_loader.DataSet(train=0)
+        conf = self.defaults._replace(train=0.0)
+        ds = data_loader.DataSet(conf)
         assert ds.lenOfEpoch('train') == 0
         assert ds.lenOfEpoch('test') == 10
 
     def test_limitSampleSize(self):
-        ds = data_loader.DataSet(train=1, N=10)
+        conf = self.defaults._replace(train=1.0, sample_size=10)
+        ds = data_loader.DataSet(conf)
 
         for i in range(1, 5):
             x = np.arange(100)
@@ -62,22 +72,24 @@ class TestDataset:
     def test_limit_dataset_size(self):
         # We only have 3-4 features per label, which means asking for 10 will
         # do nothing.
-        ds = data_loader.DataSet(train=1, N=10)
+        conf = self.defaults._replace(train=1.0, sample_size=10)
+        ds = data_loader.DataSet(conf)
         assert ds.lenOfEpoch('train') == 10
 
         # Now there must be exactly 1 feature for each of the three labels,
         # which means a total of 3 features in the data_loader.
-        ds = data_loader.DataSet(train=1, N=1)
+        conf = self.defaults._replace(train=1.0, sample_size=1)
+        ds = data_loader.DataSet(conf)
         assert ds.lenOfEpoch('train') == 3
 
     def test_basic_err(self):
         with pytest.raises(AssertionError):
-            data_loader.DataSet(train=-1)
+            data_loader.DataSet(self.defaults._replace(train=-1.0))
         with pytest.raises(AssertionError):
-            data_loader.DataSet(train=1.1)
+            data_loader.DataSet(self.defaults._replace(train=1.1))
 
     def test_nextBatch(self):
-        ds = data_loader.DataSet(train=0.8)
+        ds = data_loader.DataSet(self.defaults._replace(train=0.8))
 
         # Basic parameters.
         assert ds.lenOfEpoch('train') == 8
@@ -109,7 +121,7 @@ class TestDataset:
         assert len(_) == 0
 
     def test_nextBatch_reset(self):
-        ds = data_loader.DataSet(train=0.8)
+        ds = data_loader.DataSet(self.defaults._replace(train=0.8))
 
         ds.nextBatch(2, 'train')
         assert ds.posInEpoch('train') == 2
@@ -136,7 +148,7 @@ class TestDataset:
         assert ds.posInEpoch('test') == 0
 
     def test_nextBatch_invalid(self):
-        ds = data_loader.DataSet(train=0.8)
+        ds = data_loader.DataSet(self.defaults._replace(train=0.8))
 
         # Invalid value for N.
         with pytest.raises(AssertionError):
@@ -147,7 +159,7 @@ class TestDataset:
             ds.nextBatch(1, 'foo')
 
     def test_remapLabels(self):
-        ds = data_loader.DataSet(train=0.8)
+        ds = data_loader.DataSet(self.defaults._replace(train=0.8))
 
         old_labels = {0: '0', 2: '2'}
         old_y = np.array([0, 0, 2, 0, 2, 2, 2, 2, 0], np.int64)
@@ -167,7 +179,7 @@ class TestDataset:
         }
 
         for labels, expected in sorted(testcases.items()):
-            ds = data_loader.DataSet(train=1, labels=labels)
+            ds = data_loader.DataSet(self.defaults._replace(train=1), labels=labels)
             assert ds.lenOfEpoch('train') == len(expected)
             x, y, _ = ds.nextBatch(10, 'train')
             assert ds.classNames() == {idx: v for idx, v in enumerate(sorted(labels))}
@@ -183,4 +195,4 @@ class TestDataset:
                 expected.discard(val)
 
         with pytest.raises(AssertionError):
-            data_loader.DataSet(train=1, labels={'foo'})
+            data_loader.DataSet(self.defaults._replace(train=1), labels={'foo'})

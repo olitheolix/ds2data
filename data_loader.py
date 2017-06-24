@@ -29,16 +29,16 @@ class DataSet:
         conf (dict): custom parameters to configure the sub-classes. This base
             class does not use it.
     """
-    def __init__(self, train=0.8, seed=None, labels=all, N=None, conf=None):
-        assert 0 <= train <= 1
-        self.train = train
-        self.conf = conf or {}
-        if seed is not None:
-            np.random.seed(seed)
+    def __init__(self, conf=None, labels=all):
+        self.conf = conf
+        self.train = conf.train if conf.train is not None else 0.8
+        assert 0 <= conf.train <= 1
+        if conf.seed is not None:
+            np.random.seed(conf.seed)
 
         # Load the features and labels. The actual implementation of that
         # method depends on the dataset in question.
-        x, y, dims, label2name, meta = self.loadRawData(labels, N)
+        x, y, dims, label2name, meta = self.loadRawData(labels, conf.sample_size)
         assert len(x) == len(y) == len(meta)
 
         # Images must have three dimensions. The second and third dimensions
@@ -69,6 +69,7 @@ class DataSet:
 
         # Remap the labels if the are do not form a [0, 1, 2, ...] sequence.
         label2name, y = self.remapLabels(label2name, y)
+        N = conf.sample_size
         if N is not None:
             x, y, meta = self.limitSampleSize(x, y, meta, N)
 
