@@ -200,12 +200,17 @@ def spatialTransformer(x_img, num_regions):
     assert len(x_img.shape) == 4
     _, chan, height, width = x_img.shape.as_list()
 
-    x_img = tf.transpose(x_img, [0, 2, 3, 1])
-
     with tf.variable_scope('transformer'):
         # Setup the two-layer localisation network to figure out the
         # parameters for an affine transformation of the input.
         kp = tf.get_variable('keep_prob', trainable=False, initializer=tf.constant(1.0))
+
+        # Do nothing if the transformer was disabled.
+        if num_regions in [None, 0]:
+            return x_img
+
+        # Spatial transformer uses NHWC format.
+        x_img = tf.transpose(x_img, [0, 2, 3, 1])
 
         # Create variables for fully connected layer.
         W1, b1 = weights([chan * height * width, num_regions]), bias([num_regions])
@@ -225,4 +230,6 @@ def spatialTransformer(x_img, num_regions):
         # discriminate patches
         out_flat = spatial_transformer.transformer(x_img, h2, (height, width))
         out_img = tf.reshape(out_flat, [-1, height, width, chan])
+
+        # Return image as NCHW.
         return tf.transpose(out_img, [0, 3, 1, 2])
