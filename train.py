@@ -10,6 +10,10 @@ import data_loader
 import numpy as np
 import tensorflow as tf
 
+import matplotlib.pyplot as plt
+from IPython import embed
+
+
 
 def logAccuracy(sess, ds, batch_size, log, epoch):
     """ Print and return the accuracy for _all_ training/test data.
@@ -57,20 +61,18 @@ def trainEpoch(sess, ds, batch_size, log, epoch, optimiser):
     cor_tot, total = validation.validateAll(sess, ds, batch_size, 'test')
 
     # Adjust the learning rate according to the accuracy.
-    lrate = np.interp(cor_tot / total, [0.0, 0.5, 1.0], [1E-4, 1E-4, 1E-5])
+    lrate = np.interp(cor_tot / total, [0.0, 0.3, 1.0], [1E-3, 1E-4, 1E-5])
 
     # Train for one full epoch.
     ds.reset('train')
     while ds.posInEpoch('train') < ds.lenOfEpoch('train'):
-        # Fetch data.
+        # Fetch data, compile feed dict, and run optimiser.
         x, y, _ = ds.nextBatch(batch_size, dset='train')
         fd = {x_in: x, y_in: y, learn_rate: lrate}
-
-        # Optimise.
         sess.run(optimiser, feed_dict=fd)
 
         # Track the cost of current batch, as well as the number of batches.
-        log.f32('Cost', epoch, sess.run(cost, feed_dict=fd))
+        log.f32('Cost', None, sess.run(cost, feed_dict=fd))
 
 
 def main():
@@ -78,17 +80,47 @@ def main():
     sess = tf.Session()
     print()
 
-    batch_size, num_epochs = 16, 1
+    batch_size, num_epochs = 16, 10000
 
     # Load the data.
-    conf = dict(size=(32, 32), col_fmt='RGB')
+    conf = dict(size=(32, 32), col_fmt='RGB', seed=0)
+    conf = dict(size=(64, 64), col_fmt='L', seed=0)
+    conf = dict(size=(32, 32), col_fmt='L', seed=0)
     ds = data_loader.DS2(train=0.8, N=None, seed=0, conf=conf)
     ds.printSummary()
     dims = ds.imageDimensions()
+    chan, height, width = dims.tolist()
     num_classes = len(ds.classNames())
 
+    x_in = tf.placeholder(tf.float32, [None, chan, height, width], name='x_in')
+    y_in = tf.placeholder(tf.int32, [None], name='y_in')
+    assert (chan, height, width) == (1, 32, 32)
+
+    # Auxiliary placeholders.
+    learn_rate = tf.placeholder(tf.float32, name='learn_rate')
+
     # Build the network graph.
-    opt = model.createNetwork(dims, num_classes)
+    use_transformer = False
+    if use_transformer:
+        x_pre = model.fooTrans(x_in, keep_prob=0.9, num_regions=20)
+    else:
+        x_pre = x_in
+
+    dense2 = model.netConv2Maxpool(x_pre, num_classes, keep_prob=0.9)
+
+    # Optimisation.
+    cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=dense2, labels=y_in)
+    cost = tf.reduce_mean(cost, name='cost')
+    tf.summary.scalar('cost', cost)
+    opt = tf.train.AdamOptimizer(learning_rate=learn_rate).minimize(cost)
+
+    # Predictor.
+    pred = tf.nn.softmax(dense2, name='pred')
+    pred = tf.argmax(pred, 1, name='pred-argmax')
+    pred = tf.equal(tf.cast(pred, tf.int32), y_in, name='corInd')
+    tf.reduce_sum(tf.cast(pred, tf.int32), name='corTot')
+    tf.reduce_mean(tf.cast(pred, tf.float32), name='corAvg')
+
     sess.run(tf.global_variables_initializer())
 
     log = tflogger.TFLogger(sess)
@@ -105,7 +137,14 @@ def main():
     ts += f'-{d.hour:02d}:{d.minute:02d}:{d.second:02d}'
     fname_tf = os.path.join(dst_dir, f'model-{ts}.ckpt')
     fname_log = os.path.join(dst_dir, f'log-{ts}.pickle')
+    fname_meta = os.path.join(dst_dir, f'meta.pickle')
     del d, ts
+
+    # if os.path.exists(fname_meta):
+    #     meta = pickle.load(open(fname, 'rb'))
+    # else:
+    #     meta = {}
+    # meta[ts] = {'conf': conf}
 
     # Train the network for several epochs.
     print(f'\nWill train for {num_epochs:,} epochs')
