@@ -22,21 +22,35 @@ class DataSet:
 
     All images are provide in Tensorflow's NCWH format.
 
+    This class expects only a single argument, namely a NetConf tuple. The
+    class will only look at the following attributes:
+
     Args:
-        train (float): ratio of training and test data.
-        seed (int): seed for random generator
-        labels (list): Either `all` or a sub-set of labels.
-        N (int): limit the number of entries for each label to N images.
-        conf (dict): custom parameters to configure the sub-classes. This base
-            class does not use it.
+        conf (NetConf): simulation parameters.
+        conf.width, conf.height (int):
+            resize the image to these dimensions
+        conf.colour (str):
+            PIL image format. Must be 'L' or 'RGB'.
+        conf.seed (int):
+            Seed for Numpy random generator.
+        conf.train (float): 0.0-1.0
+            Ratio of samples to put aside for training. For example, 0.8 means 80%
+            of all samples will be in the training set, and 20% in the test set.
+        conf.sample_size (int):
+            Number of samples to use for each label. Use all if set to None.
     """
     def __init__(self, conf):
+        # Sanity check.
         assert isinstance(conf, NetConf)
         self.conf = conf
-        self.train = conf.train if conf.train is not None else 0.8
-        assert 0 <= conf.train <= 1
+
+        # Set the random number generator.
         if conf.seed is not None:
             np.random.seed(conf.seed)
+
+        # Backup the training/test ratio for later and sanity check it.
+        self.train = conf.train if conf.train is not None else 0.8
+        assert 0 <= conf.train <= 1
 
         # Load the features and labels. The actual implementation of that
         # method depends on the dataset in question.
