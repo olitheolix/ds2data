@@ -196,17 +196,21 @@ def inference(model_out, y_in):
         tf.reduce_mean(costfun(logits=model_out, labels=y_in), name='cost')
 
 
-def fooTrans(x_img, num_regions, keep_prob):
+def spatialTransformer(x_img, num_regions):
     assert len(x_img.shape) == 4
     _, chan, height, width = x_img.shape.as_list()
+
+    x_img = tf.transpose(x_img, [0, 2, 3, 1])
 
     with tf.variable_scope('transformer'):
         # Setup the two-layer localisation network to figure out the
         # parameters for an affine transformation of the input.
+        kp = tf.get_variable('keep_prob', trainable=False, initializer=tf.constant(1.0))
 
-        # Create variables for fully connected layer
-        W1, b1 = weights([width * height, num_regions]), bias([num_regions])
+        # Create variables for fully connected layer.
+        W1, b1 = weights([chan * height * width, num_regions]), bias([num_regions])
 
+        # Weights and bias for spatial transform matrix. Initialise to identity.
         W2 = weights([num_regions, 6])
         initial = np.array([[1, 0, 0], [0, 1, 0]]).astype(np.float32).flatten()
         b2 = tf.Variable(initial_value=initial, name='b2')
@@ -214,10 +218,11 @@ def fooTrans(x_img, num_regions, keep_prob):
         # Define the two layer localisation network.
         x_flat = tf.reshape(x_img, [-1, chan * height * width])
         h1 = tf.nn.tanh(tf.matmul(x_flat, W1) + b1)
-        h1_drop = tf.nn.dropout(h1, keep_prob=keep_prob)
+        h1_drop = tf.nn.dropout(h1, keep_prob=kp)
         h2 = tf.nn.tanh(tf.matmul(h1_drop, W2) + b2)
 
         # We'll create a spatial transformer module to identify
         # discriminate patches
         out_flat = spatial_transformer.transformer(x_img, h2, (height, width))
-        return tf.reshape(out_flat, [-1, chan, height, width])
+        out_img = tf.reshape(out_flat, [-1, height, width, chan])
+        return tf.transpose(out_img, [0, 3, 1, 2])
