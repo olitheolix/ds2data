@@ -211,6 +211,10 @@ def visualiseResults(sess, conf, ds, logdata):
         'legend.facecolor': 'white'
     }
 
+    c = conf
+    kn, kt = int(100 * c.keep_net), int(100 * c.keep_trans)
+    pre = f'/tmp/w{c.width}h{c.height}-dense{c.num_dense}-stn{c.num_trans_regions}'
+    pre += f'-knet{kn}-ktrans{kt}-'
     # Show the training cost over batches.
     with plt.rc_context(rc):
         plt.figure()
@@ -219,7 +223,7 @@ def visualiseResults(sess, conf, ds, logdata):
         plt.title('Cost', color='white')
         plt.xlabel('Batch', color='white')
         plt.ylim(0, plt.ylim()[1])
-        plt.savefig('/tmp/cost.png', **opts)
+        plt.savefig(pre + 'cost.png', **opts)
 
     # Test- and training accuracy over epochs.
     with plt.rc_context(rc):
@@ -234,12 +238,14 @@ def visualiseResults(sess, conf, ds, logdata):
         plt.grid()
         plt.legend(loc='best')
         plt.title('Accuracy in Percent', color='white')
-        plt.savefig('/tmp/accuracy.png', **opts)
+        plt.savefig(pre + 'accuracy.png', **opts)
 
     # Show some of the mislabelled images.
     meta = gatherWrongClassifications(sess, ds, batch_size=16, dset='train')
     h = plotWrongClassifications(meta[:16], 4)
-    h.savefig('/tmp/wrong.png', **opts)
+    h.savefig(pre + 'wrong.png', **opts)
+
+    print(f'Saved results to {pre}*.png')
 
 
 def main():
