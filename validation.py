@@ -12,6 +12,9 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 
+from config import NetConf
+
+
 def validateAll(sess, ds, batch_size, dset):
     """ Return number of correct and total features.
 
@@ -26,6 +29,16 @@ def validateAll(sess, ds, batch_size, dset):
     g = tf.get_default_graph().get_tensor_by_name
     features, labels = g('x_in:0'), g('y_in:0')
 
+    # Prevent dropouts during validation.
+    with tf.variable_scope('model', reuse=True):
+        kpm = tf.get_variable('keep_prob')
+    with tf.variable_scope('transformer', reuse=True):
+        kpt = tf.get_variable('keep_prob')
+    kpm_bak, kpt_bak = sess.run(kpm), sess.run(kpt)
+    sess.run([kpm.assign(1.0), kpt.assign(1.0)])
+
+    cor_tot = tf.get_default_graph().get_tensor_by_name('inference/corTot:0')
+
     # Reset the data set and get the first batch.
     ds.reset(dset)
     x, y, _ = ds.nextBatch(batch_size, dset=dset)
@@ -34,10 +47,12 @@ def validateAll(sess, ds, batch_size, dset):
     correct = total = 0
     while len(y) > 0:
         total += len(y)
-        correct += sess.run(g('corTot:0'), feed_dict={features: x, labels: y})
+        correct += sess.run(cor_tot, feed_dict={features: x, labels: y})
         x, y, _ = ds.nextBatch(batch_size, dset=dset)
 
+    # Restore the data pointer and dropout probability.
     ds.reset(dset)
+    sess.run([kpm.assign(kpm_bak), kpt.assign(kpt_bak)])
     return correct, total
 
 
@@ -58,38 +73,43 @@ def gatherWrongClassifications(sess, ds, batch_size, dset):
     g = tf.get_default_graph().get_tensor_by_name
     features, labels = g('x_in:0'), g('y_in:0')
 
-    # Reset the data set and get the first batch.
-    ds.reset(dset)
-    dim = ds.imageDimensions()
-    x, y, uuid = ds.nextBatch(batch_size, dset=dset)
+    # Change the keep-probability to 1.
+    with tf.variable_scope('model', reuse=True):
+        kpm = tf.get_variable('keep_prob')
+    with tf.variable_scope('transformer', reuse=True):
+        kpt = tf.get_variable('keep_prob')
+    kpm_bak, kpt_bak = sess.run(kpm), sess.run(kpt)
+    sess.run([kpm.assign(1.0), kpt.assign(1.0)])
+
+    pred_argmax = tf.get_default_graph().get_tensor_by_name('inference/pred-argmax:0')
 
     # Predict every image in every batch and filter out those that were mislabelled.
     meta = []
+    ds.reset(dset)
+    x, y, uuid = ds.nextBatch(batch_size, dset=dset)
     while len(y) > 0:
-        tmp = sess.run(g('pred-argmax:0'), feed_dict={features: x, labels: y})
+        pred = sess.run(pred_argmax, feed_dict={features: x, labels: y})
         for i in range(len(y)):
             # Skip this image if it was correctly labelled.
-            if y[i] == tmp[i]:
+            if y[i] == pred[i]:
                 continue
 
-            # Convert the flat image into the 3D matrix that the network saw,
-            # ie (depth, height, width). Then roll the axes because the
-            # Matplotlib needs the colour dimension last, ie (height, width,
-            # depth).
-            img = np.reshape(x[i], dim)
-            img = np.rollaxis(img, 0, 3)
+            # Convert from CHW to HWC format.
+            img = np.transpose(x[i], [1, 2, 0])
 
-            # Remove the colour dimensions for grayscale images.
+            # Remove the colour dimensions from Gray scale images.
             if img.shape[2] == 1:
                 img = img[:, :, 0]
 
-            # Store the image, correct label, predicted label, and feature id.
-            meta.append((img, y[i], tmp[i], uuid[i]))
+            # Store the image and its correct- and predicted label and feature id.
+            meta.append((img, y[i], pred[i], uuid[i]))
 
         # Get the next batch and repeat.
         x, y, uuid = ds.nextBatch(batch_size, dset=dset)
 
+    # Restore the data pointer and dropout probabilities.
     ds.reset(dset)
+    sess.run([kpm.assign(kpm_bak), kpt.assign(kpt_bak)])
     return meta
 
 
@@ -171,14 +191,27 @@ def main():
     sess = tf.Session()
 
     # Load the data.
-    conf = dict(size=(32, 32), col_fmt='RGB')
+    conf = NetConf(
+        width=32, height=32, colour='L', seed=0, num_trans_regions=20,
+        num_dense=32, keep_net=0.9, keep_trans=0.9, batch_size=16
+    )
     ds = data_loader.DS2(train=1.0, N=None, seed=0, conf=conf)
+    chan, height, width = ds.imageDimensions().tolist()
+    num_classes = len(ds.classNames())
     print()
     ds.printSummary()
 
-    # Build and initialise the network graph.
-    model.createNetwork(ds.imageDimensions(), len(ds.classNames()))
+    x_in = tf.placeholder(tf.float32, [None, chan, height, width], name='x_in')
+    y_in = tf.placeholder(tf.int32, [None], name='y_in')
+
+    # Add transformer network.
+    x_pre = model.spatialTransformer(x_in, num_regions=conf.num_trans_regions)
+
+    # Build model and inference nodes. Then initialise the graph.
+    model_out = model.netConv2Maxpool(x_pre, num_classes, num_dense=conf.num_dense)
+    model.inference(model_out, y_in)
     sess.run(tf.global_variables_initializer())
+    del x_in, y_in
 
     # Restore the weights and fetch the log data.
     logdata = loadLatestModelAndLogData(sess)
