@@ -106,7 +106,7 @@ def main():
     else:
         x_pre = x_in
 
-    dense2 = model.netConv2Maxpool(x_pre, num_classes, keep_prob=0.9)
+    dense2 = model.netConv2Maxpool(x_pre, num_classes, dense_N=32)
 
     # Optimisation.
     cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=dense2, labels=y_in)
@@ -145,6 +145,10 @@ def main():
     # else:
     #     meta = {}
     # meta[ts] = {'conf': conf}
+
+    with tf.variable_scope('model', reuse=True):
+        keep_prob = tf.get_variable('keep_prob')
+        sess.run(keep_prob.assign(1.0))
 
     # Train the network for several epochs.
     print(f'\nWill train for {num_epochs:,} epochs')

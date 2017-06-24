@@ -118,7 +118,7 @@ def bias(shape, name=None):
 #     return opt
 
 
-def netConv2Maxpool(x_img, num_classes, keep_prob=1):
+def netConv2Maxpool(x_img, num_classes, dense_N=32):
     """ Build DNN and return optimisation node.
 
     The mode comprises 2 convolution layers and one dense layer.
@@ -138,42 +138,47 @@ def netConv2Maxpool(x_img, num_classes, keep_prob=1):
     pool_pad = mp_stride = [1, 1, 2, 2]
     convpool_opts = dict(padding='SAME', data_format='NCHW')
 
-    # Convolution Layer #1
-    # Shape: [-1, 128, 128, 3] ---> [-1, 64, 64, 32]
-    # Kernel: 5x5  Pool: 2x2
-    conv1_W, conv1_b = weights([5, 5, chan, 64], 'c1_W'), bias(bias_shape, 'c1_b')
-    conv1 = tf.nn.conv2d(x_img, conv1_W, [1, 1, 1, 1], **convpool_opts)
-    conv1 = tf.nn.relu(conv1 + conv1_b)
-    conv1_pool = tf.nn.max_pool(conv1, pool_pad, mp_stride, **convpool_opts)
-    width, height = width // 2, height // 2
+    with tf.variable_scope('model'):
+        # Default probability for dropout layer is 1. This ensures the mode is
+        # ready for inference without further configuration. However, users
+        # should lower the value during the training phase.
+        kp = tf.get_variable('keep_prob', initializer=tf.constant(1.0), trainable=False)
 
-    # Convolution Layer #2
-    # Shape: [-1, 64, 64, 64] ---> [-1, 32, 32, 64]
-    # Kernel: 5x5  Pool: 2x2
-    conv2_W, conv2_b = weights([5, 5, 64, 64], 'c2_W'), bias(bias_shape, 'c2_b')
-    conv2 = tf.nn.conv2d(conv1_pool, conv2_W, [1, 1, 1, 1], **convpool_opts)
-    conv2 = tf.nn.relu(conv2 + conv2_b)
-    conv2_pool = tf.nn.max_pool(conv2, pool_pad, mp_stride, **convpool_opts)
-    width, height = width // 2, height // 2
+        # Convolution Layer #1
+        # Shape: [-1, 128, 128, 3] ---> [-1, 64, 64, 32]
+        # Kernel: 5x5  Pool: 2x2
+        W1, b1 = weights([5, 5, chan, 64], 'W1'), bias(bias_shape, 'b1')
+        conv1 = tf.nn.conv2d(x_img, W1, [1, 1, 1, 1], **convpool_opts)
+        conv1 = tf.nn.relu(conv1 + b1)
+        conv1_pool = tf.nn.max_pool(conv1, pool_pad, mp_stride, **convpool_opts)
+        width, height = width // 2, height // 2
 
-    # Flatten data.
-    # Shape: [-1, 16, 16, 64] ---> [-1, 16 * 16 * 64]
-    conv2_flat = tf.reshape(conv2_pool, [-1, width * height * 64])
+        # Convolution Layer #2
+        # Shape: [-1, 64, 64, 64] ---> [-1, 32, 32, 64]
+        # Kernel: 5x5  Pool: 2x2
+        W2, b2 = weights([5, 5, 64, 64], 'W2'), bias(bias_shape, 'b2')
+        conv2 = tf.nn.conv2d(conv1_pool, W2, [1, 1, 1, 1], **convpool_opts)
+        conv2 = tf.nn.relu(conv2 + b2)
+        conv2_pool = tf.nn.max_pool(conv2, pool_pad, mp_stride, **convpool_opts)
+        width, height = width // 2, height // 2
 
-    # Dense Layer #1
-    # Shape [-1, 16 * 16 * 64] ---> [-1, 128]
-    dense1_N = 32
-    dense1_W, dense1_b = weights([width * height * 64, dense1_N]), bias([dense1_N])
-    dense1 = tf.nn.relu(tf.matmul(conv2_flat, dense1_W) + dense1_b)
+        # Flatten data.
+        # Shape: [-1, 16, 16, 64] ---> [-1, 16 * 16 * 64]
+        conv2_flat = tf.reshape(conv2_pool, [-1, width * height * 64])
 
-    # Apply dropout.
-    dense1_do = tf.nn.dropout(dense1, keep_prob=1)
-    del dense1
+        # Dense Layer #1
+        # Shape [-1, 16 * 16 * 64] ---> [-1, 128]
+        bd = bias([dense_N], 'bd')
+        Wd = weights([width * height * 64, dense_N], 'Wd')
+        dense = tf.nn.relu(tf.matmul(conv2_flat, Wd) + bd)
 
-    # Dense Layer #2 (decision)
-    # Shape: [-1, 128) ---> [-1, 10]
-    dense2_W, dense2_b = weights([dense1_N, num_classes]), bias([num_classes])
-    return tf.matmul(dense1_do, dense2_W) + dense2_b
+        # Apply dropout.
+        dense_drop = tf.nn.dropout(dense, keep_prob=kp)
+
+        # Dense Layer #2 (decision)
+        # Shape: [-1, 128) ---> [-1, 10]
+        W_out, b_out = weights([dense_N, num_classes]), bias([num_classes])
+        return tf.matmul(dense_drop, W_out) + b_out
 
 
 def fooTrans(x_img, num_regions, keep_prob):
