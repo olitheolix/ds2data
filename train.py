@@ -91,9 +91,6 @@ def main():
     x_in = tf.placeholder(tf.float32, [None, chan, height, width], name='x_in')
     y_in = tf.placeholder(tf.int32, [None], name='y_in')
 
-    # Auxiliary placeholders.
-    learn_rate = tf.placeholder(tf.float32, name='learn_rate')
-
     # Add transformer network.
     use_transformer = False
     if use_transformer:
@@ -105,8 +102,10 @@ def main():
     model_out = model.netConv2Maxpool(x_pre, num_classes, dense_N=32)
     model.inference(model_out, y_in)
 
+    lr = tf.placeholder(tf.float32, name='learn_rate')
     cost = tf.get_default_graph().get_tensor_by_name('inference/cost:0')
-    opt = tf.train.AdamOptimizer(learning_rate=learn_rate).minimize(cost)
+    opt = tf.train.AdamOptimizer(learning_rate=lr).minimize(cost)
+    del lr
 
     # Initialise the graph.
     sess.run(tf.global_variables_initializer())
