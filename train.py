@@ -92,9 +92,9 @@ def main():
     y_in = tf.placeholder(tf.int32, [None], name='y_in')
 
     # Add transformer network.
-    use_transformer = False
+    use_transformer = True
     if use_transformer:
-        x_pre = model.fooTrans(x_in, keep_prob=0.9, num_regions=20)
+        x_pre = model.spatialTransformer(x_in, num_regions=20)
     else:
         x_pre = x_in
 
@@ -135,8 +135,9 @@ def main():
     # meta[ts] = {'conf': conf}
 
     with tf.variable_scope('model', reuse=True):
-        keep_prob = tf.get_variable('keep_prob')
-        sess.run(keep_prob.assign(1.0))
+        sess.run(tf.get_variable('keep_prob').assign(1.0))
+    with tf.variable_scope('transformer', reuse=True):
+        sess.run(tf.get_variable('keep_prob').assign(1.0))
 
     # Train the network for several epochs.
     print(f'\nWill train for {num_epochs:,} epochs')
