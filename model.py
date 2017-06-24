@@ -143,7 +143,7 @@ def netConv2Maxpool(x_img, num_classes, dense_N=32):
         # Default probability for dropout layer is 1. This ensures the mode is
         # ready for inference without further configuration. However, users
         # should lower the value during the training phase.
-        kp = tf.get_variable('keep_prob', initializer=tf.constant(1.0), trainable=False)
+        kp = tf.get_variable('keep_prob', trainable=False, initializer=tf.constant(1.0))
 
         # Examples dimensions assume 128x128 RGB images.
         # Convolution Layer #1
