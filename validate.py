@@ -253,6 +253,8 @@ def main():
     sess = tf.Session()
     conf, logdata, chkpt = loadLatestModelAndLogData(sess)
 
+    conf = conf._replace(train_rat=1.0)
+
     # Load the data set.
     ds = data_loader.DS2(conf)
     num_classes = len(ds.classNames())
