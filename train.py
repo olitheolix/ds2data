@@ -205,15 +205,8 @@ def main():
     print(f'\nWill train for {conf.num_epochs:,} epochs')
     try:
         # Train the model for several epochs.
-        best = -1
         for epoch in range(conf.num_epochs):
-            # Determine the accuracy for test- and training set. Save the
-            # model if its test accuracy sets a new record.
             _, accuracy_tst = logAccuracy(sess, ds, conf, log, epoch)
-            if accuracy_tst > best:
-                best = accuracy_tst
-
-            # Train the model for a full epoch.
             trainEpoch(sess, ds, conf, log, epoch, opt)
     except KeyboardInterrupt:
         pass
