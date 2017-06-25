@@ -116,10 +116,10 @@ def trainEpoch(sess, ds, conf, log, epoch, optimiser):
         # Fetch data, compile feed dict, and run optimiser.
         x, y, _ = ds.nextBatch(conf.batch_size, dset='train')
         fd = {x_in: x, y_in: y, learn_rate: lrate}
-        sess.run(optimiser, feed_dict=fd)
+        _, cost_val = sess.run([optimiser, cost], feed_dict=fd)
 
         # Track the cost of current batch, as well as the number of batches.
-        log.f32('Cost', None, sess.run(cost, feed_dict=fd))
+        log.f32('Cost', None, cost_val)
 
 
 def saveState(sess, conf, log, saver):
