@@ -72,12 +72,12 @@ def logAccuracy(sess, ds, conf, log, epoch):
         log (TFLogger): instantiated TFLogger
         epoch (int): current epoch
     """
-    correct, total = validate.validateAll(sess, ds, conf.batch_size, 'test')
+    correct, total = validate.validateAll(sess, ds, 100, 'test')
     rat_tst = 100 * (correct / total)
     status = f'      Test {rat_tst:4.1f}% ({correct: 5,} / {total: 5,})'
     log.f32('acc_test', epoch, rat_tst)
 
-    correct, total = validate.validateAll(sess, ds, conf.batch_size, 'train')
+    correct, total = validate.validateAll(sess, ds, 100, 'train')
     rat_trn = 100 * (correct / total)
     status += f'        Train {rat_trn:4.1f}% ({correct: 5,} / {total: 5,})'
     log.f32('acc_train', epoch, rat_trn)
