@@ -6,6 +6,8 @@ import sys
 import json
 import model
 import pickle
+import argparse
+import textwrap
 import data_loader
 import numpy as np
 import tensorflow as tf
@@ -14,6 +16,21 @@ import matplotlib.gridspec as gridspec
 
 
 from config import NetConf
+
+
+def parseCmdline():
+    """Parse the command line arguments."""
+    # Create a parser and program description.
+    parser = argparse.ArgumentParser(
+        description="Compile results into figures",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    padd = parser.add_argument
+    padd('--dst', metavar='', type=str, default='./',
+         help='Target directory')
+    padd('--show', action='store_true', default=False,
+         help='Show Matplotlib visualisation')
+    return parser.parse_args()
 
 
 def validateAll(sess, ds, batch_size, dset):
@@ -178,7 +195,7 @@ def loadLatestModelAndLogData(sess):
     return conf, log, f'{dst_dir}/{fname_ckpt}'
 
 
-def visualiseResults(sess, conf, ds, logdata):
+def visualiseResults(sess, conf, args, ds, logdata):
     """Produce figures"""
     cost = [v for k, v in sorted(logdata['f32']['Cost'].items())]
     acc_trn = [v for k, v in sorted(logdata['f32']['acc_train'].items())]
@@ -197,8 +214,10 @@ def visualiseResults(sess, conf, ds, logdata):
 
     c = conf
     kn, kt = int(100 * c.keep_model), int(100 * c.keep_spt)
-    pre = f'/tmp/w{c.width}h{c.height}-{c.colour}-dense{c.num_dense}-stn{c.num_sptr}'
+    pre = f'w{c.width}h{c.height}-{c.colour}-dense{c.num_dense}-stn{c.num_sptr}'
     pre += f'-knet{kn}-ktrans{kt}-'
+    pre = os.path.join(args.dst, pre)
+
     # Show the training cost over batches.
     with plt.rc_context(rc):
         plt.figure()
@@ -233,6 +252,8 @@ def visualiseResults(sess, conf, ds, logdata):
 
 
 def main():
+    args = parseCmdline()
+
     # Restore the weights and fetch the log data.
     sess = tf.Session()
     conf, logdata, chkpt = loadLatestModelAndLogData(sess)
@@ -264,10 +285,11 @@ def main():
     print(f'Accuracy: {rat:.1f}  ({correct:,} / {total:,})')
 
     # Create the plots.
-    visualiseResults(sess, conf, ds, logdata)
+    visualiseResults(sess, conf, args, ds, logdata)
 
     # Show the figures on screen.
-    plt.show()
+    if args.show:
+        plt.show()
 
 
 if __name__ == '__main__':
