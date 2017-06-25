@@ -7,7 +7,7 @@ import textwrap
 import argparse
 import datetime
 import tflogger
-import validation
+import validate
 import data_loader
 
 import numpy as np
@@ -72,12 +72,12 @@ def logAccuracy(sess, ds, conf, log, epoch):
         log (TFLogger): instantiated TFLogger
         epoch (int): current epoch
     """
-    correct, total = validation.validateAll(sess, ds, conf.batch_size, 'test')
+    correct, total = validate.validateAll(sess, ds, conf.batch_size, 'test')
     rat_tst = 100 * (correct / total)
     status = f'      Test {rat_tst:4.1f}% ({correct: 5,} / {total: 5,})'
     log.f32('acc_test', epoch, rat_tst)
 
-    correct, total = validation.validateAll(sess, ds, conf.batch_size, 'train')
+    correct, total = validate.validateAll(sess, ds, conf.batch_size, 'train')
     rat_trn = 100 * (correct / total)
     status += f'        Train {rat_trn:4.1f}% ({correct: 5,} / {total: 5,})'
     log.f32('acc_train', epoch, rat_trn)
@@ -105,7 +105,7 @@ def trainEpoch(sess, ds, conf, log, epoch, optimiser):
     cost = tf.get_default_graph().get_tensor_by_name('inference/cost:0')
 
     # Validate the performance on the entire test data set.
-    cor_tot, total = validation.validateAll(sess, ds, conf.batch_size, 'test')
+    cor_tot, total = validate.validateAll(sess, ds, conf.batch_size, 'test')
 
     # Adjust the learning rate according to the accuracy.
     lrate = np.interp(cor_tot / total, [0.0, 0.3, 1.0], [1E-3, 1E-4, 1E-5])
