@@ -103,6 +103,7 @@ def trainEpoch(sess, ds, conf, log, epoch, optimiser):
     g = tf.get_default_graph().get_tensor_by_name
     x_in, y_in, learn_rate = g('x_in:0'), g('y_in:0'), g('learn_rate:0')
     cost = tf.get_default_graph().get_tensor_by_name('inference/cost:0')
+    kpt, kpm = g('transformer/keep_prob:0'), g('model/keep_prob:0')
 
     # Validate the performance on the entire test data set.
     cor_tot, total = validate.validateAll(sess, ds, conf.batch_size, 'test')
@@ -115,7 +116,10 @@ def trainEpoch(sess, ds, conf, log, epoch, optimiser):
     while ds.posInEpoch('train') < ds.lenOfEpoch('train'):
         # Fetch data, compile feed dict, and run optimiser.
         x, y, _ = ds.nextBatch(conf.batch_size, dset='train')
-        fd = {x_in: x, y_in: y, learn_rate: lrate}
+        fd = {
+            x_in: x, y_in: y, learn_rate: lrate,
+            kpm: conf.keep_model, kpt: conf.keep_spt
+        }
         _, cost_val = sess.run([optimiser, cost], feed_dict=fd)
 
         # Track the cost of current batch, as well as the number of batches.
@@ -196,11 +200,6 @@ def main():
     # Initialise Logger and Tensorflow Saver.
     log = tflogger.TFLogger(sess)
     saver = tf.train.Saver()
-
-    with tf.variable_scope('model', reuse=True):
-        sess.run(tf.get_variable('keep_prob').assign(1.0))
-    with tf.variable_scope('transformer', reuse=True):
-        sess.run(tf.get_variable('keep_prob').assign(1.0))
 
     # Train the network for several epochs.
     print(f'\nWill train for {conf.num_epochs:,} epochs')

@@ -29,16 +29,8 @@ def validateAll(sess, ds, batch_size, dset):
     """
     g = tf.get_default_graph().get_tensor_by_name
     features, labels = g('x_in:0'), g('y_in:0')
-
-    # Prevent dropouts during validation.
-    with tf.variable_scope('model', reuse=True):
-        kpm = tf.get_variable('keep_prob')
-    with tf.variable_scope('transformer', reuse=True):
-        kpt = tf.get_variable('keep_prob')
-    kpm_bak, kpt_bak = sess.run(kpm), sess.run(kpt)
-    sess.run([kpm.assign(1.0), kpt.assign(1.0)])
-
-    cor_tot = tf.get_default_graph().get_tensor_by_name('inference/corTot:0')
+    cor_tot = g('inference/corTot:0')
+    kpt, kpm = g('transformer/keep_prob:0'), g('model/keep_prob:0')
 
     # Reset the data set and get the first batch.
     ds.reset(dset)
@@ -48,12 +40,12 @@ def validateAll(sess, ds, batch_size, dset):
     correct = total = 0
     while len(y) > 0:
         total += len(y)
-        correct += sess.run(cor_tot, feed_dict={features: x, labels: y})
+        fd = {features: x, labels: y, kpt: 1.0, kpm: 1.0}
+        correct += sess.run(cor_tot, feed_dict=fd)
         x, y, _ = ds.nextBatch(batch_size, dset=dset)
 
-    # Restore the data pointer and dropout probability.
+    # Restore the data pointer.
     ds.reset(dset)
-    sess.run([kpm.assign(kpm_bak), kpt.assign(kpt_bak)])
     return correct, total
 
 
@@ -73,23 +65,16 @@ def gatherWrongClassifications(sess, ds, batch_size, dset):
     """
     g = tf.get_default_graph().get_tensor_by_name
     features, labels = g('x_in:0'), g('y_in:0')
-
-    # Change the keep-probability to 1.
-    with tf.variable_scope('model', reuse=True):
-        kpm = tf.get_variable('keep_prob')
-    with tf.variable_scope('transformer', reuse=True):
-        kpt = tf.get_variable('keep_prob')
-    kpm_bak, kpt_bak = sess.run(kpm), sess.run(kpt)
-    sess.run([kpm.assign(1.0), kpt.assign(1.0)])
-
-    pred_argmax = tf.get_default_graph().get_tensor_by_name('inference/pred-argmax:0')
+    pred_argmax = g('inference/pred-argmax:0')
+    kpt, kpm = g('transformer/keep_prob:0'), g('model/keep_prob:0')
 
     # Predict every image in every batch and filter out those that were mislabelled.
     meta = []
     ds.reset(dset)
     x, y, uuid = ds.nextBatch(batch_size, dset=dset)
     while len(y) > 0:
-        pred = sess.run(pred_argmax, feed_dict={features: x, labels: y})
+        fd = {features: x, labels: y, kpm: 1.0, kpt: 1.0}
+        pred = sess.run(pred_argmax, feed_dict=fd)
         for i in range(len(y)):
             # Skip this image if it was correctly labelled.
             if y[i] == pred[i]:
@@ -108,9 +93,8 @@ def gatherWrongClassifications(sess, ds, batch_size, dset):
         # Get the next batch and repeat.
         x, y, uuid = ds.nextBatch(batch_size, dset=dset)
 
-    # Restore the data pointer and dropout probabilities.
+    # Restore the data pointer.
     ds.reset(dset)
-    sess.run([kpm.assign(kpm_bak), kpt.assign(kpt_bak)])
     return meta
 
 

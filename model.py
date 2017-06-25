@@ -143,7 +143,7 @@ def netConv2Maxpool(x_img, num_classes, num_dense=32):
         # Default probability for dropout layer is 1. This ensures the mode is
         # ready for inference without further configuration. However, users
         # should lower the value during the training phase.
-        kp = tf.get_variable('keep_prob', trainable=False, initializer=tf.constant(1.0))
+        kp = tf.placeholder_with_default(1.0, None, 'keep_prob')
 
         # Examples dimensions assume 128x128 RGB images.
         # Convolution Layer #1
@@ -203,7 +203,7 @@ def spatialTransformer(x_img, num_regions):
     with tf.variable_scope('transformer'):
         # Setup the two-layer localisation network to figure out the
         # parameters for an affine transformation of the input.
-        kp = tf.get_variable('keep_prob', trainable=False, initializer=tf.constant(1.0))
+        kp = tf.placeholder_with_default(1.0, None, 'keep_prob')
 
         # Do nothing if the transformer was disabled.
         if num_regions in [None, 0]:
