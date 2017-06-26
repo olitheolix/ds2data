@@ -7,7 +7,6 @@ import json
 import model
 import pickle
 import argparse
-import textwrap
 import data_loader
 import numpy as np
 import tensorflow as tf
