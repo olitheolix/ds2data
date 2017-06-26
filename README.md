@@ -12,8 +12,8 @@ through a 3D space scene.
 
 The meta data for the flight is in `flightpath/meta.pickle`. It contains, among
 other things, the screen position of each cube in each frame. The
-`draw_bboxes.py` shows how to use this information to draw bounding boxes
-around all cubes.
+`draw_bboxes.py` script shows how to use this information to draw bounding
+boxes around all cubes.
 
 | Original Scene               | After `draw_bboxes.py`      |
 | ---------------------------- | --------------------------- |
