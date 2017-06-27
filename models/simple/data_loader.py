@@ -305,9 +305,8 @@ class DS2(DataSet):
         # The size of the returned images.
         dims = (chan, height, width)
 
-        # The data set contains 11 labels: ten digits (0-9) and 'background'.
+        # The data set contains 10 labels: the digits 0-9.
         label2name = {_: str(_) for _ in range(10)}
-        label2name[len(label2name)] = 'background'
 
         # Location to data folder.
         data_path = os.path.dirname(os.path.abspath(__file__))
@@ -322,6 +321,16 @@ class DS2(DataSet):
                 fnames.extend(glob.glob(ftype + ext))
             del ftype, ext
 
+            # Abort if the data set does not exist.
+            if len(fnames) == 0:
+                print(f'\nError: No files in {data_path}')
+                print('\nPlease download '
+                      'https://github.com/olitheolix/ds2data/blob/master/ds2.tar.gz'
+                      '\nand unpack it to data/\n')
+                raise FileNotFoundError
+
+            # Load each image, pre-process it (eg resize, RGB/Gray), and add it
+            # to the data set.
             for i, fname in enumerate(fnames[:N]):
                 # Convert to correct colour format and resize.
                 img = Image.open(fname)
