@@ -33,8 +33,11 @@ from
 The rendered images were created with
 [PyHorde](https://github.com/olitheolix/pyhorde).
 
+# Results
+My own models are in the `models/` folder. The results are documented
+[here](https://olitheolix.github.io/ds2data/)
 
 # Feeback
 I would be happy to hear from anyone who uses it. Does it work for you? Is
-something missing? Which ML models have you built for it, and how well did they
+something missing? Which ML models have you built for it and how well did they
 do?
