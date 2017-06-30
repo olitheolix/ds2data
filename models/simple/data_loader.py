@@ -403,7 +403,7 @@ class FasterRcnnRpn(DataSet):
         # Location to data folder.
         data_path = os.path.dirname(os.path.abspath(__file__))
         data_path = os.path.join(data_path, 'data', 'training')
-        data_path = '/tmp/delme/flightpath'
+        data_path = 'data/background'
 
         # Iterate over all labels. Each label must reside in its own directory.
         all_labels, all_features, meta = [], [], []
@@ -618,7 +618,7 @@ class FasterRcnnClassifier(DataSet):
         # Location to data folder.
         data_path = os.path.dirname(os.path.abspath(__file__))
         data_path = os.path.join(data_path, 'data', 'training')
-        data_path = '/tmp/delme/flightpath'
+        data_path = 'data/background'
 
         # Iterate over all labels.
         all_labels, all_features, meta = [], [], []
