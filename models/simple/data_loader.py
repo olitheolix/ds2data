@@ -497,10 +497,22 @@ class FasterRcnnRpn(DataSet):
                     break
                 continue
 
+            # Mark off the regions in the image we have already used.
             box_img[y0:y1, x0:x1] = 1
 
-            obj = objs[np.random.randint(0, pool_size)]
-            img[:, y0:y1, x0:x1] = obj
+            # Pick a random object and scale its colour channel(s).
+            obj = np.array(objs[np.random.randint(0, pool_size)])
+            for i in range(obj.shape[0]):
+                obj[i, :, :] = obj[i, :, :] * np.random.uniform(0.3, 1)
+            obj = obj.astype(np.uint8)
+
+            # Compute a mask to only copy the image portion that contains the
+            # object but not those that contain only the black background.
+            idx = np.nonzero(obj > 30)
+            mask = np.zeros_like(obj)
+            mask[idx] = 1
+
+            img[:, y0:y1, x0:x1] = (1 - mask) * img[:, y0:y1, x0:x1] + mask * obj
             bbox.append((x0, x1, y0, y1))
 
         bbox = np.array(bbox, np.uint32)
