@@ -662,6 +662,7 @@ class FasterRcnnClassifier(DataSet):
 
             assert img.shape[1] > height and img.shape[2] > width
 
+            # Sample the background.
             for j in range(patches_per_image):
                 y0 = np.random.randint(0, img.shape[1] - height)
                 x0 = np.random.randint(0, img.shape[2] - width)
@@ -670,29 +671,38 @@ class FasterRcnnClassifier(DataSet):
                 del j, y0, x0, y1, x1
             del i, img
 
+            # Abort once we have enough background patches.
             if len(background) >= 3 * N:
                 break
 
+        # Ensure we have the correct number of background patches.
         background = background[:3 * N]
         assert len(background) == 3 * N
         background = np.array(background, np.uint8)
 
+        # Load the objects we want to place over the background.
         shapes = loadObjects(N=32, chan=chan)
 
+        # Initialise output variables.
         meta = []
         all_labels = np.zeros(3 * N, np.int32)
         all_features = np.zeros((3 * N, chan, height, width), np.uint8)
 
+        # The first N features are random background patches.
         idx = np.random.permutation(N)
         all_labels[:N] = 0
         all_features[:N] = background[idx]
         meta += [MetaData(None, 0, None)] * N
 
+        # The next N features are background images with the first object in
+        # the foreground.
         idx = np.random.permutation(N)
         all_labels[N:2 * N] = 1
         all_features[N:2 * N] = self.makeShapeExamples(shapes[0], background[idx])
         meta += [MetaData(None, 0, None)] * N
 
+        # The next N features are background images with the second object in
+        # the foreground.
         idx = np.random.permutation(N)
         all_labels[2 * N:] = 2
         all_features[2 * N:] = self.makeShapeExamples(shapes[1], background[idx])
@@ -701,14 +711,20 @@ class FasterRcnnClassifier(DataSet):
         return all_features, all_labels, dims, label2name, meta
 
     def makeShapeExamples(self, obj, background):
+        # Ensure obj and background have the same pixel dimensions and channels.
         assert obj.shape == background.shape[1:]
+
+        # Convenience: image parameters. N is the number of background images
+        # to stamp.
         N, chan, height, width = background.shape
 
+        # Extract the the image and convert it to HWC for colour.
         if obj.shape[0] == 1:
             obj = obj[0]
         else:
             obj = np.transpose(obj, [1, 2, 0])
 
+        # Stamp one object onto every background image.
         out = np.array(background)
         for i in range(N):
             # Randomly scale the colour channel(s).
@@ -727,8 +743,8 @@ class FasterRcnnClassifier(DataSet):
             w, h = int(width * scale), int(height * scale)
             img = img.resize((w, h), Image.BILINEAR)
 
-            # Convert from Pillow and ensure that the new image is, again, in
-            # CHW format.
+            # Convert from Pillow to NumPy and ensure that the new image is,
+            # again, in CHW format.
             img = np.array(img, np.uint8)
             if img.ndim == 2:
                 img = np.expand_dims(img, axis=0)
@@ -747,6 +763,7 @@ class FasterRcnnClassifier(DataSet):
             mask = np.zeros_like(img)
             mask[idx] = 1
 
+            # Stamp the object into the image.
             img = (1 - mask) * out[i, :, y0:y1, x0:x1] + mask * img
             out[i, :, y0:y1, x0:x1] = img
         return out
