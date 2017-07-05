@@ -191,14 +191,7 @@ def main_cls():
     # Initialise Logger and Tensorflow Saver.
     log = tflogger.TFLogger(sess)
 
-    g = tf.get_default_graph().get_tensor_by_name
-    saver = tf.train.Saver({
-        'W1': g('model/W1:0'),
-        'b1': g('model/b1:0'),
-        'W2': g('model/W2:0'),
-        'b2': g('model/b2:0'),
-        }
-    )
+    saver = tf.train.Saver()
 
     # Train the network for several epochs.
     print(f'\nWill train for {conf.num_epochs:,} epochs')
