@@ -474,19 +474,46 @@ class FasterRcnnRpn(DataSet):
         assert img.ndim == 3
         assert num_placements >= 0
 
+        # Dimension of full image, eg 3x512x512.
         chan, width, height = img.shape
         assert chan in [1, 3]
 
+        # Load the test shapes we want to find. These are smaller than the
+        # image and they are also always Gray scale. For instance, their
+        # dimension might be 1x32x32.
         objs = loadObjects(N=32, chan=chan)
-        pool_size, obj_chan, obj_height, obj_width = objs.shape
+        pool_size, obj_chan, _, _ = objs.shape
         assert obj_chan == chan
+        del obj_chan
 
+        # A dummy image the size of the final output image. This one only
+        # serves as a mask to indicate which regions already contain an object.
         box_img = np.zeros((height, width), np.uint8)
 
-        bbox = []
-        miss = 0
+        # Stamp randomly scaled, positioned and coloured objects into the full
+        # output image.
+        bbox, miss = [], 0
         while len(bbox) < num_placements:
-            # Pick random coordinate for object (upper left corner).
+            # Pick a random object and give it an also random colour.
+            obj = np.array(objs[np.random.randint(0, pool_size)])
+            for i in range(obj.shape[0]):
+                obj[i, :, :] = obj[i, :, :] * np.random.uniform(0.3, 1)
+            obj = obj.astype(np.uint8)
+            chan, obj_height, obj_width = obj.shape
+            obj = np.transpose(obj, [1, 2, 0])
+
+            # Randomly scale the object.
+            scale = np.random.uniform(0.3, 1)
+            obj_width = int(scale * obj_width)
+            obj_height = int(scale * obj_height)
+            obj = Image.fromarray(obj)
+            obj = obj.resize((obj_width, obj_height), Image.BILINEAR)
+            obj = np.array(obj, np.uint8)
+            assert obj.shape == (obj_height, obj_width, chan)
+            obj = np.transpose(obj, [2, 0, 1])
+            del scale
+
+            # Pick random position for upper left corner of object.
             x0 = np.random.randint(0, width - obj_width)
             y0 = np.random.randint(0, height - obj_height)
             x1, y1 = x0 + obj_width, y0 + obj_height
