@@ -610,15 +610,17 @@ class FasterRcnnRpn(DataSet):
 
                 # Compute the centre and width of the GT bbox.
                 bx0, bx1, by0, by1 = bbox
-                bx, by = (bx1 + bx0) / 2, (by1 + by0) / 2
+                bcx, bcy = (bx0 + bx1) / 2, (by0 + by1) / 2
                 bw, bh = bx1 - bx0, by1 - by0
+                assert bw > 0 and bh > 0
                 del bbox, bx0, bx1, by0, by1
 
                 # Compute the bbox part of the label data.
-                lx, ly = bx - acx, by - acy
+                lx, ly = (bcx - acx) / a_width, (bcy - acy) / a_height
                 lw, lh = np.log(bw / a_width), np.log(bh / a_height)
-                out[3:, y, x] = [lx, ly, lw, lh]
-                del bx, by, bw, bh, lx, ly, lw, lh
+                tmp = np.array([lx, ly, lw, lh], np.float32)
+                out[3:, y, x] = tmp
+                del bcx, bcy, bw, bh, lx, ly, lw, lh
         return out
 
 
