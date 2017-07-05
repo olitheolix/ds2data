@@ -549,7 +549,7 @@ class FasterRcnnRpn(DataSet):
         out = np.zeros((7, ft_height, ft_width), np.float32)
 
         anchor_hwidth, anchor_hheight = 16, 16
-        a_width, a_height = 2 * anchor_hwidth + 1, 2 * anchor_hheight + 1
+        a_width, a_height = 2 * anchor_hwidth, 2 * anchor_hheight
 
         # Find out where the anchor box will overlap with each BBox. To do
         # this, we simply stamp a block of 1's into the image and convolve it
