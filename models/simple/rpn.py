@@ -562,8 +562,10 @@ def main_rpn():
 
 
 def main():
-    # main_cls()
-    main_rpn()
+    if False:
+        main_cls()
+    else:
+        main_rpn()
 
 
 if __name__ == '__main__':
