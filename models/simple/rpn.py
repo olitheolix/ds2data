@@ -448,6 +448,96 @@ def train_rpn(sess, conf):
     return tot_cost
 
 
+def validate_rpn(sess, conf):
+    # Load weights of first layers.
+    data = pickle.load(open('/tmp/dump2.pickle', 'rb'))
+
+    assert 'w3' in data and 'b3' in data
+    build_rpn_model(conf, W3=data['w3'], b3=data['b3'])
+
+    g = tf.get_default_graph().get_tensor_by_name
+    x_in, y_in = g('x_in:0'), g('y_in:0')
+    net_out = g('rpn/net_out:0')
+
+    sess.run(tf.global_variables_initializer())
+
+    # Load data set and dump some info about it into the terminal.
+    ds = data_loader.FasterRcnnRpn(conf)
+    ds.printSummary()
+    chan, height, width = ds.imageDimensions().tolist()
+
+    while True:
+        # Get next batch. If there is no next batch, save the current weights,
+        # reset the data source, and start over.
+        x, y, meta = ds.nextBatch(1, 'test')
+        if len(y) == 0:
+            break
+
+        t0 = time.perf_counter()
+        if True:
+            out = sess.run(net_out, feed_dict={x_in: x})
+        else:
+            out = y[:, 1:, :, :]
+            # tmp = out[0, 2:].reshape((4, -1))
+            # plt.plot(tmp.T); plt.grid(); plt.show(); return
+        etime = int(1000 * (time.perf_counter() - t0))
+        print(f'\nElapsed: {etime:,}ms')
+
+        img = np.transpose(x[0], [1, 2, 0])
+        obj = out[0, :2, :, :]
+        bbox = out[0, 2:, :, :]
+
+        # from PIL import Image
+        img = (255 * img).astype(np.uint8)
+        # img = Image.fromarray(img)
+        # img = img.resize((obj.shape[2], obj.shape[1]), Image.BILINEAR)
+        # img = np.array(img, np.uint8)
+        img_out = np.array(img)
+
+        obj = np.argmax(obj, axis=0)
+
+        for fy in range(obj.shape[0]):
+            for fx in range(obj.shape[1]):
+                if obj[fy, fx] == 0:
+                    continue
+                ibxc, ibyc, ibw, ibh = bbox[:, fy, fx]
+
+                ix, iy = fx * 4 + 2, fy * 4 + 2
+
+                xc = int(32 * ibxc + ix)
+                yc = int(32 * ibyc + iy)
+                hw = int(16 * np.exp(ibw))
+                hh = int(16 * np.exp(ibh))
+                assert hw > 1 and hh > 1
+                x0, y0 = xc - hw, yc - hh
+                x1, y1 = xc + hw, yc + hh
+                tmp = np.array(img_out[y0:y1, x0:x1, :])
+                img_out[y0:y1, x0:x1, :] = 255
+                try:
+                    img_out[y0 + 1:y1 - 1, x0 + 1:x1 - 1, :] = tmp[1:-1, 1:-1, :]
+                except ValueError:
+                    pass
+
+        gs1 = gridspec.GridSpec(2, 2)
+        gs1.update(wspace=0.01, hspace=0.01)
+
+        plt.figure()
+        plt.subplot(gs1[0])
+        plt.imshow(img)
+        plt.subplot(gs1[1])
+        plt.imshow(obj, cmap='gray')
+        plt.subplot(gs1[2])
+        plt.imshow(obj, cmap='gray')
+        plt.subplot(gs1[3])
+        plt.imshow(obj, cmap='gray')
+
+        plt.figure()
+        plt.imshow(img_out)
+
+        plt.show()
+        return
+
+
 def main_rpn():
     # Network configuration.
     conf = NetConf(
