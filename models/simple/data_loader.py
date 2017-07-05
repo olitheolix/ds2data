@@ -107,8 +107,12 @@ class DataSet:
         for dset in self.handles:
             name = dset.capitalize()
             print(f'  {name:10}: {len(self.handles[dset]):,} samples')
-        tmp = [_[1] for _ in sorted(self.label2name.items())]
-        tmp = str.join(', ', tmp)
+
+        if self.label2name is not None:
+            tmp = [_[1] for _ in sorted(self.label2name.items())]
+            tmp = str.join(', ', tmp)
+        else:
+            tmp = 'None'
         d, h, w = self.image_dims
         print(f'  Labels    : {tmp}')
         print(f'  Dimensions: {d} x {h} x {w}')
