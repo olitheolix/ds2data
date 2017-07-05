@@ -214,7 +214,7 @@ def main_cls():
     saveState(sess, conf, log, saver)
 
 
-def build_rpn_model(conf):
+def build_rpn_model(conf, W3=None, b3=None):
     data = pickle.load(open('/tmp/dump.pickle', 'rb'))
 
     # Input variables.
@@ -228,10 +228,10 @@ def build_rpn_model(conf):
     width, height = conf.width, conf.height
 
     with tf.variable_scope('rpn'):
-        W1 = tf.Variable(data['w1'], name='W1', trainable=False)
-        b1 = tf.Variable(data['b1'], name='b1', trainable=False)
-        W2 = tf.Variable(data['w2'], name='W2', trainable=False)
-        b2 = tf.Variable(data['b2'], name='b2', trainable=False)
+        W1 = tf.Variable(data['w1'], name='W1', trainable=True)
+        b1 = tf.Variable(data['b1'], name='b1', trainable=True)
+        W2 = tf.Variable(data['w2'], name='W2', trainable=True)
+        b2 = tf.Variable(data['b2'], name='b2', trainable=True)
 
         # Examples dimensions assume 128x128 RGB images.
         # Convolution Layer #1
@@ -253,10 +253,16 @@ def build_rpn_model(conf):
         # Convolution layer to learn the anchor boxes.
         # Shape: [-1, 64, 64, 64] ---> [-1, 6, 64, 64]
         # Kernel: 5x5  Features: 6
-        b3 = model.bias([6, 1, 1], 'b3')
-        W3 = model.weights([5, 5, num_filters, 6], 'W3')
+        if b3 is W3 is None:
+            print('Using default W3')
+            b3 = model.bias([6, 1, 1], 'b3')
+            W3 = model.weights([15, 15, num_filters, 6], 'W3')
+        else:
+            print('Restoring W3')
+            W3 = tf.Variable(W3, name='W3', trainable=False)
+            b3 = tf.Variable(b3, name='b3', trainable=False)
         conv3 = tf.nn.conv2d(conv2_pool, W3, [1, 1, 1, 1], **convpool_opts)
-        conv3 = tf.nn.relu(conv3 + b3)
+        conv3 = tf.nn.relu(conv3 + b3, name='net_out')
 
         mask = tf.slice(y_in, [0, 0, 0, 0], [-1, 1, -1, -1])
         mask = tf.squeeze(mask, 1, name='mask')
