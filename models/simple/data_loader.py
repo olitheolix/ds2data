@@ -460,10 +460,6 @@ class FasterRcnnRpn(DataSet):
             all_features.append(img)
             meta.append(MetaData(fname, label_mr, None))
 
-            # fixme
-            print('debug: Only loading one image')
-            break
-
         # Ensure that everything is a proper NumPy array.
         all_features = np.array(all_features, np.uint8)
         all_labels = np.array(all_labels, np.float32)
