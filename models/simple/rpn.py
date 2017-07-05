@@ -315,7 +315,7 @@ def main_rpn():
         assert is_obj.shape.as_list()[1:] == [128, 128]
         cost2 = tf.multiply(cost2, is_obj)
 
-        cost = tf.reduce_sum(cost1 + 0 * cost2)
+        cost = tf.reduce_sum(cost1 + cost2)
         opt = tf.train.AdamOptimizer(learning_rate=1E-4).minimize(cost)
 
     sess.run(tf.global_variables_initializer())
@@ -340,23 +340,35 @@ def main_rpn():
 
         # Find all locations with valid mask and an object.
         mask = y[0, 0]
-        num_obj = len(np.nonzero(y[0, 2] * mask)[0])
-        # num_obj = min(num_obj, 40)
+        has_obj = y[0, 2] * mask
+        h, w = has_obj.shape
+        has_obj = has_obj.flatten()
 
-        # Equally, find all locations with valid mask but devoid of object.
+        # Equally, find all locations with valid mask but devoid of an object.
         has_no_obj = y[0, 1] * mask
-        h, w = has_no_obj.shape
+        assert has_no_obj.shape == (h, w)
         has_no_obj = has_no_obj.flatten()
 
-        idx = np.nonzero(has_no_obj)[0]
-        idx = idx[np.random.permutation(len(idx))]
-        idx = idx[num_obj:]
+        idx_obj = np.nonzero(has_obj)[0]
+        if len(idx_obj) > 40:
+            p = np.random.permutation(len(idx_obj))
+            idx_obj = idx_obj[p[:40]]
 
-        assert mask.shape == (h, w)
-        mask = mask.flatten()
-        mask[idx] = 0
+        idx_no_obj = np.nonzero(has_no_obj)[0]
+        assert len(idx_no_obj) >= 80 - len(idx_obj)
+        p = np.random.permutation(len(idx_no_obj))
+        idx_no_obj = idx_no_obj[p[:80 - len(idx_obj)]]
+
+        # Ensure we have exactly 80 valid locations. Ideally, 40 will contain
+        # an object and 40 will not. However, if we do not have 40 locations
+        # with an object we will use non-object locations instead.
+        mask = np.zeros(h * w, mask.dtype)
+        mask[idx_obj] = 1
+        mask[idx_no_obj] = 1
+        assert np.count_nonzero(mask) == 80
         mask = mask.reshape((h, w))
         y[0, 0] = mask
+        del mask, has_obj, h, w, has_no_obj, idx_obj, idx_no_obj, p
 
         fd = dict(feed_dict={x_in: x, y_in: y})
         out = sess.run([opt, cost], **fd)
@@ -399,17 +411,9 @@ def main_rpn():
 
         avg_pos = np.mean(np.abs(gt_bbox[:2, :] - pred_bbox[:2, :]))
         avg_dim = np.mean(np.abs(gt_bbox[2:, :] - pred_bbox[2:, :]))
-        s3 = f'   Pos={avg_pos:4.2f}  Dim={avg_dim:4.2f}'
+        s3 = f'   Pos={avg_pos:4.2f}  Dim={avg_dim:5.3f}'
         print(s1 + s2 + s3)
 
-        # gt_obj = gt_obj * mask
-        # pred_obj = pred_obj * mask
-        # plt.figure()
-        # plt.subplot(1, 2, 1); plt.imshow(gt_obj)
-        # plt.subplot(1, 2, 2); plt.imshow(pred_obj)
-        # plt.show()
-
-        # plt.plot((gt_bbox[:2, :] - pred_bbox[:2, :]).T); plt.grid(); plt.show()
         # embed(); return
 
         del g, gt_obj, pred_obj, mask, mask_idx
