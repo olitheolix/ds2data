@@ -555,13 +555,23 @@ class FasterRcnnRpn(DataSet):
         # this, we simply stamp a block of 1's into the image and convolve it
         # with the anchor box.
         overlap = np.zeros((len(bboxes), im_height, im_width), np.float32)
+        overlap_rat = np.zeros_like(overlap)
         anchor = np.ones((a_height, a_width), np.float32)
         for i, (x0, x1, y0, y1) in enumerate(bboxes):
             overlap[i, y0:y1, x0:x1] = 1
             overlap[i] = scipy.signal.fftconvolve(overlap[i], anchor, mode='same')
-            del i, x0, x1, y0, y1
+
+            bbox_area = (x1 - x0) * (y1 - y0)
+            assert bbox_area > 0
+            max_overlap = min(a_width * a_height, bbox_area)
+            overlap_rat[i] = overlap[i] / max_overlap
+            del i, x0, x1, y0, y1, max_overlap
         del anchor
 
+        # Compute the size of each BBox in pixels. Add the size of the Anchor
+        # box to that number. The result is the maximum possible size of the
+        # union of the two shapes. We will need this when we compute the IoU
+        # ratio below.
         sum_areas = np.zeros(len(bboxes), np.float32)
         for i, (x0, x1, y0, y1) in enumerate(bboxes):
             bbox_area = (x1 - x0) * (y1 - y0)
@@ -593,15 +603,21 @@ class FasterRcnnRpn(DataSet):
                     continue
 
                 # Compute Intersection over Union.
-                union = sum_areas - overlap[:, acy, acx]
-                iou = overlap[:, acy, acx] / union
-                idx = np.argmax(iou)
-                max_iou = iou[idx]
-                if max_iou <= 0.7:
-                    continue
-
-                bbox = bboxes[idx]
-                del union, iou, idx, max_iou
+                if False:
+                    union = sum_areas - overlap[:, acy, acx]
+                    iou = overlap[:, acy, acx] / union
+                    idx = np.argmax(iou)
+                    max_iou = iou[idx]
+                    if max_iou <= 0.7:
+                        continue
+                    bbox = bboxes[idx]
+                    del union, iou, idx, max_iou
+                else:
+                    rat = overlap_rat[:, acy, acx]
+                    if max(rat) <= 0.9:
+                        continue
+                    bbox = bboxes[np.argmax(rat)]
+                    del rat
 
                 # If we get to here it means the anchor has sufficient overlap
                 # with at least one object. Therefore, mark the area as
