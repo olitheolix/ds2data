@@ -6,6 +6,7 @@ import model
 import datetime
 import tflogger
 import data_loader
+import scipy.signal
 import matplotlib.pyplot as plt
 from IPython import embed
 
@@ -418,14 +419,13 @@ def main_rpn():
 
         del g, gt_obj, pred_obj, mask, mask_idx
 
-    import scipy.signal
     data['w3'] = sess.run(W3)
     data['b3'] = sess.run(b3)
     pickle.dump(data, open('/tmp/dump2.pickle', 'wb'))
     smooth = scipy.signal.convolve(tot_cost, [1 / 3] * 3)[1:-2]
-    plt.semilogy(tot_cost, '-b')
-    plt.semilogy(smooth, '--r', linewidth=2)
-    plt.ylim((1E-5, 1E-1))
+    plt.plot(tot_cost, '-b')
+    plt.plot(smooth, '--r', linewidth=2)
+    plt.ylim((0, np.amax(tot_cost)))
     plt.grid()
     plt.show()
     embed()
