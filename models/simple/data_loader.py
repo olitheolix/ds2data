@@ -2,6 +2,7 @@
 import os
 import glob
 import collections
+import scipy.signal
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -527,12 +528,6 @@ class FasterRcnnRpn(DataSet):
             # Mark off the regions in the image we have already used.
             box_img[y0:y1, x0:x1] = 1
 
-            # Pick a random object and scale its colour channel(s).
-            obj = np.array(objs[np.random.randint(0, pool_size)])
-            for i in range(obj.shape[0]):
-                obj[i, :, :] = obj[i, :, :] * np.random.uniform(0.3, 1)
-            obj = obj.astype(np.uint8)
-
             # Compute a mask to only copy the image portion that contains the
             # object but not those that contain only the black background.
             idx = np.nonzero(obj > 30)
@@ -556,6 +551,24 @@ class FasterRcnnRpn(DataSet):
         anchor_hwidth, anchor_hheight = 16, 16
         a_width, a_height = 2 * anchor_hwidth + 1, 2 * anchor_hheight + 1
 
+        # Find out where the anchor box will overlap with each BBox. To do
+        # this, we simply stamp a block of 1's into the image and convolve it
+        # with the anchor box.
+        overlap = np.zeros((len(bboxes), im_height, im_width), np.float32)
+        anchor = np.ones((a_height, a_width), np.float32)
+        for i, (x0, x1, y0, y1) in enumerate(bboxes):
+            overlap[i, y0:y1, x0:x1] = 1
+            overlap[i] = scipy.signal.fftconvolve(overlap[i], anchor, mode='same')
+            del i, x0, x1, y0, y1
+        del anchor
+
+        sum_areas = np.zeros(len(bboxes), np.float32)
+        for i, (x0, x1, y0, y1) in enumerate(bboxes):
+            bbox_area = (x1 - x0) * (y1 - y0)
+            assert bbox_area > 0
+            sum_areas[i] = a_width * a_height + bbox_area
+            del i, x0, x1, y0, y1, bbox_area
+
         for y in range(ft_height):
             for x in range(ft_width):
                 # Compute anchor box coordinates in original image.
@@ -570,35 +583,25 @@ class FasterRcnnRpn(DataSet):
                     out[0:3, y, x] = [0, 1, 0]
                     continue
 
-                # Mark this region as a valid one (ie the anchor box is not
-                # clipped in any direction).
-                out[0, y, x] = 1
+                # Mark this region as valid one (ie the anchor box is not
+                # clipped in any direction). Also, initialise it with no object
+                # present (we will update this later if necessary).
+                out[0:3, y, x] = [1, 1, 0]
 
-                # Find out which BBox (if any) has the highest IoU:
-                max_iou, bbox = 0.7, None
-                sa = {(x, y) for x in range(ax0, ax1 + 1) for y in range(ay0, ay1 + 1)}
-                for x0, x1, y0, y1 in bboxes:
-                    sb = {(x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)}
-                    inter = len(sa.intersection(sb))
-                    union = len(sa.union(sb))
-
-                    # Do nothing if there is no overlap.
-                    if union == 0:
-                        continue
-
-                    # Compute the IoU ratio. If it exceeds 0.7 add the current
-                    # bbox to the candidate list.
-                    iou = inter / union
-                    if iou > max_iou:
-                        max_iou = iou
-                        bbox = x0, x1, y0, y1
-
-                # Mark the area as "no-object" if the anchor did not
-                # sufficiently overlap with an object. Then move on to the next
-                # object.
-                if bbox is None:
-                    out[1:3, y, x] = [1, 0]
+                # Do not proceed if there is no overlap between BBox and anchor.
+                if np.max(overlap[:, acy, acx]) == 0:
                     continue
+
+                # Compute Intersection over Union.
+                union = sum_areas - overlap[:, acy, acx]
+                iou = overlap[:, acy, acx] / union
+                idx = np.argmax(iou)
+                max_iou = iou[idx]
+                if max_iou <= 0.7:
+                    continue
+
+                bbox = bboxes[idx]
+                del union, iou, idx, max_iou
 
                 # If we get to here it means the anchor has sufficient overlap
                 # with at least one object. Therefore, mark the area as
