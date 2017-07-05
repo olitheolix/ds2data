@@ -450,7 +450,7 @@ class FasterRcnnRpn(DataSet):
             assert img.shape == dims == (chan, height, width)
 
             # Place objects.
-            img, bboxes = self.placeObjects(img, num_placements=2)
+            img, bboxes = self.placeObjects(img, num_placements=20)
             assert img.shape == dims
             assert bboxes.dtype == np.uint32
             assert bboxes.shape[1] == 4
