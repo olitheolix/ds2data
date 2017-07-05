@@ -377,23 +377,26 @@ def train_rpn(sess, conf):
         assert has_no_obj.shape == (h, w)
         has_no_obj = has_no_obj.flatten()
 
+        tot_samples = 40
+
         idx_obj = np.nonzero(has_obj)[0]
-        if len(idx_obj) > 40:
+        if len(idx_obj) > tot_samples // 2:
             p = np.random.permutation(len(idx_obj))
-            idx_obj = idx_obj[p[:40]]
+            idx_obj = idx_obj[p[:tot_samples // 2]]
+        num_obj = len(idx_obj)
 
         idx_no_obj = np.nonzero(has_no_obj)[0]
-        assert len(idx_no_obj) >= 80 - len(idx_obj)
+        assert len(idx_no_obj) >= tot_samples - len(idx_obj)
         p = np.random.permutation(len(idx_no_obj))
-        idx_no_obj = idx_no_obj[p[:80 - len(idx_obj)]]
+        idx_no_obj = idx_no_obj[p[:tot_samples - len(idx_obj)]]
 
-        # Ensure we have exactly 80 valid locations. Ideally, 40 will contain
-        # an object and 40 will not. However, if we do not have 40 locations
-        # with an object we will use non-object locations instead.
+        # Ensure we have exactly tot_samples (160) valid locations. Ideally, 80
+        # will contain an object and 80 will not. However, if we do not have 80
+        # locations with an object we will use non-object locations instead.
         mask = np.zeros(h * w, mask.dtype)
         mask[idx_obj] = 1
         mask[idx_no_obj] = 1
-        assert np.count_nonzero(mask) == 80
+        assert np.count_nonzero(mask) == tot_samples
         mask = mask.reshape((h, w))
         y[0, 0] = mask
         del mask, has_obj, h, w, has_no_obj, idx_obj, idx_no_obj, p
@@ -422,7 +425,7 @@ def train_rpn(sess, conf):
         correct = np.count_nonzero(gt_obj == pred_obj)
         rat = 100 * (correct / tot)
         s1 = f'  {batch:,}: Cost: {out[1]:.2E}'
-        s2 = f'   IsObject={rat:4.1f}% ({correct} / {tot})'
+        s2 = f'   IsObject={rat:4.1f}% ({num_obj} {correct}/{tot})'
 
         gt_bbox, pred_bbox = sess.run([g('rpn/gt_bbox:0'), g('rpn/pred_bbox:0')], **fd)
         gt_bbox = np.squeeze(gt_bbox)
