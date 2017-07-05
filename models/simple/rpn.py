@@ -543,17 +543,22 @@ def main_rpn():
     conf = NetConf(
         width=512, height=512, colour='rgb', seed=0, num_sptr=20,
         num_dense=32, keep_model=0.9, keep_spt=0.9, batch_size=16,
-        num_epochs=1, train_rat=0.8, num_samples=10
+        num_epochs=30, train_rat=0.8, num_samples=20
     )
 
     sess = tf.Session()
-    tot_cost = train_rpn(sess, conf)
-    smooth = scipy.signal.convolve(tot_cost, [1 / 3] * 3)[1:-2]
-    plt.plot(tot_cost, '-b')
-    plt.plot(smooth, '--r', linewidth=2)
-    plt.ylim((0, np.amax(tot_cost)))
-    plt.grid()
-    plt.show()
+    train = True
+
+    if train:
+        tot_cost = train_rpn(sess, conf)
+        smooth = scipy.signal.convolve(tot_cost, [1 / 3] * 3)[1:-2]
+        plt.plot(tot_cost, '-b')
+        plt.plot(smooth, '--r', linewidth=2)
+        plt.ylim((0, np.amax(tot_cost)))
+        plt.grid()
+        plt.show()
+    else:
+        validate_rpn(sess, conf)
 
 
 def main():
