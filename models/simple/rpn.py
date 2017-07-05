@@ -3,6 +3,7 @@
 import os
 import json
 import model
+import pickle
 import datetime
 import tflogger
 import data_loader
@@ -209,17 +210,7 @@ def main_cls():
     saveState(sess, conf, log, saver)
 
 
-def main_rpn():
-    sess = tf.Session()
-
-    # Network configuration.
-    conf = NetConf(
-        width=512, height=512, colour='rgb', seed=0, num_sptr=20,
-        num_dense=32, keep_model=0.9, keep_spt=0.9, batch_size=16,
-        num_epochs=1, train_rat=0.8, num_samples=10
-    )
-
-    import pickle
+def build_rpn_model(conf):
     data = pickle.load(open('/tmp/dump.pickle', 'rb'))
 
     # Input variables.
@@ -252,15 +243,14 @@ def main_rpn():
         # Kernel: 5x5  Features: 64  Pool: 2x2
         conv2 = tf.nn.conv2d(conv1_pool, W2, [1, 1, 1, 1], **convpool_opts)
         conv2 = tf.nn.relu(conv2 + b2)
-        conv2_pool = tf.nn.max_pool(conv2, pool_pad, mp_stride,
-                                        **convpool_opts, name='c2p')
+        conv2_pool = tf.nn.max_pool(conv2, pool_pad, mp_stride, **convpool_opts)
         width, height = width // 2, height // 2
 
         # Convolution layer to learn the anchor boxes.
         # Shape: [-1, 64, 64, 64] ---> [-1, 6, 64, 64]
         # Kernel: 5x5  Features: 6
-        b3 = model.bias([6, 1, 1])
-        W3 = model.weights([5, 5, num_filters, 6])
+        b3 = model.bias([6, 1, 1], 'b3')
+        W3 = model.weights([5, 5, num_filters, 6], 'W3')
         conv3 = tf.nn.conv2d(conv2_pool, W3, [1, 1, 1, 1], **convpool_opts)
         conv3 = tf.nn.relu(conv3 + b3)
 
@@ -316,8 +306,18 @@ def main_rpn():
         assert is_obj.shape.as_list()[1:] == [128, 128]
         cost2 = tf.multiply(cost2, is_obj)
 
-        cost = tf.reduce_sum(cost1 + cost2)
-        opt = tf.train.AdamOptimizer(learning_rate=1E-4).minimize(cost)
+        tf.reduce_sum(cost1 + cost2, name='cost')
+
+
+def train_rpn(sess, conf):
+    build_rpn_model(conf)
+
+    g = tf.get_default_graph().get_tensor_by_name
+    W3, b3 = g('rpn/W3:0'), g('rpn/b3:0')
+    x_in, y_in = g('x_in:0'), g('y_in:0')
+    cost = g('rpn/cost:0')
+
+    opt = tf.train.AdamOptimizer(learning_rate=1E-4).minimize(cost)
 
     sess.run(tf.global_variables_initializer())
 
@@ -325,18 +325,33 @@ def main_rpn():
     ds = data_loader.FasterRcnnRpn(conf)
     chan, height, width = ds.imageDimensions().tolist()
 
-    epoch = 0
+    # Load weights of first layers.
+    data = pickle.load(open('/tmp/dump.pickle', 'rb'))
+
     tot_cost = []
-    for i in range(400):
+    batch, epoch = -1, 0
+    while True:
+        batch += 1
+
+        # Get next batch. If there is no next batch, save the current weights,
+        # reset the data source, and start over.
         x, y, meta = ds.nextBatch(1, 'train')
-        if len(y) == 0:
+        if len(y) == 0 or batch == 0:
             ds.reset()
-            epoch += 1
+
+            # Save all weights.
             data['w3'] = sess.run(W3)
             data['b3'] = sess.run(b3)
             data['log'] = tot_cost
             pickle.dump(data, open('/tmp/dump2.pickle', 'wb'))
+
+            # Time to abort training?
+            if epoch >= conf.num_epochs:
+                break
+
+            # No that the data source has been reset, we can start over.
             print(f'Epoch {epoch:,}')
+            epoch += 1
             continue
 
         # Find all locations with valid mask and an object.
@@ -375,7 +390,6 @@ def main_rpn():
         out = sess.run([opt, cost], **fd)
         tot_cost.append(out[1])
 
-        g = tf.get_default_graph().get_tensor_by_name
         gt_obj, pred_obj = sess.run([g('rpn/gt_obj:0'), g('rpn/pred_obj:0')], **fd)
         mask = sess.run(g('rpn/mask:0'), **fd)
         gt_obj, pred_obj, mask = gt_obj[0], pred_obj[0], mask[0]
@@ -395,7 +409,7 @@ def main_rpn():
         tot = len(gt_obj)
         correct = np.count_nonzero(gt_obj == pred_obj)
         rat = 100 * (correct / tot)
-        s1 = f'  {i:,}: Cost: {out[1]:.2E}'
+        s1 = f'  {batch:,}: Cost: {out[1]:.2E}'
         s2 = f'   IsObject={rat:4.1f}% ({correct} / {tot})'
 
         gt_bbox, pred_bbox = sess.run([g('rpn/gt_bbox:0'), g('rpn/pred_bbox:0')], **fd)
@@ -415,20 +429,26 @@ def main_rpn():
         s3 = f'   Pos={avg_pos:4.2f}  Dim={avg_dim:5.3f}'
         print(s1 + s2 + s3)
 
-        # embed(); return
+        del gt_obj, pred_obj, mask, mask_idx
+    return tot_cost
 
-        del g, gt_obj, pred_obj, mask, mask_idx
 
-    data['w3'] = sess.run(W3)
-    data['b3'] = sess.run(b3)
-    pickle.dump(data, open('/tmp/dump2.pickle', 'wb'))
+def main_rpn():
+    # Network configuration.
+    conf = NetConf(
+        width=512, height=512, colour='rgb', seed=0, num_sptr=20,
+        num_dense=32, keep_model=0.9, keep_spt=0.9, batch_size=16,
+        num_epochs=1, train_rat=0.8, num_samples=10
+    )
+
+    sess = tf.Session()
+    tot_cost = train_rpn(sess, conf)
     smooth = scipy.signal.convolve(tot_cost, [1 / 3] * 3)[1:-2]
     plt.plot(tot_cost, '-b')
     plt.plot(smooth, '--r', linewidth=2)
     plt.ylim((0, np.amax(tot_cost)))
     plt.grid()
     plt.show()
-    embed()
 
 
 def main():
