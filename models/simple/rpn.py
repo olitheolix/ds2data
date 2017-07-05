@@ -2,6 +2,7 @@
 """
 import os
 import json
+import time
 import model
 import pickle
 import datetime
@@ -9,6 +10,8 @@ import tflogger
 import data_loader
 import scipy.signal
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+
 from IPython import embed
 
 import numpy as np
@@ -166,6 +169,7 @@ def main_cls():
 
     # Load data set and dump some info about it into the terminal.
     ds = data_loader.FasterRcnnClassifier(conf)
+    ds.printSummary()
     chan, height, width = ds.imageDimensions().tolist()
     num_classes = len(ds.classNames())
 
@@ -323,6 +327,7 @@ def train_rpn(sess, conf):
 
     # Load data set and dump some info about it into the terminal.
     ds = data_loader.FasterRcnnRpn(conf)
+    ds.printSummary()
     chan, height, width = ds.imageDimensions().tolist()
 
     # Load weights of first layers.
@@ -330,6 +335,7 @@ def train_rpn(sess, conf):
 
     tot_cost = []
     batch, epoch = -1, 0
+    print()
     while True:
         batch += 1
 
