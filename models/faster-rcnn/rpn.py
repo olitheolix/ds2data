@@ -505,6 +505,9 @@ def validate_rpn(sess, conf):
         if len(y) == 0:
             break
 
+        # Either run the network to predict the positions and BBoxes, or use
+        # the ground truth label directly. The second option is only useful to
+        # verify the plots below work as intended.
         t0 = time.perf_counter()
         if True:
             out = sess.run(net_out, feed_dict={x_in: x})
@@ -534,16 +537,10 @@ def validate_rpn(sess, conf):
 
                 ix, iy = fx * 4 + 2, fy * 4 + 2
 
-                if False:
-                    xc = int(32 * ibxc + ix)
-                    yc = int(32 * ibyc + iy)
-                    hw = int(16 * np.exp(ibw))
-                    hh = int(16 * np.exp(ibh))
-                else:
-                    xc = int(ibxc + ix)
-                    yc = int(ibyc + iy)
-                    hw = int(32 + ibw) // 2
-                    hh = int(32 + ibh) // 2
+                xc = int(ibxc + ix)
+                yc = int(ibyc + iy)
+                hw = int(32 + ibw) // 2
+                hh = int(32 + ibh) // 2
 
                 if hw < 2 or hh < 2:
                     continue
@@ -580,7 +577,7 @@ def main_rpn():
     # Network configuration.
     conf = NetConf(
         width=512, height=512, colour='rgb', seed=0, num_dense=32,
-        batch_size=16, num_epochs=1, train_rat=0.8, num_samples=20
+        batch_size=16, num_epochs=5, train_rat=0.8, num_samples=20
     )
 
     train = False

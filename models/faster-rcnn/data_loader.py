@@ -602,22 +602,14 @@ class FasterRcnnRpn(DataSet):
                 if np.max(overlap[:, acy, acx]) == 0:
                     continue
 
-                # Compute Intersection over Union.
-                if False:
-                    union = sum_areas - overlap[:, acy, acx]
-                    iou = overlap[:, acy, acx] / union
-                    idx = np.argmax(iou)
-                    max_iou = iou[idx]
-                    if max_iou <= 0.7:
-                        continue
-                    bbox = bboxes[idx]
-                    del union, iou, idx, max_iou
-                else:
-                    rat = overlap_rat[:, acy, acx]
-                    if max(rat) <= 0.9:
-                        continue
-                    bbox = bboxes[np.argmax(rat)]
-                    del rat
+                # Compute the ratio of overlap. The value ranges from 0.0 to
+                # 1.0. A value of 1.0 means that the anchor contains an entire
+                # object.
+                rat = overlap_rat[:, acy, acx]
+                if max(rat) <= 0.9:
+                    continue
+                bbox = bboxes[np.argmax(rat)]
+                del rat
 
                 # If we get to here it means the anchor has sufficient overlap
                 # with at least one object. Therefore, mark the area as
@@ -631,16 +623,17 @@ class FasterRcnnRpn(DataSet):
                 assert bw > 0 and bh > 0
                 del bbox, bx0, bx1, by0, by1
 
-                # Compute the bbox part of the label data.
-                if False:
-                    lx, ly = (bcx - acx) / a_width, (bcy - acy) / a_height
-                    lw, lh = np.log(bw / a_width), np.log(bh / a_height)
-                else:
-                    lx, ly = bcx - acx, bcy - acy
-                    lw, lh = bw - a_width, bh - a_height
+                # Compute the BBox parameters in image coordinates (_not_
+                # feature coordinates). The (lx, ly) values encode the object
+                # centre relative to the anchor in the image. The (lw, lh)
+                # encode the difference of BBox width/height with respect to
+                # the anchor box.
+                lx, ly = bcx - acx, bcy - acy
+                lw, lh = bw - a_width, bh - a_height
 
-                tmp = np.array([lx, ly, lw, lh], np.float32)
-                out[3:, y, x] = tmp
+                # Insert the BBox parameters into the training vector at the
+                # respective image position.
+                out[3:, y, x] = [lx, ly, lw, lh]
                 del bcx, bcy, bw, bh, lx, ly, lw, lh
         return out
 
