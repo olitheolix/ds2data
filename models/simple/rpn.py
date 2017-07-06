@@ -437,10 +437,13 @@ def train_rpn(sess, conf):
         pred_obj = np.squeeze(pred_obj)
 
         mask = mask.flatten()
+        mask_obj = np.array(mask)
         gt_obj = gt_obj.flatten()
         pred_obj = pred_obj.flatten()
+        mask_obj = (mask_obj * gt_obj).flatten()
 
         mask_idx = np.nonzero(mask)
+        mask_obj_idx = np.nonzero(mask_obj)
         gt_obj = gt_obj[mask_idx]
         pred_obj = pred_obj[mask_idx]
 
@@ -459,15 +462,42 @@ def train_rpn(sess, conf):
         assert gt_bbox.shape == pred_bbox.shape == (4, 128, 128)
         gt_bbox = gt_bbox.reshape((4, 128 * 128))
         pred_bbox = pred_bbox.reshape((4, 128 * 128))
-        gt_bbox = gt_bbox[:, mask_idx[0]]
-        pred_bbox = pred_bbox[:, mask_idx[0]]
+        gt_bbox = gt_bbox[:, mask_obj_idx[0]]
+        pred_bbox = pred_bbox[:, mask_obj_idx[0]]
 
-        avg_pos = np.mean(np.abs(gt_bbox[:2, :] - pred_bbox[:2, :]))
-        avg_dim = np.mean(np.abs(gt_bbox[2:, :] - pred_bbox[2:, :]))
-        s3 = f'   Pos={avg_pos:4.2f}  Dim={avg_dim:5.3f}'
-        print(s1 + s2 + s3)
+        err = np.abs(gt_bbox - pred_bbox)
+        avg_pos = np.mean(err[:2, :])
+        min_pos = np.amin(err[:2, :])
+        max_pos = np.amax(err[:2, :])
+        avg_dim = np.mean(err[2:, :])
+        min_dim = np.amin(err[2:, :])
+        max_dim = np.amax(err[2:, :])
+        s3 = f'   Pos={min_pos:5.2f} {avg_pos:5.2f} {max_pos:5.2f}'
+        s4 = f'   Dim={min_dim:5.2f} {avg_dim:5.2f} {max_dim:5.2f}'
+        print(s1 + s2 + s3 + s4)
 
         del gt_obj, pred_obj, mask, mask_idx
+
+    plt.figure()
+    plt.subplot(1, 2, 1)
+    plt.plot(gt_bbox[0, :].T, 'b-', label='PR X')
+    plt.plot(gt_bbox[1, :].T, 'r-', label='PR Y')
+    plt.plot(pred_bbox[0, :].T, 'b--', label='GT X')
+    plt.plot(pred_bbox[1, :].T, 'r--', label='GT Y')
+    plt.grid()
+    plt.legend(loc='best')
+    plt.title('BBox Position')
+
+    plt.subplot(1, 2, 2)
+    plt.plot(gt_bbox[2, :].T, 'b-', label='PR W')
+    plt.plot(gt_bbox[3, :].T, 'r-', label='PR H')
+    plt.plot(pred_bbox[2, :].T, 'b--', label='GT W')
+    plt.plot(pred_bbox[3, :].T, 'r--', label='GT H')
+    plt.grid()
+    plt.legend(loc='best')
+    plt.title('BBox Width/Height')
+
+    # embed()
     return tot_cost
 
 
