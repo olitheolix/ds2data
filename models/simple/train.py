@@ -163,11 +163,6 @@ def saveState(sess, conf, log, saver):
 
 def main():
     # Network configuration.
-    conf = NetConf(
-        width=32, height=32, colour='L', seed=0, num_sptr=20,
-        num_dense=32, keep_model=0.9, keep_spt=0.9, batch_size=16,
-        num_epochs=2, train_rat=0.8, num_samples=None
-    )
     conf = parseCmdline()
 
     # Load data set and dump some info about it into the terminal.
