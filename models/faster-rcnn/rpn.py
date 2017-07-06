@@ -481,17 +481,18 @@ def train_rpn(sess, conf, log):
 
 
 def validate_rpn(sess, conf):
-    # Load weights of first layers.
+    # Load the network weights.
     net_vars = pickle.load(open('/tmp/dump2.pickle', 'rb'))
-
     assert 'w3' in net_vars and 'b3' in net_vars
-    build_rpn_model(conf, net_vars)
 
+    # Build model with pre-trained weights.
+    build_rpn_model(conf, net_vars)
+    sess.run(tf.global_variables_initializer())
+
+    # Handles to the TF nodes for data input/output.
     g = tf.get_default_graph().get_tensor_by_name
     x_in = g('x_in:0')
     net_out = g('rpn/net_out:0')
-
-    sess.run(tf.global_variables_initializer())
 
     # Load data set and dump some info about it into the terminal.
     ds = data_loader.FasterRcnnRpn(conf)
@@ -571,24 +572,17 @@ def validate_rpn(sess, conf):
                 img_out[y0, x0:x1, :] = 255
                 img_out[y1, x0:x1, :] = 255
 
-        gs1 = gridspec.GridSpec(2, 2)
-        gs1.update(wspace=0.01, hspace=0.01)
-
+        # Show the image with BBoxes, without BBoxes, and the predicted object
+        # class (with-object, without-object).
         plt.figure()
-        plt.subplot(gs1[0])
-        plt.imshow(img)
-        plt.subplot(gs1[1])
-        plt.imshow(obj, cmap='gray')
-        plt.subplot(gs1[2])
-        plt.imshow(obj, cmap='gray')
-        plt.subplot(gs1[3])
-        plt.imshow(obj, cmap='gray')
-
-        plt.figure()
+        plt.subplot(1, 3, 1)
         plt.imshow(img_out)
+        plt.subplot(1, 3, 2)
+        plt.imshow(img)
+        plt.subplot(1, 3, 3)
+        plt.imshow(obj, cmap='gray')
 
-        plt.show()
-        return
+    plt.show()
 
 
 def main_rpn():
