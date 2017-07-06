@@ -321,7 +321,7 @@ def build_rpn_model(conf, net_vars):
 
         # Remove all bbox cost components for when there is no object that
         # could have a bbox to begin with.
-        is_obj = tf.squeeze(tf.slice(y_in, [0, 1, 0, 0], [-1, 1, -1, -1]), 1)
+        is_obj = tf.squeeze(tf.slice(y_in, [0, 2, 0, 0], [-1, 1, -1, -1]), 1)
         assert is_obj.shape.as_list()[1:] == [128, 128]
         cost2 = tf.multiply(cost2, is_obj)
 
