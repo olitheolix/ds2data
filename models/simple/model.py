@@ -19,19 +19,19 @@ def bias(shape, name=None):
 
 
 def netConv2Maxpool(x_img, num_classes, num_dense=32):
-    """ Build DNN and return optimisation node.
+    """ Build DNN and return output tensor.
 
-    The mode comprises 2 convolution layers and one dense layer.
+    The model comprises 2 convolution layers and one dense layer.
 
-    The dropout probability defaults to `keep_prob=1.0`. The placeholder that
-    controls it is `model/keep_prob:0`.
+    The dropout probability defaults to `keep_prob=1.0`. The name of the
+    placeholder variable that controls it is called `model/keep_prob:0`.
 
     Args:
         dims (list): chan, width, height of the input
         num_classes (int): number of output neurons
 
     Returns:
-        Tensorflow node that corresponds to the cost optimiser.
+        Output of network.
     """
     assert len(x_img.shape) == 4
     _, chan, height, width = x_img.shape.as_list()
