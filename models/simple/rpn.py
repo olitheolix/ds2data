@@ -268,8 +268,8 @@ def build_rpn_model(conf, net_vars):
             W3 = model.weights([15, 15, num_filters, 6], 'W3')
         else:
             print('Restoring W3')
-            W3 = tf.Variable(W3, name='W3', trainable=False)
             b3 = tf.Variable(b3, name='b3', trainable=False)
+            W3 = tf.Variable(W3, name='W3', trainable=False)
         conv3 = tf.nn.conv2d(conv2_pool, W3, [1, 1, 1, 1], **convpool_opts)
         conv3 = tf.add(conv3, b3, name='net_out')
 
@@ -354,16 +354,16 @@ def train_rpn(sess, conf):
     net_vars = copy.deepcopy(net_vars)
 
     tot_cost = []
-    batch, epoch = -1, 0
+    batch, epoch = 0, 0
+    first = True
     print()
     while True:
-        batch += 1
-
         # Get next batch. If there is no next batch, save the current weights,
         # reset the data source, and start over.
         x, y, meta = ds.nextBatch(1, 'train')
-        if len(y) == 0 or batch == 0:
+        if len(y) == 0 or first:
             lrate = np.interp(epoch, [0, conf.num_epochs], [1E-3, 5E-6])
+            first = False
             ds.reset()
 
             # Save all weights.
@@ -385,6 +385,8 @@ def train_rpn(sess, conf):
             print(f'Epoch {epoch:,}')
             epoch += 1
             continue
+
+        batch += 1
 
         # Find all locations with valid mask and an object.
         mask = y[0, 0]
@@ -417,6 +419,7 @@ def train_rpn(sess, conf):
         mask[idx_obj] = 1
         mask[idx_no_obj] = 1
         assert np.count_nonzero(mask) == tot_samples
+
         mask = mask.reshape((h, w))
         y[0, 0] = mask
         del mask, has_obj, h, w, has_no_obj, idx_obj, idx_no_obj, p
