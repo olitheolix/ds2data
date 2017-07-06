@@ -612,10 +612,12 @@ def main_rpn():
         tot_cost = train_rpn(sess, conf)
         smooth = scipy.signal.convolve(tot_cost, [1 / 7] * 7)[3:-4]
 
+        plt.figure()
         plt.plot(tot_cost, '-b')
         plt.plot(smooth, '--r', linewidth=2)
         plt.ylim((0, np.amax(tot_cost)))
         plt.grid()
+        plt.title('Cost')
         plt.show()
     else:
         validate_rpn(sess, conf)
