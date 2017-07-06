@@ -212,13 +212,11 @@ def main_cls():
     saveState(sess, conf, log, saver)
 
 
-def build_rpn_model(conf, net_vars):
-    W1 = net_vars['w1']
-    b1 = net_vars['b1']
-    W2 = net_vars['w2']
-    b2 = net_vars['b2']
-    W3 = net_vars.get('w3', None)
-    b3 = net_vars.get('b3', None)
+def build_rpn_model(conf, bwt1, bwt2, bwt3):
+    b1, W1, train1 = bwt1
+    b2, W2, train2 = bwt2
+    b3, W3, train3 = bwt3
+    del bwt1, bwt2, bwt3
 
     # W3 and b3 must be either both None, nor neither must be None.
     assert (W3 is b3 is None) or (W3 is not None and b3 is not None)
@@ -234,10 +232,10 @@ def build_rpn_model(conf, net_vars):
     width, height = conf.width, conf.height
 
     with tf.variable_scope('rpn'):
-        W1 = tf.Variable(W1, name='W1', trainable=True)
-        b1 = tf.Variable(b1, name='b1', trainable=True)
-        W2 = tf.Variable(W2, name='W2', trainable=True)
-        b2 = tf.Variable(b2, name='b2', trainable=True)
+        W1 = tf.Variable(W1, name='W1', trainable=train1)
+        b1 = tf.Variable(b1, name='b1', trainable=train1)
+        W2 = tf.Variable(W2, name='W2', trainable=train2)
+        b2 = tf.Variable(b2, name='b2', trainable=train2)
 
         # Examples dimensions assume 128x128 RGB images.
         # Convolution Layer #1
@@ -265,8 +263,8 @@ def build_rpn_model(conf, net_vars):
             W3 = model.weights([15, 15, num_filters, 6], 'W3')
         else:
             print('Restoring W3')
-            b3 = tf.Variable(b3, name='b3', trainable=False)
-            W3 = tf.Variable(W3, name='W3', trainable=False)
+            b3 = tf.Variable(b3, name='b3', trainable=train3)
+            W3 = tf.Variable(W3, name='W3', trainable=train3)
         conv3 = tf.nn.conv2d(conv2_pool, W3, [1, 1, 1, 1], **convpool_opts)
         conv3 = tf.add(conv3, b3, name='net_out')
 
@@ -329,7 +327,15 @@ def train_rpn(sess, conf, log):
     # Load the pre-trained model.
     net_vars = pickle.load(open('/tmp/dump.pickle', 'rb'))
     assert 'w3' not in net_vars and 'b3' not in net_vars
-    build_rpn_model(conf, net_vars)
+
+    W1 = net_vars['w1']
+    b1 = net_vars['b1']
+    W2 = net_vars['w2']
+    b2 = net_vars['b2']
+    W3 = net_vars.get('w3', None)
+    b3 = net_vars.get('b3', None)
+    build_rpn_model(conf, (b1, W1, True), (b2, W2, True), (None, None, True))
+    del b1, b2, W1, W2
 
     g = tf.get_default_graph().get_tensor_by_name
     W1, b1 = g('rpn/W1:0'), g('rpn/b1:0')
@@ -483,8 +489,15 @@ def validate_rpn(sess, conf):
     assert 'w3' in net_vars and 'b3' in net_vars
 
     # Build model with pre-trained weights.
-    build_rpn_model(conf, net_vars)
+    W1 = net_vars['w1']
+    b1 = net_vars['b1']
+    W2 = net_vars['w2']
+    b2 = net_vars['b2']
+    W3 = net_vars.get('w3', None)
+    b3 = net_vars.get('b3', None)
+    build_rpn_model(conf, (b1, W1, True), (b2, W2, True), (b3, W3, True))
     sess.run(tf.global_variables_initializer())
+    del b1, b2, b3, W1, W2, W3
 
     # Handles to the TF nodes for data input/output.
     g = tf.get_default_graph().get_tensor_by_name
