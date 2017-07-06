@@ -1,6 +1,7 @@
 """ Train the DNN model and save weights and log data to saved/ folder.
 """
 import os
+import copy
 import json
 import time
 import model
@@ -214,11 +215,19 @@ def main_cls():
     saveState(sess, conf, log, saver)
 
 
-def build_rpn_model(conf, W3=None, b3=None):
-    data = pickle.load(open('/tmp/dump.pickle', 'rb'))
+def build_rpn_model(conf, net_vars):
+    W1 = net_vars['w1']
+    b1 = net_vars['b1']
+    W2 = net_vars['w2']
+    b2 = net_vars['b2']
+    W3 = net_vars.get('w3', None)
+    b3 = net_vars.get('b3', None)
+
+    # W3 and b3 must be either both None, nor neither must be None.
+    assert (W3 is b3 is None) or (W3 is not None and b3 is not None)
 
     # Input variables.
-    _, _, chan, num_filters = data['w1'].shape
+    _, _, chan, num_filters = W1.shape
     x_in = tf.placeholder(tf.float32, [None, chan, conf.height, conf.width], name='x_in')
     y_in = tf.placeholder(tf.float32, [None, 7, 128, 128], name='y_in')
 
@@ -228,10 +237,10 @@ def build_rpn_model(conf, W3=None, b3=None):
     width, height = conf.width, conf.height
 
     with tf.variable_scope('rpn'):
-        W1 = tf.Variable(data['w1'], name='W1', trainable=True)
-        b1 = tf.Variable(data['b1'], name='b1', trainable=True)
-        W2 = tf.Variable(data['w2'], name='W2', trainable=True)
-        b2 = tf.Variable(data['b2'], name='b2', trainable=True)
+        W1 = tf.Variable(W1, name='W1', trainable=True)
+        b1 = tf.Variable(b1, name='b1', trainable=True)
+        W2 = tf.Variable(W2, name='W2', trainable=True)
+        b2 = tf.Variable(b2, name='b2', trainable=True)
 
         # Examples dimensions assume 128x128 RGB images.
         # Convolution Layer #1
@@ -320,9 +329,14 @@ def build_rpn_model(conf, W3=None, b3=None):
 
 
 def train_rpn(sess, conf):
-    build_rpn_model(conf)
+    # Load the pre-trained model.
+    net_vars = pickle.load(open('/tmp/dump.pickle', 'rb'))
+    assert 'w3' not in net_vars and 'b3' not in net_vars
+    build_rpn_model(conf, net_vars)
 
     g = tf.get_default_graph().get_tensor_by_name
+    W1, b1 = g('rpn/W1:0'), g('rpn/b1:0')
+    W2, b2 = g('rpn/W2:0'), g('rpn/b2:0')
     W3, b3 = g('rpn/W3:0'), g('rpn/b3:0')
     x_in, y_in = g('x_in:0'), g('y_in:0')
     cost = g('rpn/cost:0')
@@ -336,8 +350,7 @@ def train_rpn(sess, conf):
     ds.printSummary()
     chan, height, width = ds.imageDimensions().tolist()
 
-    # Load weights of first layers.
-    data = pickle.load(open('/tmp/dump.pickle', 'rb'))
+    net_vars = copy.deepcopy(net_vars)
 
     tot_cost = []
     batch, epoch = -1, 0
@@ -352,10 +365,15 @@ def train_rpn(sess, conf):
             ds.reset()
 
             # Save all weights.
-            data['w3'] = sess.run(W3)
-            data['b3'] = sess.run(b3)
-            data['log'] = tot_cost
-            pickle.dump(data, open('/tmp/dump2.pickle', 'wb'))
+            net_vars['w1'] = sess.run(W1)
+            net_vars['b1'] = sess.run(b1)
+            net_vars['w2'] = sess.run(W2)
+            net_vars['b2'] = sess.run(b2)
+            net_vars['w3'] = sess.run(W3)
+            net_vars['b3'] = sess.run(b3)
+            net_vars['log'] = tot_cost
+
+            pickle.dump(net_vars, open('/tmp/dump2.pickle', 'wb'))
 
             # Time to abort training?
             if epoch >= conf.num_epochs:
@@ -450,10 +468,10 @@ def train_rpn(sess, conf):
 
 def validate_rpn(sess, conf):
     # Load weights of first layers.
-    data = pickle.load(open('/tmp/dump2.pickle', 'rb'))
+    net_vars = pickle.load(open('/tmp/dump2.pickle', 'rb'))
 
-    assert 'w3' in data and 'b3' in data
-    build_rpn_model(conf, W3=data['w3'], b3=data['b3'])
+    assert 'w3' in net_vars and 'b3' in net_vars
+    build_rpn_model(conf, net_vars)
 
     g = tf.get_default_graph().get_tensor_by_name
     x_in, y_in = g('x_in:0'), g('y_in:0')
