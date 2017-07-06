@@ -610,7 +610,8 @@ def main_rpn():
 
     if train:
         tot_cost = train_rpn(sess, conf)
-        smooth = scipy.signal.convolve(tot_cost, [1 / 3] * 3)[1:-2]
+        smooth = scipy.signal.convolve(tot_cost, [1 / 7] * 7)[3:-4]
+
         plt.plot(tot_cost, '-b')
         plt.plot(smooth, '--r', linewidth=2)
         plt.ylim((0, np.amax(tot_cost)))
