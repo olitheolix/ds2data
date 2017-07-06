@@ -545,7 +545,7 @@ def validate_rpn(sess, conf):
                 try:
                     img_out[y0 + 1:y1 - 1, x0 + 1:x1 - 1, :] = tmp[1:-1, 1:-1, :]
                 except ValueError:
-                    pass
+                    img_out[y0:y1, x0:x1, :] = tmp
 
         gs1 = gridspec.GridSpec(2, 2)
         gs1.update(wspace=0.01, hspace=0.01)
