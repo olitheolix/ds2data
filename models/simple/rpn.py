@@ -271,7 +271,7 @@ def build_rpn_model(conf, net_vars):
             W3 = tf.Variable(W3, name='W3', trainable=False)
             b3 = tf.Variable(b3, name='b3', trainable=False)
         conv3 = tf.nn.conv2d(conv2_pool, W3, [1, 1, 1, 1], **convpool_opts)
-        conv3 = tf.nn.relu(conv3 + b3, name='net_out')
+        conv3 = tf.add(conv3, b3, name='net_out')
 
         mask = tf.slice(y_in, [0, 0, 0, 0], [-1, 1, -1, -1])
         mask = tf.squeeze(mask, 1, name='mask')
