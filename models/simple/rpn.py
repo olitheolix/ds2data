@@ -299,23 +299,23 @@ def build_rpn_model(conf, net_vars):
         pred_bbox = tf.slice(conv3, [0, 2, 0, 0], [-1, 4, -1, -1])
         gt_bbox = tf.transpose(gt_bbox, [0, 2, 3, 1], name='gt_bbox')
         pred_bbox = tf.transpose(pred_bbox, [0, 2, 3, 1], name='pred_bbox')
-        cost2 = tf.abs(gt_bbox - pred_bbox)
+        cost2 = tf.abs(gt_bbox - pred_bbox, name='cost2_t1')
 
         assert gt_bbox.shape.as_list()[1:] == [128, 128, 4]
         assert pred_bbox.shape.as_list()[1:] == [128, 128, 4]
         assert cost2.shape.as_list()[1:] == [128, 128, 4], cost1.shape
         del gt_bbox, pred_bbox
 
-        # Average over the cost of the 4 BBox parameters.
+        # Average the cost over the 4 BBox parameters.
         # In:  [N, 128, 128, 4]
         # Out: [N, 128, 128]
-        cost2 = tf.reduce_mean(cost2, axis=3, keep_dims=False)
+        cost2 = tf.reduce_mean(cost2, axis=3, keep_dims=False, name='cost2_t2')
         assert cost2.shape.as_list()[1:] == [128, 128], cost2.shape
 
         # Remove the cost for all locations not cleared by the mask. Those are
         # the regions near the boundaries.
         cost1 = tf.multiply(cost1, mask)
-        cost2 = tf.multiply(cost2, mask)
+        cost2 = tf.multiply(cost2, mask, name='cost2_t3')
         assert cost1.shape.as_list()[1:] == [128, 128]
         assert cost2.shape.as_list()[1:] == [128, 128]
 
