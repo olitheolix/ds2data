@@ -632,8 +632,13 @@ class FasterRcnnRpn(DataSet):
                 del bbox, bx0, bx1, by0, by1
 
                 # Compute the bbox part of the label data.
-                lx, ly = (bcx - acx) / a_width, (bcy - acy) / a_height
-                lw, lh = np.log(bw / a_width), np.log(bh / a_height)
+                if False:
+                    lx, ly = (bcx - acx) / a_width, (bcy - acy) / a_height
+                    lw, lh = np.log(bw / a_width), np.log(bh / a_height)
+                else:
+                    lx, ly = bcx - acx, bcy - acy
+                    lw, lh = bw - a_width, bh - a_height
+
                 tmp = np.array([lx, ly, lw, lh], np.float32)
                 out[3:, y, x] = tmp
                 del bcx, bcy, bw, bh, lx, ly, lw, lh

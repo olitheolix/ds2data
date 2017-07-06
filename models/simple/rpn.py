@@ -504,11 +504,19 @@ def validate_rpn(sess, conf):
 
                 ix, iy = fx * 4 + 2, fy * 4 + 2
 
-                xc = int(32 * ibxc + ix)
-                yc = int(32 * ibyc + iy)
-                hw = int(16 * np.exp(ibw))
-                hh = int(16 * np.exp(ibh))
-                assert hw > 1 and hh > 1
+                if False:
+                    xc = int(32 * ibxc + ix)
+                    yc = int(32 * ibyc + iy)
+                    hw = int(16 * np.exp(ibw))
+                    hh = int(16 * np.exp(ibh))
+                else:
+                    xc = int(ibxc + ix)
+                    yc = int(ibyc + iy)
+                    hw = int(32 + ibw) // 2
+                    hh = int(32 + ibh) // 2
+
+                if hw < 2 or hh < 2:
+                    continue
                 x0, y0 = xc - hw, yc - hh
                 x1, y1 = xc + hw, yc + hh
                 tmp = np.array(img_out[y0:y1, x0:x1, :])
