@@ -339,9 +339,10 @@ def train_rpn(sess, conf):
     W2, b2 = g('rpn/W2:0'), g('rpn/b2:0')
     W3, b3 = g('rpn/W3:0'), g('rpn/b3:0')
     x_in, y_in = g('x_in:0'), g('y_in:0')
+    lrate_in = tf.placeholder(tf.float32)
     cost = g('rpn/cost:0')
 
-    opt = tf.train.AdamOptimizer(learning_rate=1E-4).minimize(cost)
+    opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
 
     sess.run(tf.global_variables_initializer())
 
@@ -362,6 +363,7 @@ def train_rpn(sess, conf):
         # reset the data source, and start over.
         x, y, meta = ds.nextBatch(1, 'train')
         if len(y) == 0 or batch == 0:
+            lrate = np.interp(epoch, [0, conf.num_epochs], [1E-3, 5E-6])
             ds.reset()
 
             # Save all weights.
@@ -419,7 +421,7 @@ def train_rpn(sess, conf):
         y[0, 0] = mask
         del mask, has_obj, h, w, has_no_obj, idx_obj, idx_no_obj, p
 
-        fd = dict(feed_dict={x_in: x, y_in: y})
+        fd = dict(feed_dict={x_in: x, y_in: y, lrate_in: lrate})
         out = sess.run([opt, cost], **fd)
         tot_cost.append(out[1])
 
