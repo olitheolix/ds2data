@@ -516,42 +516,60 @@ def validate_rpn(sess, conf):
         etime = int(1000 * (time.perf_counter() - t0))
         print(f'\nElapsed: {etime:,}ms')
 
+        # Unpack the image and convert it to HWC format for Matplotlib later.
         img = np.transpose(x[0], [1, 2, 0])
-        obj = out[0, :2, :, :]
-        bbox = out[0, 2:, :, :]
-
-        # from PIL import Image
         img = (255 * img).astype(np.uint8)
-        # img = Image.fromarray(img)
-        # img = img.resize((obj.shape[2], obj.shape[1]), Image.BILINEAR)
-        # img = np.array(img, np.uint8)
         img_out = np.array(img)
 
+        # The class label is a one-hot-label encoding for is-object and
+        # is-not-object. Determine which option the network deemed more likely.
+        obj = out[0, :2, :, :]
         obj = np.argmax(obj, axis=0)
 
+        # Unpack the BBox parameters: centre x, centre y, width, height.
+        bbox = out[0, 2:6, :, :]
+
+        # Iterate over every position of the feature map and determine if the
+        # network found an object. Add the estimated BBox if it did.
         for fy in range(obj.shape[0]):
             for fx in range(obj.shape[1]):
                 if obj[fy, fx] == 0:
                     continue
-                ibxc, ibyc, ibw, ibh = bbox[:, fy, fx]
 
+                # Convert the current feature map position to the corresponding
+                # image coordinates. The following formula assumes that the
+                # image was down-sampled twice (hence the factor 4).
                 ix, iy = fx * 4 + 2, fy * 4 + 2
 
+                # BBox in image coordinates.
+                ibxc, ibyc, ibw, ibh = bbox[:, fy, fx]
+
+                # The BBox parameters are relative to the anchor position and
+                # size. Here we convert those relative values back to absolute
+                # values in the original image.
                 xc = int(ibxc + ix)
                 yc = int(ibyc + iy)
                 hw = int(32 + ibw) // 2
                 hh = int(32 + ibh) // 2
 
+                # Ignore invalid BBoxes.
                 if hw < 2 or hh < 2:
                     continue
+
+                # Compute corner coordinates for BBox to draw the rectangle.
                 x0, y0 = xc - hw, yc - hh
                 x1, y1 = xc + hw, yc + hh
-                tmp = np.array(img_out[y0:y1, x0:x1, :])
-                img_out[y0:y1, x0:x1, :] = 255
-                try:
-                    img_out[y0 + 1:y1 - 1, x0 + 1:x1 - 1, :] = tmp[1:-1, 1:-1, :]
-                except ValueError:
-                    img_out[y0:y1, x0:x1, :] = tmp
+
+                # Clip the corner coordinates to ensure they do not extend
+                # beyond the image.
+                x0, x1 = np.clip([x0, x1], 0, img_out.shape[1] - 1)
+                y0, y1 = np.clip([y0, y1], 0, img_out.shape[0] - 1)
+
+                # Draw the rectangle.
+                img_out[y0:y1, x0, :] = 255
+                img_out[y0:y1, x1, :] = 255
+                img_out[y0, x0:x1, :] = 255
+                img_out[y1, x0:x1, :] = 255
 
         gs1 = gridspec.GridSpec(2, 2)
         gs1.update(wspace=0.01, hspace=0.01)
