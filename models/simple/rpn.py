@@ -448,7 +448,7 @@ def train_rpn(sess, conf):
         correct = np.count_nonzero(gt_obj == pred_obj)
         rat = 100 * (correct / tot)
         s1 = f'  {batch:,}: Cost: {out[1]:.2E}'
-        s2 = f'   IsObject={rat:4.1f}% ({num_obj} {correct}/{tot})'
+        s2 = f'   Cls={rat:5.1f}% ({num_obj:2d} {correct:2d}/{tot:2d})'
 
         gt_bbox, pred_bbox = sess.run([g('rpn/gt_bbox:0'), g('rpn/pred_bbox:0')], **fd)
         gt_bbox = np.squeeze(gt_bbox)
