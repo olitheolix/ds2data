@@ -606,7 +606,7 @@ def main_rpn():
     )
 
     sess = tf.Session()
-    train = True
+    train = False
 
     if train:
         tot_cost = train_rpn(sess, conf)
