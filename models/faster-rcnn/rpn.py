@@ -7,7 +7,7 @@ import time
 import model
 import pickle
 import datetime
-import tflogger
+import collections
 import data_loader
 import scipy.signal
 import matplotlib.pyplot as plt
@@ -67,12 +67,12 @@ def logAccuracy(sess, ds, conf, log, epoch):
     correct, total = validateAll(sess, ds, 100, 'test')
     rat_tst = 100 * (correct / total)
     status = f'      Test {rat_tst:4.1f}% ({correct: 5,} / {total: 5,})'
-    log.f32('acc_test', epoch, rat_tst)
+    log['acc_test'].append((epoch, rat_tst))
 
     correct, total = validateAll(sess, ds, 100, 'train')
     rat_trn = 100 * (correct / total)
     status += f'        Train {rat_trn:4.1f}% ({correct: 5,} / {total: 5,})'
-    log.f32('acc_train', epoch, rat_trn)
+    log['acc_train'].append((epoch, rat_trn))
 
     print(f'Epoch {epoch}: ' + status)
     return rat_trn, rat_tst
@@ -112,7 +112,7 @@ def trainEpoch(sess, ds, conf, log, epoch, optimiser):
         _, cost_val = sess.run([optimiser, cost], feed_dict=fd)
 
         # Track the cost of current batch, as well as the number of batches.
-        log.f32('Cost', None, cost_val)
+        log['Cost'].append(cost_val)
 
 
 def saveState(sess, conf, log, saver):
@@ -153,7 +153,8 @@ def saveState(sess, conf, log, saver):
     saver.save(sess, os.path.join(dst_dir, fname_ckpt))
 
     # Save the log data (and only the log data, not the entire class).
-    log.save(os.path.join(dst_dir, fname_log))
+    # fixme: save the pickled dict
+    # log.save(os.path.join(dst_dir, fname_log))
 
     # Update the meta information.
     meta[ts] = {'conf': conf._asdict(), 'checkpoint': fname_ckpt, 'log': fname_log}
@@ -196,7 +197,7 @@ def main_cls():
     ds.printSummary()
 
     # Initialise Logger and Tensorflow Saver.
-    log = tflogger.TFLogger(sess)
+    log = collections.defaultdict(list)
 
     saver = tf.train.Saver()
 
