@@ -501,8 +501,6 @@ def validate_rpn(sess, conf):
             out = sess.run(net_out, feed_dict={x_in: x})
         else:
             out = y[:, 1:, :, :]
-            # tmp = out[0, 2:].reshape((4, -1))
-            # plt.plot(tmp.T); plt.grid(); plt.show(); return
         etime = int(1000 * (time.perf_counter() - t0))
         print(f'\nElapsed: {etime:,}ms')
 
