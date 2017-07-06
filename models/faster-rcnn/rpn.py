@@ -328,7 +328,7 @@ def build_rpn_model(conf, net_vars):
         tf.reduce_sum(cost1 + cost2, name='cost')
 
 
-def train_rpn(sess, conf):
+def train_rpn(sess, conf, log):
     # Load the pre-trained model.
     net_vars = pickle.load(open('/tmp/dump.pickle', 'rb'))
     assert 'w3' not in net_vars and 'b3' not in net_vars
@@ -353,7 +353,6 @@ def train_rpn(sess, conf):
 
     net_vars = copy.deepcopy(net_vars)
 
-    tot_cost = []
     batch, epoch = 0, 0
     first = True
     print()
@@ -362,19 +361,16 @@ def train_rpn(sess, conf):
         # reset the data source, and start over.
         x, y, meta = ds.nextBatch(1, 'train')
         if len(y) == 0 or first:
-            lrate = np.interp(epoch, [0, conf.num_epochs], [1E-3, 5E-6])
             first = False
             ds.reset()
 
-            # Save all weights.
+            # Save all the weights and biases of the network.
             net_vars['w1'] = sess.run(W1)
             net_vars['b1'] = sess.run(b1)
             net_vars['w2'] = sess.run(W2)
             net_vars['b2'] = sess.run(b2)
             net_vars['w3'] = sess.run(W3)
             net_vars['b3'] = sess.run(b3)
-            net_vars['log'] = tot_cost
-
             pickle.dump(net_vars, open('/tmp/dump2.pickle', 'wb'))
 
             # Time to abort training?
@@ -384,6 +380,7 @@ def train_rpn(sess, conf):
             # No that the data source has been reset, we can start over.
             print(f'Epoch {epoch:,}')
             epoch += 1
+            lrate = np.interp(epoch, [0, conf.num_epochs], [1E-3, 5E-6])
             continue
 
         batch += 1
@@ -426,7 +423,7 @@ def train_rpn(sess, conf):
 
         fd = dict(feed_dict={x_in: x, y_in: y, lrate_in: lrate})
         out = sess.run([opt, cost], **fd)
-        tot_cost.append(out[1])
+        log['tot_cost'].append(out[1])
 
         gt_obj, pred_obj = sess.run([g('rpn/gt_obj:0'), g('rpn/pred_obj:0')], **fd)
         mask = sess.run(g('rpn/mask:0'), **fd)
@@ -476,29 +473,11 @@ def train_rpn(sess, conf):
         s4 = f'   Dim={min_dim:5.2f} {avg_dim:5.2f} {max_dim:5.2f}'
         print(s1 + s2 + s3 + s4)
 
+        # Backup the current BBox parameters.
+        log['gt_bbox'] = gt_bbox
+        log['pred_bbox'] = pred_bbox
+
         del gt_obj, pred_obj, mask, mask_idx
-
-    plt.figure()
-    plt.subplot(1, 2, 1)
-    plt.plot(gt_bbox[0, :].T, 'b-', label='PR X')
-    plt.plot(gt_bbox[1, :].T, 'r-', label='PR Y')
-    plt.plot(pred_bbox[0, :].T, 'b--', label='GT X')
-    plt.plot(pred_bbox[1, :].T, 'r--', label='GT Y')
-    plt.grid()
-    plt.legend(loc='best')
-    plt.title('BBox Position')
-
-    plt.subplot(1, 2, 2)
-    plt.plot(gt_bbox[2, :].T, 'b-', label='PR W')
-    plt.plot(gt_bbox[3, :].T, 'r-', label='PR H')
-    plt.plot(pred_bbox[2, :].T, 'b--', label='GT W')
-    plt.plot(pred_bbox[3, :].T, 'r--', label='GT H')
-    plt.grid()
-    plt.legend(loc='best')
-    plt.title('BBox Width/Height')
-
-    # embed()
-    return tot_cost
 
 
 def validate_rpn(sess, conf):
@@ -601,19 +580,43 @@ def main_rpn():
     # Network configuration.
     conf = NetConf(
         width=512, height=512, colour='rgb', seed=0, num_dense=32,
-        batch_size=16, num_epochs=30, train_rat=0.8, num_samples=20
+        batch_size=16, num_epochs=1, train_rat=0.8, num_samples=20
     )
 
-    sess = tf.Session()
     train = False
+    log = collections.defaultdict(list)
 
+    sess = tf.Session()
     if train:
-        tot_cost = train_rpn(sess, conf)
-        smooth = scipy.signal.convolve(tot_cost, [1 / 7] * 7)[3:-4]
+        train_rpn(sess, conf, log)
+
+        gt_bbox = log['gt_bbox']
+        pred_bbox = log['pred_bbox']
+        plt.figure()
+        plt.subplot(1, 2, 1)
+        plt.plot(gt_bbox[0, :].T, 'b-', label='PR X')
+        plt.plot(gt_bbox[1, :].T, 'r-', label='PR Y')
+        plt.plot(pred_bbox[0, :].T, 'b--', label='GT X')
+        plt.plot(pred_bbox[1, :].T, 'r--', label='GT Y')
+        plt.grid()
+        plt.legend(loc='best')
+        plt.title('BBox Position')
+
+        plt.subplot(1, 2, 2)
+        plt.plot(gt_bbox[2, :].T, 'b-', label='PR W')
+        plt.plot(gt_bbox[3, :].T, 'r-', label='PR H')
+        plt.plot(pred_bbox[2, :].T, 'b--', label='GT W')
+        plt.plot(pred_bbox[3, :].T, 'r--', label='GT H')
+        plt.grid()
+        plt.legend(loc='best')
+        plt.title('BBox Width/Height')
+
+        tot_cost = log['tot_cost']
+        tot_cost_smooth = scipy.signal.convolve(tot_cost, [1 / 7] * 7)[3:-4]
 
         plt.figure()
         plt.plot(tot_cost, '-b')
-        plt.plot(smooth, '--r', linewidth=2)
+        plt.plot(tot_cost_smooth, '--r', linewidth=2)
         plt.ylim((0, np.amax(tot_cost)))
         plt.grid()
         plt.title('Cost')
