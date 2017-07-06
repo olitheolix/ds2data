@@ -509,7 +509,7 @@ def validate_rpn(sess, conf):
     build_rpn_model(conf, net_vars)
 
     g = tf.get_default_graph().get_tensor_by_name
-    x_in, y_in = g('x_in:0'), g('y_in:0')
+    x_in = g('x_in:0')
     net_out = g('rpn/net_out:0')
 
     sess.run(tf.global_variables_initializer())
