@@ -10,14 +10,11 @@ import datetime
 import collections
 import data_loader
 import scipy.signal
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-
-from IPython import embed
-
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
+from IPython import embed
 from config import NetConf
 
 
