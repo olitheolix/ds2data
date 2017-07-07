@@ -484,6 +484,20 @@ def printTrainingStatistics(sess, feed_dict, log):
     return s1 + s2 + s3
 
 
+def saveNetworkWeights(sess):
+    # Save all the weights and biases of the network.
+    g = tf.get_default_graph().get_tensor_by_name
+    W1, b1 = g('rpn/W1:0'), g('rpn/b1:0')
+    W2, b2 = g('rpn/W2:0'), g('rpn/b2:0')
+    W3, b3 = g('rpn/W3:0'), g('rpn/b3:0')
+    net_vars = dict(
+        w1=sess.run(W1), b1=sess.run(b1),
+        w2=sess.run(W2), b2=sess.run(b2),
+        w3=sess.run(W3), b3=sess.run(b3),
+    )
+    pickle.dump(net_vars, open('/tmp/dump2.pickle', 'wb'))
+
+
 def train_rpn(sess, conf, log):
     # Load the filters of the pre-trained model.
     net_vars = pickle.load(open('/tmp/dump.pickle', 'rb'))
@@ -497,9 +511,6 @@ def train_rpn(sess, conf, log):
 
     # TF node handles.
     g = tf.get_default_graph().get_tensor_by_name
-    W1, b1 = g('rpn/W1:0'), g('rpn/b1:0')
-    W2, b2 = g('rpn/W2:0'), g('rpn/b2:0')
-    W3, b3 = g('rpn/W3:0'), g('rpn/b3:0')
     x_in, y_in = g('x_in:0'), g('y_in:0')
     cost = g('rpn/cost:0')
     del g
@@ -515,35 +526,28 @@ def train_rpn(sess, conf, log):
 
     batch, epoch = 0, 0
     first = True
-    print()
+    print(f'\nTraining for {conf.num_epochs} epochs')
     while True:
-        # Get next batch. If there is no next batch, save the current weights,
-        # reset the data source, and start over.
+        # Get the next batch. If there is no next batch (ie we are the end of
+        # the epoch), save the current weights, reset the data source and start
+        # over with a new epoch.
         x, y, meta = ds.nextBatch(1, 'train')
         if len(y) == 0 or first:
-            first = False
-            ds.reset()
-
-            # Save all the weights and biases of the network.
-            net_vars = dict(
-                w1=sess.run(W1), b1=sess.run(b1),
-                w2=sess.run(W2), b2=sess.run(b2),
-                w3=sess.run(W3), b3=sess.run(b3),
-            )
-            pickle.dump(net_vars, open('/tmp/dump2.pickle', 'wb'))
-            del net_vars
+            saveNetworkWeights(sess)
 
             # Time to abort training?
             if epoch >= conf.num_epochs:
                 break
 
-            # No that the data source has been reset, we can start over.
+            # Reset the data source and upate admin variables. Then restart loop.
             print(f'Epoch {epoch:,}')
+            ds.reset()
             epoch += 1
+            first = False
             lrate = np.interp(epoch, [0, conf.num_epochs], [1E-3, 5E-6])
             continue
-
-        batch += 1
+        else:
+            batch += 1
 
         # Only retain 40 location with an object and 40 without. This will
         # avoid skewing the training data since an image often has more
