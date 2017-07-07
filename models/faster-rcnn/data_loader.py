@@ -208,9 +208,6 @@ class DS2(DataSet):
     """
     MetaData = namedtuple('MetaData', 'filename label name')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def loadRawData(self):
         # Original attributes of the images in the DS2 dataset.
         N = self.conf.num_samples
@@ -307,9 +304,6 @@ class FasterRcnnRpn(DataSet):
     each BBox with the anchor and the precise dimensions of the BBox.
     """
     MetaData = namedtuple('MetaData', 'filename mask obj_cls score')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
     def loadRawData(self):
         # Original attributes of the images in the DS2 dataset.
