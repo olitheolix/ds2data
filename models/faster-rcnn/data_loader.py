@@ -372,8 +372,13 @@ class FasterRcnnRpn(DataSet):
             img = np.transpose(img, [2, 0, 1])
             assert img.shape == dims == (chan, height, width)
 
-            # Place objects.
-            img, bboxes = self.placeObjects(img, num_placements=20)
+            # Place objects. This returns the image with the inserted objects,
+            # the BBox parameters (4 values for each placed object to encode x,
+            # y, width, height), and the class of each object.
+            num_placements = 20
+            bg_label = [k for k, v in label2name.items() if v == 'background']
+            assert len(bg_label) == 1
+            img, bboxes, obj_cls = self.placeObjects(img, num_placements, bg_label[0])
             assert img.shape == dims
             assert bboxes.dtype == np.uint32
             assert bboxes.shape[1] == 4
@@ -393,10 +398,10 @@ class FasterRcnnRpn(DataSet):
 
         return all_features, all_labels, dims, label2name, meta
 
-    def placeObjects(self, img, num_placements):
-        assert img.dtype == np.uint8
-        assert img.ndim == 3
+    def placeObjects(self, img, num_placements, bg_label):
         assert num_placements >= 0
+        assert img.ndim == 3
+        assert img.dtype == np.uint8
 
         # Dimension of full image, eg 3x512x512.
         chan, width, height = img.shape
