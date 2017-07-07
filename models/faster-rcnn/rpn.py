@@ -531,7 +531,7 @@ def train_rpn(sess, conf, log):
         # Get the next batch. If there is no next batch (ie we are the end of
         # the epoch), save the current weights, reset the data source and start
         # over with a new epoch.
-        x, y, meta = ds.nextBatch(1, 'train')
+        x, y, _ = ds.nextBatch(1, 'train')
         if len(y) == 0 or first:
             saveNetworkWeights(sess)
 
