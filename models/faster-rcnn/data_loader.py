@@ -427,9 +427,11 @@ class FasterRcnnRpn(DataSet):
         # output image.
         bbox, miss = [], 0
 
-        # Mark every location as background. We will update this as we add objects.
+        # Mark every location in the full sized images as background initially.
+        # We will update this as we add objects.
         obj_types = bg_label * np.ones((height, width), np.uint32)
 
+        # Stamp objects into the image. Their class, size and position are random.
         while len(bbox) < num_placements:
             # Pick a random object and give it an also random colour.
             obj_type = np.random.randint(0, pool_size)
@@ -526,7 +528,7 @@ class FasterRcnnRpn(DataSet):
                     out[0:3, y, x] = [0, 1, 0]
                     continue
 
-                # Mark this region as valid one (ie the anchor box is not
+                # Mark this region as valid (ie the anchor box is not
                 # clipped in any direction). Also, initialise it with no object
                 # present (we will update this later if necessary).
                 out[0:3, y, x] = [1, 1, 0]
@@ -549,7 +551,7 @@ class FasterRcnnRpn(DataSet):
                 # containing an object.
                 out[1:3, y, x] = [0, 1]
 
-                # Compute the centre and width/height of the GT bbox.
+                # Compute the centre and width/height of the GT BBox.
                 bx0, bx1, by0, by1 = bbox
                 bcx, bcy = (bx0 + bx1) / 2, (by0 + by1) / 2
                 bw, bh = bx1 - bx0, by1 - by0
