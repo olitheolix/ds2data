@@ -254,7 +254,7 @@ def build_rpn_model(conf, bwt1, bwt2, bwt3):
         # Shape: [-1, 64, 64, 64] ---> [-1, 6, 64, 64]
         # Kernel: 5x5  Features: 6
         if b3 is None:
-            b3 = model.bias([6, 1, 1], 'b3')
+            b3 = model.bias([6, 1, 1], 'b3', 0.5)
         else:
             b3 = tf.Variable(b3, name='b3', trainable=train3)
         print(f'b3: Trained={b3 is not None}  Trainable={train3}  Shape={b3.shape}')

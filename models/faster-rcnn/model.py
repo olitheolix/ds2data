@@ -10,9 +10,9 @@ def weights(shape, name=None):
     return tf.Variable(init, name=name)
 
 
-def bias(shape, name=None):
+def bias(shape, name=None, value=0.0):
     """Convenience function to construct bias tensors."""
-    init = tf.constant(value=0.0, shape=shape, dtype=tf.float32)
+    init = tf.constant(value=value, shape=shape, dtype=tf.float32)
     return tf.Variable(init, name=name)
 
 
