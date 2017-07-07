@@ -381,7 +381,8 @@ class FasterRcnnRpn(DataSet):
             img, bboxes, obj_cls = self.placeObjects(img, num_placements, bg_label[0])
             assert img.shape == dims
             assert bboxes.dtype == np.uint32
-            assert bboxes.shape[1] == 4
+            assert obj_cls.dtype == np.uint32
+            assert obj_cls.ndim == 2
 
             # fixme
             # assert img.shape == obj_cls.shape
@@ -393,7 +394,7 @@ class FasterRcnnRpn(DataSet):
             # Store the flattened image alongside its label and meta data.
             all_labels.append(label_mr)
             all_features.append(img)
-            meta.append(MetaData(fname, label_mr, None))
+            meta.append(self.MetaData(fname, mask=mask, obj_cls=obj_cls, score=score))
 
         # Ensure that everything is a proper NumPy array.
         all_features = np.array(all_features, np.uint8)
@@ -425,9 +426,14 @@ class FasterRcnnRpn(DataSet):
         # Stamp randomly scaled, positioned and coloured objects into the full
         # output image.
         bbox, miss = [], 0
+
+        # Mark every location as background. We will update this as we add objects.
+        obj_types = bg_label * np.ones((height, width), np.uint32)
+
         while len(bbox) < num_placements:
             # Pick a random object and give it an also random colour.
-            obj = np.array(objs[np.random.randint(0, pool_size)])
+            obj_type = np.random.randint(0, pool_size)
+            obj = np.array(objs[obj_type])
             for i in range(obj.shape[0]):
                 obj[i, :, :] = obj[i, :, :] * np.random.uniform(0.3, 1)
             obj = obj.astype(np.uint8)
@@ -465,11 +471,17 @@ class FasterRcnnRpn(DataSet):
             mask = np.zeros_like(obj)
             mask[idx] = 1
 
+            # Stamp the object into the image.
             img[:, y0:y1, x0:x1] = (1 - mask) * img[:, y0:y1, x0:x1] + mask * obj
+
+            # Record the bounding box parameters and object type we just stamped.
             bbox.append((x0, x1, y0, y1))
 
+            # fixme: obj_types[y, x] = obj_type
+
         bbox = np.array(bbox, np.uint32)
-        return img, bbox
+        obj_types = np.array(obj_types, np.uint32)
+        return img, bbox, obj_types
 
     def bbox2RPNLabels(self, bboxes, dims_hw, downsample=4):
         assert bboxes.shape[1] == 4
