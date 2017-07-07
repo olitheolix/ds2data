@@ -324,6 +324,75 @@ def build_rpn_model(conf, bwt1, bwt2, bwt3):
         tf.reduce_sum(cost1 + cost2, name='cost')
 
 
+def equaliseBBoxTrainingData(y, N):
+    """Ensure the training data contains N regions with- and without object.
+
+    Find N positions that contain an object, and another
+    N that do not. Mark all other regions as invalid via the 'mask' dimension.
+
+    The net effect of this operation will be that only 2 * N points contribute
+    to the cost, N with and object, and N without an object. This will reduce
+    the likelihood that the network learns skewed priors.
+
+    NOTE: if the region does not contain N positions with an object then the
+    remaining ones will be filled up with regions that do not.
+
+    Args:
+        y: NumPy array
+            The training data (BBox and object classification) for a *single*
+            input image.
+        N: int
+            Find N positions with an object, and N without an object.
+
+    Returns:
+        y: NumPy array
+           Except for the mask dimension (dim 0) it is identical to the input.
+           The mask will have exactly 2*N non-zero entries.
+        num_obj: number of positions with an object. Always in [0, N].
+    """
+    # Batch size must be 1.
+    assert y.shape[0] == 1
+
+    # Unpack the mask.
+    mask = y[0, 0]
+    h, w = mask.shape
+
+    # Find all locations with valid mask and an object.
+    has_obj = y[0, 2] * mask
+    assert has_obj.shape == (h, w)
+    has_obj = has_obj.flatten()
+
+    # Equally, find all locations with valid mask but without an object.
+    has_no_obj = y[0, 1] * mask
+    assert has_no_obj.shape == (h, w)
+    has_no_obj = has_no_obj.flatten()
+
+    # Unpack the 'has-object' feature and pick N at random. Pick all if there
+    # are less than N.
+    idx_obj = np.nonzero(has_obj)[0]
+    if len(idx_obj) > N:
+        p = np.random.permutation(len(idx_obj))
+        idx_obj = idx_obj[p[:N]]
+
+    # Similarly, unpack the 'has-no-object' feature and pick as many as we need
+    # to create a set of 2*N positions.
+    idx_no_obj = np.nonzero(has_no_obj)[0]
+    assert len(idx_no_obj) >= 2 * N - len(idx_obj)
+    p = np.random.permutation(len(idx_no_obj))
+    idx_no_obj = idx_no_obj[p[:2 * N - len(idx_obj)]]
+
+    # Update the mask to be non-zero only for our set of 2*N locations.
+    mask = 0 * mask.flatten()
+    mask[idx_obj] = 1
+    mask[idx_no_obj] = 1
+    assert np.count_nonzero(mask) == 2 * N
+
+    # Replace the original mask and return the number of locations where the
+    # mask is non-zero and that have an object.
+    y[0, 0] = mask.reshape((h, w))
+    return y, len(idx_obj)
+
+
 def train_rpn(sess, conf, log):
     # Load the filters of the pre-trained model.
     net_vars = pickle.load(open('/tmp/dump.pickle', 'rb'))
@@ -385,41 +454,7 @@ def train_rpn(sess, conf, log):
 
         batch += 1
 
-        # Find all locations with valid mask and an object.
-        mask = y[0, 0]
-        has_obj = y[0, 2] * mask
-        h, w = has_obj.shape
-        has_obj = has_obj.flatten()
-
-        # Equally, find all locations with valid mask but devoid of an object.
-        has_no_obj = y[0, 1] * mask
-        assert has_no_obj.shape == (h, w)
-        has_no_obj = has_no_obj.flatten()
-
-        tot_samples = 40
-
-        idx_obj = np.nonzero(has_obj)[0]
-        if len(idx_obj) > tot_samples // 2:
-            p = np.random.permutation(len(idx_obj))
-            idx_obj = idx_obj[p[:tot_samples // 2]]
-        num_obj = len(idx_obj)
-
-        idx_no_obj = np.nonzero(has_no_obj)[0]
-        assert len(idx_no_obj) >= tot_samples - len(idx_obj)
-        p = np.random.permutation(len(idx_no_obj))
-        idx_no_obj = idx_no_obj[p[:tot_samples - len(idx_obj)]]
-
-        # Ensure we have exactly tot_samples (160) valid locations. Ideally, 80
-        # will contain an object and 80 will not. However, if we do not have 80
-        # locations with an object we will use non-object locations instead.
-        mask = np.zeros(h * w, mask.dtype)
-        mask[idx_obj] = 1
-        mask[idx_no_obj] = 1
-        assert np.count_nonzero(mask) == tot_samples
-
-        mask = mask.reshape((h, w))
-        y[0, 0] = mask
-        del mask, has_obj, h, w, has_no_obj, idx_obj, idx_no_obj, p
+        y, num_obj = equaliseBBoxTrainingData(y, 40)
 
         fd = dict(feed_dict={x_in: x, y_in: y, lrate_in: lrate})
         out = sess.run([opt, cost], **fd)
