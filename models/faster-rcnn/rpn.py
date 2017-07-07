@@ -1,7 +1,6 @@
 """ Train the DNN model and save weights and log data to saved/ folder.
 """
 import os
-import copy
 import json
 import time
 import model
@@ -393,6 +392,62 @@ def equaliseBBoxTrainingData(y, N):
     return y, len(idx_obj)
 
 
+def printTrainingStatistics(sess, feed_dict, log):
+    g = tf.get_default_graph().get_tensor_by_name
+    fd = feed_dict
+    gt_obj, pred_obj = sess.run([g('rpn/gt_obj:0'), g('rpn/pred_obj:0')], **fd)
+    mask = sess.run(g('rpn/mask:0'), **fd)
+    gt_obj, pred_obj, mask = gt_obj[0], pred_obj[0], mask[0]
+    gt_obj = np.argmax(gt_obj, axis=2)
+    pred_obj = np.argmax(pred_obj, axis=2)
+    gt_obj = np.squeeze(gt_obj)
+    pred_obj = np.squeeze(pred_obj)
+
+    mask = mask.flatten()
+    mask_obj = np.array(mask)
+    gt_obj = gt_obj.flatten()
+    pred_obj = pred_obj.flatten()
+    mask_obj = (mask_obj * gt_obj).flatten()
+
+    mask_idx = np.nonzero(mask)
+    mask_obj_idx = np.nonzero(mask_obj)
+    gt_obj = gt_obj[mask_idx]
+    pred_obj = pred_obj[mask_idx]
+
+    tot = len(gt_obj)
+    correct = np.count_nonzero(gt_obj == pred_obj)
+    rat = 100 * (correct / tot)
+    s2 = f'   Cls={rat:5.1f}% ({correct:2d}/{tot:2d})'
+
+    gt_bbox, pred_bbox = sess.run([g('rpn/gt_bbox:0'), g('rpn/pred_bbox:0')], **fd)
+    gt_bbox = np.squeeze(gt_bbox)
+    pred_bbox = np.squeeze(pred_bbox)
+    gt_bbox = np.transpose(gt_bbox, [2, 0, 1])
+    pred_bbox = np.transpose(pred_bbox, [2, 0, 1])
+
+    assert gt_bbox.shape == pred_bbox.shape == (4, 128, 128)
+    gt_bbox = gt_bbox.reshape((4, 128 * 128))
+    pred_bbox = pred_bbox.reshape((4, 128 * 128))
+    gt_bbox = gt_bbox[:, mask_obj_idx[0]]
+    pred_bbox = pred_bbox[:, mask_obj_idx[0]]
+
+    err = np.abs(gt_bbox - pred_bbox)
+    avg_pos = np.mean(err[:2, :])
+    min_pos = np.amin(err[:2, :])
+    max_pos = np.amax(err[:2, :])
+    avg_dim = np.mean(err[2:, :])
+    min_dim = np.amin(err[2:, :])
+    max_dim = np.amax(err[2:, :])
+    s3 = f'   Pos={min_pos:5.2f} {avg_pos:5.2f} {max_pos:5.2f}'
+    s4 = f'   Dim={min_dim:5.2f} {avg_dim:5.2f} {max_dim:5.2f}'
+
+    # Backup the current BBox parameters.
+    log['gt_bbox'] = gt_bbox
+    log['pred_bbox'] = pred_bbox
+
+    return s2 + s3 + s4
+
+
 def train_rpn(sess, conf, log):
     # Load the filters of the pre-trained model.
     net_vars = pickle.load(open('/tmp/dump.pickle', 'rb'))
@@ -411,6 +466,7 @@ def train_rpn(sess, conf, log):
     W3, b3 = g('rpn/W3:0'), g('rpn/b3:0')
     x_in, y_in = g('x_in:0'), g('y_in:0')
     cost = g('rpn/cost:0')
+    del g
 
     # Define optimisation problem and initialise the graph.
     lrate_in = tf.placeholder(tf.float32)
@@ -420,7 +476,6 @@ def train_rpn(sess, conf, log):
     # Load data set and dump some info about it into the terminal.
     ds = data_loader.FasterRcnnRpn(conf)
     ds.printSummary()
-    chan, height, width = ds.imageDimensions().tolist()
 
     batch, epoch = 0, 0
     first = True
@@ -454,65 +509,19 @@ def train_rpn(sess, conf, log):
 
         batch += 1
 
-        y, num_obj = equaliseBBoxTrainingData(y, 40)
+        # Only retain 40 location with an object and 40 without. This will
+        # avoid skewing the training data since an image often has more
+        # locations without an object than it has locations with an object.
+        y, num_obj = equaliseBBoxTrainingData(y, N=40)
 
+        # Run training step and record the cost.
         fd = dict(feed_dict={x_in: x, y_in: y, lrate_in: lrate})
         out = sess.run([opt, cost], **fd)
         log['tot_cost'].append(out[1])
 
-        gt_obj, pred_obj = sess.run([g('rpn/gt_obj:0'), g('rpn/pred_obj:0')], **fd)
-        mask = sess.run(g('rpn/mask:0'), **fd)
-        gt_obj, pred_obj, mask = gt_obj[0], pred_obj[0], mask[0]
-        gt_obj = np.argmax(gt_obj, axis=2)
-        pred_obj = np.argmax(pred_obj, axis=2)
-        gt_obj = np.squeeze(gt_obj)
-        pred_obj = np.squeeze(pred_obj)
-
-        mask = mask.flatten()
-        mask_obj = np.array(mask)
-        gt_obj = gt_obj.flatten()
-        pred_obj = pred_obj.flatten()
-        mask_obj = (mask_obj * gt_obj).flatten()
-
-        mask_idx = np.nonzero(mask)
-        mask_obj_idx = np.nonzero(mask_obj)
-        gt_obj = gt_obj[mask_idx]
-        pred_obj = pred_obj[mask_idx]
-
-        tot = len(gt_obj)
-        correct = np.count_nonzero(gt_obj == pred_obj)
-        rat = 100 * (correct / tot)
-        s1 = f'  {batch:,}: Cost: {out[1]:.2E}'
-        s2 = f'   Cls={rat:5.1f}% ({num_obj:2d} {correct:2d}/{tot:2d})'
-
-        gt_bbox, pred_bbox = sess.run([g('rpn/gt_bbox:0'), g('rpn/pred_bbox:0')], **fd)
-        gt_bbox = np.squeeze(gt_bbox)
-        pred_bbox = np.squeeze(pred_bbox)
-        gt_bbox = np.transpose(gt_bbox, [2, 0, 1])
-        pred_bbox = np.transpose(pred_bbox, [2, 0, 1])
-
-        assert gt_bbox.shape == pred_bbox.shape == (4, 128, 128)
-        gt_bbox = gt_bbox.reshape((4, 128 * 128))
-        pred_bbox = pred_bbox.reshape((4, 128 * 128))
-        gt_bbox = gt_bbox[:, mask_obj_idx[0]]
-        pred_bbox = pred_bbox[:, mask_obj_idx[0]]
-
-        err = np.abs(gt_bbox - pred_bbox)
-        avg_pos = np.mean(err[:2, :])
-        min_pos = np.amin(err[:2, :])
-        max_pos = np.amax(err[:2, :])
-        avg_dim = np.mean(err[2:, :])
-        min_dim = np.amin(err[2:, :])
-        max_dim = np.amax(err[2:, :])
-        s3 = f'   Pos={min_pos:5.2f} {avg_pos:5.2f} {max_pos:5.2f}'
-        s4 = f'   Dim={min_dim:5.2f} {avg_dim:5.2f} {max_dim:5.2f}'
-        print(s1 + s2 + s3 + s4)
-
-        # Backup the current BBox parameters.
-        log['gt_bbox'] = gt_bbox
-        log['pred_bbox'] = pred_bbox
-
-        del gt_obj, pred_obj, mask, mask_idx
+        # Compile a string with basic stats about the current training data.
+        stat = printTrainingStatistics(sess, fd, log)
+        print(f'  {batch:,}: Cost: {out[1]:.2E}  {stat}')
 
 
 def validate_rpn(sess, conf):
