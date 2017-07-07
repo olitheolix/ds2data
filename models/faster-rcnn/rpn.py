@@ -13,7 +13,6 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-from IPython import embed
 from config import NetConf
 
 
@@ -219,7 +218,8 @@ def build_rpn_model(conf, bwt1, bwt2, bwt3):
 
     # Input variables.
     _, _, chan, num_filters = W1.shape
-    x_in = tf.placeholder(tf.float32, [None, chan, conf.height, conf.width], name='x_in')
+    x_in = tf.placeholder(
+        tf.float32, [None, chan, conf.height, conf.width], name='x_in')
     y_in = tf.placeholder(tf.float32, [None, 7, 128, 128], name='y_in')
 
     # Convenience: shared arguments for bias variable, conv2d, and max-pool.
@@ -393,44 +393,80 @@ def equaliseBBoxTrainingData(y, N):
 
 
 def printTrainingStatistics(sess, feed_dict, log):
-    g = tf.get_default_graph().get_tensor_by_name
+    # Convenience.
     fd = feed_dict
-    gt_obj, pred_obj = sess.run([g('rpn/gt_obj:0'), g('rpn/pred_obj:0')], **fd)
+    g = tf.get_default_graph().get_tensor_by_name
+
+    # Query the current mask, ground truth and prediction.
     mask = sess.run(g('rpn/mask:0'), **fd)
+    gt_obj, pred_obj = sess.run([g('rpn/gt_obj:0'), g('rpn/pred_obj:0')], **fd)
+    gt_bbox, pred_bbox = sess.run([g('rpn/gt_bbox:0'), g('rpn/pred_bbox:0')], **fd)
+    del fd
+
+    # Unpack the one-hot labels for whether or not an object is present.
+    # NOTE: we remove the batch dimension because it is always 1
+    # In:  (1, height, width, 2)
+    # Out: (height, width, 2)
+    assert gt_obj.ndim == pred_obj.ndim == 4
+    assert gt_obj.shape[0] == pred_obj.shape[0] == 1
+    assert gt_obj.shape[3] == pred_obj.shape[3] == 2
     gt_obj, pred_obj, mask = gt_obj[0], pred_obj[0], mask[0]
+
+    # For each location, determine whether or not it contains an object.
+    # In:  (2, height, width)
+    # Out: (height, width)
     gt_obj = np.argmax(gt_obj, axis=2)
     pred_obj = np.argmax(pred_obj, axis=2)
     gt_obj = np.squeeze(gt_obj)
     pred_obj = np.squeeze(pred_obj)
 
+    # Flatten the mask, prediction and ground truth. This will make the
+    # indexing operations below easier.
+    # In:  (height, width)
+    # Out: (height * width)
     mask = mask.flatten()
-    mask_obj = np.array(mask)
     gt_obj = gt_obj.flatten()
     pred_obj = pred_obj.flatten()
-    mask_obj = (mask_obj * gt_obj).flatten()
 
-    mask_idx = np.nonzero(mask)
-    mask_obj_idx = np.nonzero(mask_obj)
+    # Find the locations where only the mask is valid, and those were it is not
+    # only valid but also contains an object.
+    mask_idx = np.nonzero(mask)[0]
+    mask_obj_idx = np.nonzero(mask * gt_obj)[0]
+
+    # Retain only the location where the mask is valid. These are the 2 * N
+    # locations created by `equaliseBBoxTrainingData`.
     gt_obj = gt_obj[mask_idx]
     pred_obj = pred_obj[mask_idx]
+    del mask_idx
 
+    # Compare predictions to the ground truth.
     tot = len(gt_obj)
     correct = np.count_nonzero(gt_obj == pred_obj)
     rat = 100 * (correct / tot)
-    s2 = f'   Cls={rat:5.1f}% ({correct:2d}/{tot:2d})'
+    s1 = f'Cls={rat:5.1f}% ({correct:2d}/{tot:2d})'
+    del tot, correct, rat
 
-    gt_bbox, pred_bbox = sess.run([g('rpn/gt_bbox:0'), g('rpn/pred_bbox:0')], **fd)
+    # Unpack the 4 BBox values for each location.
+    # In:  (1, height, width, 4)
+    # Out: (4, height, width)
     gt_bbox = np.squeeze(gt_bbox)
     pred_bbox = np.squeeze(pred_bbox)
     gt_bbox = np.transpose(gt_bbox, [2, 0, 1])
     pred_bbox = np.transpose(pred_bbox, [2, 0, 1])
-
     assert gt_bbox.shape == pred_bbox.shape == (4, 128, 128)
+
+    # Flatten the last two dimensions.
+    # In:  (4, height, width)
+    # Out: (4, height * width)
     gt_bbox = gt_bbox.reshape((4, 128 * 128))
     pred_bbox = pred_bbox.reshape((4, 128 * 128))
-    gt_bbox = gt_bbox[:, mask_obj_idx[0]]
-    pred_bbox = pred_bbox[:, mask_obj_idx[0]]
 
+    # We only care about the BBox data at locations with an object.
+    gt_bbox = gt_bbox[:, mask_obj_idx]
+    pred_bbox = pred_bbox[:, mask_obj_idx]
+    del mask_obj_idx
+
+    # Compute the L1 error between predicted and ground truth BBox.
     err = np.abs(gt_bbox - pred_bbox)
     avg_pos = np.mean(err[:2, :])
     min_pos = np.amin(err[:2, :])
@@ -438,14 +474,14 @@ def printTrainingStatistics(sess, feed_dict, log):
     avg_dim = np.mean(err[2:, :])
     min_dim = np.amin(err[2:, :])
     max_dim = np.amax(err[2:, :])
-    s3 = f'   Pos={min_pos:5.2f} {avg_pos:5.2f} {max_pos:5.2f}'
-    s4 = f'   Dim={min_dim:5.2f} {avg_dim:5.2f} {max_dim:5.2f}'
+    s2 = f'   Pos={min_pos:5.2f} {avg_pos:5.2f} {max_pos:5.2f}'
+    s3 = f'   Dim={min_dim:5.2f} {avg_dim:5.2f} {max_dim:5.2f}'
 
     # Backup the current BBox parameters.
     log['gt_bbox'] = gt_bbox
     log['pred_bbox'] = pred_bbox
 
-    return s2 + s3 + s4
+    return s1 + s2 + s3
 
 
 def train_rpn(sess, conf, log):
