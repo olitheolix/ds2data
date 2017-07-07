@@ -204,9 +204,6 @@ class DS2(DataSet):
 
     The parameters in the `conf` dictionary that is passed to the super class
     have the following meaning:
-
-    `size` (tuple): the desired (width, height) of each image.
-    `colour_format` (str): passed directly to Pillow, eg 'RGB', or 'L'.
     """
     def loadRawData(self):
         # Original attributes of the images in the DS2 dataset.
@@ -440,11 +437,11 @@ class FasterRcnnRpn(DataSet):
                     break
                 continue
 
-            # Mark off the regions in the image we have already used.
+            # Mark off the regions in the image we have used already.
             box_img[y0:y1, x0:x1] = 1
 
-            # Compute a mask to only copy the image portion that contains the
-            # object but not those that contain only the black background.
+            # Compute a mask to only copy the object pixels but not the black
+            # background pixels.
             idx = np.nonzero(obj > 30)
             mask = np.zeros_like(obj)
             mask[idx] = 1
@@ -506,9 +503,8 @@ class FasterRcnnRpn(DataSet):
                 if np.max(overlap[:, acy, acx]) == 0:
                     continue
 
-                # Compute the ratio of overlap. The value ranges from 0.0 to
-                # 1.0. A value of 1.0 means that the anchor contains an entire
-                # object.
+                # Compute the ratio of overlap. The value ranges from [0, 1]. A
+                # value of 1.0 means object is entirely within the anchor.
                 rat = overlap_rat[:, acy, acx]
                 if max(rat) <= 0.9:
                     continue
@@ -520,7 +516,7 @@ class FasterRcnnRpn(DataSet):
                 # containing an object.
                 out[1:3, y, x] = [0, 1]
 
-                # Compute the centre and width of the GT bbox.
+                # Compute the centre and width/height of the GT bbox.
                 bx0, bx1, by0, by1 = bbox
                 bcx, bcy = (bx0 + bx1) / 2, (by0 + by1) / 2
                 bw, bh = bx1 - bx0, by1 - by0
