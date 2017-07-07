@@ -680,16 +680,19 @@ def main_rpn():
     # Network configuration.
     conf = NetConf(
         width=512, height=512, colour='rgb', seed=0, num_dense=32,
-        batch_size=16, num_epochs=5, train_rat=0.8, num_samples=20
+        batch_size=16, num_epochs=1, train_rat=0.8, num_samples=20
     )
 
-    train = False
-    log = collections.defaultdict(list)
+    # Select training/validation mode.
+    train = True
 
     sess = tf.Session()
+    log = collections.defaultdict(list)
     if train:
+        # Train the network with the specified configuration.
         train_rpn(sess, conf, log)
 
+        # Compare the BBox centre position.
         gt_bbox = log['gt_bbox']
         pred_bbox = log['pred_bbox']
         plt.figure()
@@ -702,6 +705,7 @@ def main_rpn():
         plt.legend(loc='best')
         plt.title('BBox Position')
 
+        # Compare the BBox dimensions (width and height).
         plt.subplot(1, 2, 2)
         plt.plot(gt_bbox[2, :].T, 'b-', label='PR W')
         plt.plot(gt_bbox[3, :].T, 'r-', label='PR H')
@@ -711,6 +715,7 @@ def main_rpn():
         plt.legend(loc='best')
         plt.title('BBox Width/Height')
 
+        # Plot the overall cost.
         tot_cost = log['tot_cost']
         tot_cost_smooth = scipy.signal.convolve(tot_cost, [1 / 7] * 7)[3:-4]
 
@@ -722,6 +727,7 @@ def main_rpn():
         plt.title('Cost')
         plt.show()
     else:
+        # Run trained network on test data.
         validate_rpn(sess, conf)
 
 
