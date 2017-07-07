@@ -326,7 +326,7 @@ class FasterRcnnRpn(DataSet):
         # The size of the returned images.
         dims = (chan, height, width)
 
-        label2name = None
+        label2name = {0: 'background', 1: 'box', 2: 'circle'}
 
         # Location to data folder.
         data_path = os.path.dirname(os.path.abspath(__file__))
