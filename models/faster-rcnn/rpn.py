@@ -280,11 +280,11 @@ def build_rpn_model(conf, bwt1, bwt2, bwt3):
         cost_ce = tf.nn.softmax_cross_entropy_with_logits
         gt_obj = tf.transpose(gt_obj, [0, 2, 3, 1], name='gt_obj')
         pred_obj = tf.transpose(pred_obj, [0, 2, 3, 1], name='pred_obj')
-        cost1 = cost_ce(logits=pred_obj, labels=gt_obj)
+        cost_cls = cost_ce(logits=pred_obj, labels=gt_obj)
 
         assert gt_obj.shape.as_list()[1:] == [128, 128, 2]
         assert pred_obj.shape.as_list()[1:] == [128, 128, 2]
-        assert cost1.shape.as_list()[1:] == [128, 128]
+        assert cost_cls.shape.as_list()[1:] == [128, 128]
         del gt_obj, pred_obj, cost_ce
 
         # Cost function for bbox
@@ -294,33 +294,33 @@ def build_rpn_model(conf, bwt1, bwt2, bwt3):
         pred_bbox = tf.slice(conv3, [0, 2, 0, 0], [-1, 4, -1, -1])
         gt_bbox = tf.transpose(gt_bbox, [0, 2, 3, 1], name='gt_bbox')
         pred_bbox = tf.transpose(pred_bbox, [0, 2, 3, 1], name='pred_bbox')
-        cost2 = tf.abs(gt_bbox - pred_bbox, name='cost2_t1')
+        cost_bbox = tf.abs(gt_bbox - pred_bbox)
 
         assert gt_bbox.shape.as_list()[1:] == [128, 128, 4]
         assert pred_bbox.shape.as_list()[1:] == [128, 128, 4]
-        assert cost2.shape.as_list()[1:] == [128, 128, 4], cost1.shape
+        assert cost_bbox.shape.as_list()[1:] == [128, 128, 4], cost_cls.shape
         del gt_bbox, pred_bbox
 
         # Average the cost over the 4 BBox parameters.
         # In:  [N, 128, 128, 4]
         # Out: [N, 128, 128]
-        cost2 = tf.reduce_mean(cost2, axis=3, keep_dims=False, name='cost2_t2')
-        assert cost2.shape.as_list()[1:] == [128, 128], cost2.shape
+        cost_bbox = tf.reduce_mean(cost_bbox, axis=3, keep_dims=False)
+        assert cost_bbox.shape.as_list()[1:] == [128, 128], cost_bbox.shape
 
         # Remove the cost for all locations not cleared by the mask. Those are
         # the regions near the boundaries.
-        cost1 = tf.multiply(cost1, mask)
-        cost2 = tf.multiply(cost2, mask, name='cost2_t3')
-        assert cost1.shape.as_list()[1:] == [128, 128]
-        assert cost2.shape.as_list()[1:] == [128, 128]
+        cost_cls = tf.multiply(cost_cls, mask)
+        cost_bbox = tf.multiply(cost_bbox, mask)
+        assert cost_cls.shape.as_list()[1:] == [128, 128]
+        assert cost_bbox.shape.as_list()[1:] == [128, 128]
 
         # Remove all bbox cost components for when there is no object that
         # could have a bbox to begin with.
         is_obj = tf.squeeze(tf.slice(y_in, [0, 2, 0, 0], [-1, 1, -1, -1]), 1)
         assert is_obj.shape.as_list()[1:] == [128, 128]
-        cost2 = tf.multiply(cost2, is_obj)
+        cost_bbox = tf.multiply(cost_bbox, is_obj)
 
-        tf.reduce_sum(cost1 + cost2, name='cost')
+        tf.reduce_sum(cost_cls + cost_bbox, name='cost')
 
 
 def equaliseBBoxTrainingData(y, N):
