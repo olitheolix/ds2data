@@ -383,9 +383,7 @@ class FasterRcnnRpn(DataSet):
             assert bboxes.dtype == np.uint32
             assert obj_cls.dtype == np.uint32
             assert obj_cls.ndim == 2
-
-            # fixme
-            # assert img.shape == obj_cls.shape
+            assert obj_cls.shape == (height, width)
 
             # Compile a list of RPN training data based on the BBoxes of the
             # objects in the image.
@@ -429,13 +427,13 @@ class FasterRcnnRpn(DataSet):
 
         # Mark every location in the full sized images as background initially.
         # We will update this as we add objects.
-        obj_types = bg_label * np.ones((height, width), np.uint32)
+        obj_classes = bg_label * np.ones((height, width), np.uint32)
 
         # Stamp objects into the image. Their class, size and position are random.
         while len(bbox) < num_placements:
             # Pick a random object and give it an also random colour.
-            obj_type = np.random.randint(0, pool_size)
-            obj = np.array(objs[obj_type])
+            obj_cls = np.random.randint(0, pool_size)
+            obj = np.array(objs[obj_cls])
             for i in range(obj.shape[0]):
                 obj[i, :, :] = obj[i, :, :] * np.random.uniform(0.3, 1)
             obj = obj.astype(np.uint8)
@@ -480,10 +478,16 @@ class FasterRcnnRpn(DataSet):
             # Record the bounding box parameters and object type we just stamped.
             bbox.append((x0, x1, y0, y1))
 
-            # fixme: obj_types[y, x] = obj_type
+            # Record the object label for this BBox.
+            x = int((x0 + x1) / 2)
+            y = int((y0 + y1) / 2)
+            assert 0 <= x < obj_classes.shape[1]
+            assert 0 <= y < obj_classes.shape[0]
+            obj_classes[y, x] = obj_cls
+            del obj, obj_cls, chan, obj_height, obj_width, mask, x, y
 
         bbox = np.array(bbox, np.uint32)
-        obj_types = np.array(obj_types, np.uint32)
+        obj_types = np.array(obj_classes, np.uint32)
         return img, bbox, obj_types
 
     def bbox2RPNLabels(self, bboxes, dims_hw, downsample=4):
