@@ -593,9 +593,14 @@ def validate_rpn(sess, conf):
     while True:
         # Get next batch. If there is no next batch, save the current weights,
         # reset the data source, and start over.
-        x, y, meta = ds.nextBatch(1, 'test')
+        x, y, meta_idx = ds.nextBatch(1, 'test')
         if len(y) == 0:
             break
+
+        # Unpack the meta data for the one element we just retrieved.
+        meta = ds.getMeta(meta_idx)
+        meta = meta[meta_idx[0]]
+        del meta_idx
 
         # Either run the network to predict the positions and BBoxes, or use
         # the ground truth label directly. The second option is only useful to
