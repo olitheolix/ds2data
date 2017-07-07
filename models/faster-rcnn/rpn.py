@@ -218,9 +218,6 @@ def build_rpn_model(conf, bwt1, bwt2, bwt3):
     b3, W3, train3 = bwt3
     del bwt1, bwt2, bwt3
 
-    # W3 and b3 must be either both None, nor neither must be None.
-    assert (W3 is b3 is None) or (W3 is not None and b3 is not None)
-
     # Input variables.
     _, _, chan, num_filters = W1.shape
     x_in = tf.placeholder(tf.float32, [None, chan, conf.height, conf.width], name='x_in')
@@ -257,14 +254,18 @@ def build_rpn_model(conf, bwt1, bwt2, bwt3):
         # Convolution layer to learn the anchor boxes.
         # Shape: [-1, 64, 64, 64] ---> [-1, 6, 64, 64]
         # Kernel: 5x5  Features: 6
-        if b3 is W3 is None:
-            print('Using default W3')
+        if b3 is None:
             b3 = model.bias([6, 1, 1], 'b3')
+        else:
+            b3 = tf.Variable(b3, name='b3', trainable=train3)
+        print(f'b3: Trained={b3 is not None}  Trainable={train3}  Shape={b3.shape}')
+
+        if W3 is None:
             W3 = model.weights([15, 15, num_filters, 6], 'W3')
         else:
-            print('Restoring W3')
-            b3 = tf.Variable(b3, name='b3', trainable=train3)
             W3 = tf.Variable(W3, name='W3', trainable=train3)
+        print(f'W3: Trained={W3 is not None}  Trainable={train3}  Shape={W3.shape}')
+
         conv3 = tf.nn.conv2d(conv2_pool, W3, [1, 1, 1, 1], **convpool_opts)
         conv3 = tf.add(conv3, b3, name='net_out')
 
@@ -324,37 +325,33 @@ def build_rpn_model(conf, bwt1, bwt2, bwt3):
 
 
 def train_rpn(sess, conf, log):
-    # Load the pre-trained model.
+    # Load the filters of the pre-trained model.
     net_vars = pickle.load(open('/tmp/dump.pickle', 'rb'))
     assert 'w3' not in net_vars and 'b3' not in net_vars
 
-    W1 = net_vars['w1']
-    b1 = net_vars['b1']
-    W2 = net_vars['w2']
-    b2 = net_vars['b2']
-    W3 = net_vars.get('w3', None)
-    b3 = net_vars.get('b3', None)
+    # Build the pre-trained model.
+    W1, b1 = net_vars['w1'], net_vars['b1']
+    W2, b2 = net_vars['w2'], net_vars['b2']
     build_rpn_model(conf, (b1, W1, True), (b2, W2, True), (None, None, True))
-    del b1, b2, W1, W2
+    del b1, b2, W1, W2, net_vars
 
+    # TF node handles.
     g = tf.get_default_graph().get_tensor_by_name
     W1, b1 = g('rpn/W1:0'), g('rpn/b1:0')
     W2, b2 = g('rpn/W2:0'), g('rpn/b2:0')
     W3, b3 = g('rpn/W3:0'), g('rpn/b3:0')
     x_in, y_in = g('x_in:0'), g('y_in:0')
-    lrate_in = tf.placeholder(tf.float32)
     cost = g('rpn/cost:0')
 
+    # Define optimisation problem and initialise the graph.
+    lrate_in = tf.placeholder(tf.float32)
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
-
     sess.run(tf.global_variables_initializer())
 
     # Load data set and dump some info about it into the terminal.
     ds = data_loader.FasterRcnnRpn(conf)
     ds.printSummary()
     chan, height, width = ds.imageDimensions().tolist()
-
-    net_vars = copy.deepcopy(net_vars)
 
     batch, epoch = 0, 0
     first = True
@@ -368,13 +365,13 @@ def train_rpn(sess, conf, log):
             ds.reset()
 
             # Save all the weights and biases of the network.
-            net_vars['w1'] = sess.run(W1)
-            net_vars['b1'] = sess.run(b1)
-            net_vars['w2'] = sess.run(W2)
-            net_vars['b2'] = sess.run(b2)
-            net_vars['w3'] = sess.run(W3)
-            net_vars['b3'] = sess.run(b3)
+            net_vars = dict(
+                w1=sess.run(W1), b1=sess.run(b1),
+                w2=sess.run(W2), b2=sess.run(b2),
+                w3=sess.run(W3), b3=sess.run(b3),
+            )
             pickle.dump(net_vars, open('/tmp/dump2.pickle', 'wb'))
+            del net_vars
 
             # Time to abort training?
             if epoch >= conf.num_epochs:
@@ -497,7 +494,7 @@ def validate_rpn(sess, conf):
     b3 = net_vars.get('b3', None)
     build_rpn_model(conf, (b1, W1, True), (b2, W2, True), (b3, W3, True))
     sess.run(tf.global_variables_initializer())
-    del b1, b2, b3, W1, W2, W3
+    del b1, b2, b3, W1, W2, W3, net_vars
 
     # Handles to the TF nodes for data input/output.
     g = tf.get_default_graph().get_tensor_by_name
