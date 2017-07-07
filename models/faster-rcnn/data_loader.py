@@ -383,9 +383,12 @@ class FasterRcnnRpn(DataSet):
             assert bboxes.dtype == np.uint32
             assert bboxes.shape[1] == 4
 
-            # Compile a list of RPN training data based on the bboxes of the
+            # fixme
+            # assert img.shape == obj_cls.shape
+
+            # Compile a list of RPN training data based on the BBoxes of the
             # objects in the image.
-            label_mr = self.bbox2RPNLabels(bboxes, (height, width))
+            label_mr, mask, score = self.bbox2RPNLabels(bboxes, (height, width))
 
             # Store the flattened image alongside its label and meta data.
             all_labels.append(label_mr)
@@ -496,6 +499,7 @@ class FasterRcnnRpn(DataSet):
             del i, x0, x1, y0, y1, max_overlap
         del anchor
 
+        score = np.zeros((ft_height, ft_width), overlap.dtype)
         for y in range(ft_height):
             for x in range(ft_width):
                 # Compute anchor box coordinates in original image.
@@ -525,6 +529,7 @@ class FasterRcnnRpn(DataSet):
                 if max(rat) <= 0.9:
                     continue
                 bbox = bboxes[np.argmax(rat)]
+                score[y, x] = max(rat)
                 del rat
 
                 # If we get to here it means the anchor has sufficient overlap
@@ -551,7 +556,7 @@ class FasterRcnnRpn(DataSet):
                 # respective image position.
                 out[3:, y, x] = [lx, ly, lw, lh]
                 del bcx, bcy, bw, bh, lx, ly, lw, lh
-        return out
+        return out, out[0], score
 
 
 class FasterRcnnClassifier(DataSet):
