@@ -378,22 +378,20 @@ class FasterRcnnRpn(DataSet):
             # Place objects. This returns the image with the inserted objects,
             # the BBox parameters (4 values for each placed object to encode x,
             # y, width, height), and the class of each object.
-            num_placements = 20
-            img, bboxes, obj_cls = self.placeObjects(img, num_placements, label2name)
+            img, bboxes, bbox_labels = self.placeObjects(img, 20, label2name)
             assert img.shape == dims
             assert bboxes.dtype == np.uint32
-            assert obj_cls.dtype == np.uint32
-            assert obj_cls.ndim == 2
-            assert obj_cls.shape == (height, width)
+            assert bboxes.shape[0] == bbox_labels.shape[0]
 
             # Compile a list of RPN training data based on the BBoxes of the
             # objects in the image.
-            label_mr, mask, score = self.bbox2RPNLabels(bboxes, (height, width))
+            label_mr, mask, score_img, label_img = self.bbox2RPNLabels(
+                bboxes, bbox_labels, (height, width))
 
             # Store the flattened image alongside its label and meta data.
             all_labels.append(label_mr)
             all_features.append(img)
-            meta.append(self.MetaData(fname, mask=mask, obj_cls=obj_cls, score=score))
+            meta.append(self.MetaData(fname, mask=mask, obj_cls=label_img, score=score_img))
 
         # Ensure that everything is a proper NumPy array.
         all_features = np.array(all_features, np.uint8)
@@ -422,13 +420,8 @@ class FasterRcnnRpn(DataSet):
         # serves as a mask to indicate which regions already contain an object.
         box_img = np.zeros((height, width), np.uint8)
 
-        # Stamp randomly scaled, positioned and coloured objects into the full
-        # output image.
-        bbox, miss = [], 0
-
-        # Mark every location in the full sized images as background initially.
-        # We will update this as we add objects.
-        obj_classes = name2label['background'] * np.ones((height, width), np.uint32)
+        # Will contain the BBox parameters and the label of the shape it encases.
+        bbox, bbox_labels, miss = [], [], 0
 
         # Stamp objects into the image. Their class, size and position are random.
         shape_names = list(shapes.keys())
@@ -481,20 +474,13 @@ class FasterRcnnRpn(DataSet):
 
             # Record the bounding box parameters and object type we just stamped.
             bbox.append((x0, x1, y0, y1))
-
-            # Record the object label for this BBox.
-            x = int((x0 + x1) / 2)
-            y = int((y0 + y1) / 2)
-            assert 0 <= x < obj_classes.shape[1]
-            assert 0 <= y < obj_classes.shape[0]
-            obj_classes[y, x] = name2label[name]
-            del obj, chan, obj_height, obj_width, mask, x, y
+            bbox_labels.append(name2label[name])
 
         bbox = np.array(bbox, np.uint32)
-        obj_types = np.array(obj_classes, np.uint32)
-        return img, bbox, obj_types
+        bbox_labels = np.array(bbox_labels, np.uint32)
+        return img, bbox, bbox_labels
 
-    def bbox2RPNLabels(self, bboxes, dims_hw, downsample=4):
+    def bbox2RPNLabels(self, bboxes, bbox_labels, dims_hw, downsample=4):
         assert bboxes.shape[1] == 4
         assert isinstance(downsample, int) and downsample >= 1
 
@@ -522,7 +508,29 @@ class FasterRcnnRpn(DataSet):
             del i, x0, x1, y0, y1, max_overlap
         del anchor
 
-        score = np.zeros((ft_height, ft_width), overlap.dtype)
+        # Compute the best overlap score (by any BBox) at every location.
+        score_img = np.amax(overlap_rat, axis=0)
+
+        # Compute which shape (if any) got the highest score at each position.
+        label_img = np.zeros_like(score_img).astype(np.uint32)
+        for y in range(label_img.shape[0]):
+            for x in range(label_img.shape[1]):
+                # If no shape has a viable score do nothing. This will leave
+                # the label value at zero, which always means background.
+                if max(overlap_rat[:, y, x]) < 0.9:
+                    continue
+
+                # Find out which BBox got the highest score, then find out
+                # which label it corresponds to and assign it to the location.
+                best_bbox = np.argmax(overlap_rat[:, y, x])
+                label_img[y, x] = bbox_labels[best_bbox]
+                del best_bbox
+        del x, y
+
+        # Compute the BBox parameters that the network will ultimately learn.
+        # These are two values to encode the BBox centre (relative to the
+        # anchor in the full image), and another two value to encode the
+        # width/height difference compared to the anchor.
         for y in range(ft_height):
             for x in range(ft_width):
                 # Compute anchor box coordinates in original image.
@@ -552,7 +560,6 @@ class FasterRcnnRpn(DataSet):
                 if max(rat) <= 0.9:
                     continue
                 bbox = bboxes[np.argmax(rat)]
-                score[y, x] = max(rat)
                 del rat
 
                 # If we get to here it means the anchor has sufficient overlap
@@ -579,7 +586,7 @@ class FasterRcnnRpn(DataSet):
                 # respective image position.
                 out[3:, y, x] = [lx, ly, lw, lh]
                 del bcx, bcy, bw, bh, lx, ly, lw, lh
-        return out, out[0], score
+        return out, out[0], score_img, label_img
 
 
 class FasterRcnnClassifier(DataSet):
@@ -685,19 +692,16 @@ class FasterRcnnClassifier(DataSet):
         all_features[:N] = background[idx]
         meta += [self.MetaData(None, 0, None)] * N
 
-        # The next N features are background images with the first object in
-        # the foreground.
-        idx = np.random.permutation(N)
-        all_labels[N:2 * N] = 1
-        all_features[N:2 * N] = self.makeShapeExamples(shapes[0], background[idx])
-        meta += [self.MetaData(None, 0, None)] * N
-
-        # The next N features are background images with the second object in
-        # the foreground.
-        idx = np.random.permutation(N)
-        all_labels[2 * N:] = 2
-        all_features[2 * N:] = self.makeShapeExamples(shapes[1], background[idx])
-        meta += [self.MetaData(None, 0, None)] * N
+        # Add N images for each object type. Each of these objects have a
+        # random background patch as, well, background.
+        start = N
+        for name, shape in shapes.items():
+            stop = start + N
+            idx = np.random.permutation(N)
+            all_labels[start:stop] = name2label[name]
+            all_features[start:stop] = self.makeShapeExamples(shape, background[idx])
+            meta += [self.MetaData(None, 0, None)] * N
+            start = stop
 
         return all_features, all_labels, dims, label2name, meta
 
