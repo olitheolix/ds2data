@@ -391,7 +391,7 @@ class FasterRcnnRpn(DataSet):
             # Store the flattened image alongside its label and meta data.
             all_labels.append(label_mr)
             all_features.append(img)
-            meta.append(self.MetaData(fname, mask=mask, obj_cls=label_img, score=score_img))
+            meta.append(self.MetaData(fname, mask, label_img, score_img))
 
         # Ensure that everything is a proper NumPy array.
         all_features = np.array(all_features, np.uint8)
@@ -512,20 +512,13 @@ class FasterRcnnRpn(DataSet):
         score_img = np.amax(overlap_rat, axis=0)
 
         # Compute which shape (if any) got the highest score at each position.
-        label_img = np.zeros_like(score_img).astype(np.uint32)
-        for y in range(label_img.shape[0]):
-            for x in range(label_img.shape[1]):
-                # If no shape has a viable score do nothing. This will leave
-                # the label value at zero, which always means background.
-                if max(overlap_rat[:, y, x]) < 0.9:
-                    continue
+        idx = np.nonzero(score_img >= 0.9)
+        best_bbox = np.argmax(overlap_rat, axis=0)
+        bbox_label = bbox_labels[best_bbox[idx]]
 
-                # Find out which BBox got the highest score, then find out
-                # which label it corresponds to and assign it to the location.
-                best_bbox = np.argmax(overlap_rat[:, y, x])
-                label_img[y, x] = bbox_labels[best_bbox]
-                del best_bbox
-        del x, y
+        label_img = np.zeros_like(score_img).astype(np.uint32)
+        label_img[idx] = bbox_label
+        del best_bbox, bbox_label, idx
 
         # Compute the BBox parameters that the network will ultimately learn.
         # These are two values to encode the BBox centre (relative to the
