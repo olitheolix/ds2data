@@ -149,6 +149,9 @@ class DataSet:
         """Return image dimensions, eg (3, 64, 64)"""
         return np.array(self.image_dims, np.uint32)
 
+    def getMeta(self, meta_idx):
+        return {k: self.meta[k] for k in meta_idx}
+
     def nextBatch(self, N, dset):
         """Return next batch of `N` from `dset`.
 
