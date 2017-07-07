@@ -84,8 +84,6 @@ class DataSet:
 
         # Limit the number of samples for each label.
         N = conf.num_samples
-        # if N is not None:
-        #     x, y, meta = self.limitSampleSize(x, y, meta, N)
 
         # Store the pre-processed labels.
         self.meta = meta
@@ -150,71 +148,6 @@ class DataSet:
         """Return image dimensions, eg (3, 64, 64)"""
         return np.array(self.image_dims, np.uint32)
 
-    def limitSampleSize(self, x, y, meta, N):
-        """Remove all classes except those in `keep_labels`
-
-        NOTE: This operation is irreversible. To recover the original sample
-        you must instantiate the class anew.
-        """
-        assert len(x) == len(y)
-        N = int(np.clip(N, 0, len(y)))
-        if N == 0:
-            return x[:0], y[:0], meta[:0]
-
-        # Determine how many images there are for each label, and cap it at N.
-        cnt = collections.Counter(y.tolist())
-        cnt = {k: min(N, v) for k, v in cnt.items()}
-
-        # Allocate the array that will hold the reduced feature/label/meta set.
-        num_out = sum(cnt.values())
-        dim_x = list(x.shape)
-        dim_x[0] = num_out
-        x_out = np.zeros(dim_x, x.dtype)
-        y_out = np.zeros(num_out, y.dtype)
-        m_out = [None] * num_out
-
-        # Remove all labels for which we have no features to begin with (ie.
-        # this is a lousy data set).
-        for v in cnt:
-            if cnt[v] == 0:
-                del cnt[v]
-
-        # Loop over the features until we reach the correct quota for each label.
-        out_idx, in_idx = 0, -1
-        while len(cnt) > 0:
-            in_idx += 1
-
-            # Skip if we do not need any more features with this label.
-            label = y[in_idx]
-            if label not in cnt:
-                continue
-
-            # Reduce the quota for this label.
-            cnt[label] -= 1
-            if cnt[label] == 0:
-                del cnt[label]
-
-            # Add the feature/label/metadata to the new pool.
-            x_out[out_idx] = x[in_idx]
-            y_out[out_idx] = y[in_idx]
-            m_out[out_idx] = meta[in_idx]
-            out_idx += 1
-        return x_out, y_out, m_out
-
-    def show(self, handle=0):
-        """Plot the image with id `handle`."""
-        assert 0 <= handle < len(self.handles)
-
-        m_label = self.labels[handle]
-        h_label = self.label2name[m_label]
-        img = self.toImage(self.features[handle])
-        if img.shape[2] == 1:
-            plt.imshow(img[:, :, 0], cmap='gray')
-        else:
-            plt.imshow(img)
-        plt.title(f'{handle}: {h_label} (Class {m_label})')
-        plt.show()
-
     def nextBatch(self, N, dset):
         """Return next batch of `N` from `dset`.
 
@@ -229,24 +162,6 @@ class DataSet:
         idx = self.handles[dset][a:b]
         self.ofs[dset] = min(b, self.lenOfEpoch(dset))
         return self.features[idx], self.labels[idx], idx
-
-    def toImage(self, img):
-        """Return the flat `img` as a properly reshaped image.
-        """
-        # Reshape the image to the original dimensions.
-        assert img.shape == np.prod(self.image_dims)
-        img = np.array(255 * img, np.uint8)
-        img = img.reshape(*self.image_dims)
-
-        if (img.ndim == 3) and (img.shape[0] in [1, 3]):
-            # If the image has a third dimension then it *must* be an RGB
-            # image, but not an RGBA image. Furthermore, due to TF's filter
-            # format that treats each dimension as a feature, the shape is
-            # 3xNxN, and _not_ NxNx3
-            img = img.swapaxes(0, 1).swapaxes(1, 2)
-        else:
-            assert False, ('Wrong image dimensions', img.shape)
-        return img
 
     def loadRawData(self):
         """Return feature and label vector for data set of choice.
