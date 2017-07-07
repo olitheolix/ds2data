@@ -159,7 +159,7 @@ def saveState(sess, conf, log, saver):
 def main_cls():
     # Network configuration.
     conf = NetConf(
-        width=32, height=32, colour='rgb', seed=0, num_dense=32,
+        width=32, height=32, colour='rgb', seed=0, num_dense=32, keep_model=0.8,
         batch_size=16, num_epochs=20, train_rat=0.8, num_samples=1000
     )
 
@@ -679,12 +679,12 @@ def validate_rpn(sess, conf):
 def main_rpn():
     # Network configuration.
     conf = NetConf(
-        width=512, height=512, colour='rgb', seed=0, num_dense=32,
+        width=512, height=512, colour='rgb', seed=0, num_dense=32, keep_model=0.8,
         batch_size=16, num_epochs=1, train_rat=0.8, num_samples=20
     )
 
     # Select training/validation mode.
-    train = True
+    train = False
 
     sess = tf.Session()
     log = collections.defaultdict(list)
