@@ -285,17 +285,22 @@ class DS2(DataSet):
 
 
 def loadObjects(N=32, chan=3):
-    out = np.zeros((2, chan, N, N), np.uint8)
+    out = {}
+    canvas = np.zeros((chan, N, N), np.uint8)
 
     # First shape is a box.
-    out[0, :, 1:-1, 1:-1] = 255
+    canvas[:, 1:-1, 1:-1] = 255
+    out['box'] = np.array(canvas)
+    canvas = 0 * canvas
 
     # Second shape is a disc.
     centre = N / 2
     for y in range(N):
         for x in range(N):
             dist = np.sqrt(((x - centre) ** 2 + (y - centre) ** 2))
-            out[1, :, y, x] = 255 if dist < (N - 2) / 2 else 0
+            canvas[:, y, x] = 255 if dist < (N - 2) / 2 else 0
+
+    out['disc'] = np.array(canvas)
     return out
 
 
@@ -323,7 +328,8 @@ class FasterRcnnRpn(DataSet):
         # The size of the returned images.
         dims = (chan, height, width)
 
-        label2name = {0: 'background', 1: 'box', 2: 'circle'}
+        # Fixme: must be aligned with loadObjects
+        label2name = {0: 'background', 1: 'box', 2: 'disc'}
 
         # Location to data folder.
         data_path = os.path.dirname(os.path.abspath(__file__))
@@ -373,9 +379,7 @@ class FasterRcnnRpn(DataSet):
             # the BBox parameters (4 values for each placed object to encode x,
             # y, width, height), and the class of each object.
             num_placements = 20
-            bg_label = [k for k, v in label2name.items() if v == 'background']
-            assert len(bg_label) == 1
-            img, bboxes, obj_cls = self.placeObjects(img, num_placements, bg_label[0])
+            img, bboxes, obj_cls = self.placeObjects(img, num_placements, label2name)
             assert img.shape == dims
             assert bboxes.dtype == np.uint32
             assert obj_cls.dtype == np.uint32
@@ -397,10 +401,13 @@ class FasterRcnnRpn(DataSet):
 
         return all_features, all_labels, dims, label2name, meta
 
-    def placeObjects(self, img, num_placements, bg_label):
+    def placeObjects(self, img, num_placements, label2name):
         assert num_placements >= 0
         assert img.ndim == 3
         assert img.dtype == np.uint8
+
+        # Create inverse map.
+        name2label = {v: k for k, v in label2name.items()}
 
         # Dimension of full image, eg 3x512x512.
         chan, width, height = img.shape
@@ -409,10 +416,7 @@ class FasterRcnnRpn(DataSet):
         # Load the test shapes we want to find. These are smaller than the
         # image and they are also always Gray scale. For instance, their
         # dimension might be 1x32x32.
-        objs = loadObjects(N=32, chan=chan)
-        pool_size, obj_chan, _, _ = objs.shape
-        assert obj_chan == chan
-        del obj_chan
+        shapes = loadObjects(N=32, chan=chan)
 
         # A dummy image the size of the final output image. This one only
         # serves as a mask to indicate which regions already contain an object.
@@ -424,13 +428,16 @@ class FasterRcnnRpn(DataSet):
 
         # Mark every location in the full sized images as background initially.
         # We will update this as we add objects.
-        obj_classes = bg_label * np.ones((height, width), np.uint32)
+        obj_classes = name2label['background'] * np.ones((height, width), np.uint32)
 
         # Stamp objects into the image. Their class, size and position are random.
+        shape_names = list(shapes.keys())
         while len(bbox) < num_placements:
-            # Pick a random object and give it an also random colour.
-            obj_cls = np.random.randint(0, pool_size)
-            obj = np.array(objs[obj_cls])
+            # Pick a random object and determine its label.
+            name = shape_names[np.random.randint(len(shape_names))]
+            obj = np.array(shapes[name])
+
+            # Give object a random colour.
             for i in range(obj.shape[0]):
                 obj[i, :, :] = obj[i, :, :] * np.random.uniform(0.3, 1)
             obj = obj.astype(np.uint8)
@@ -480,8 +487,8 @@ class FasterRcnnRpn(DataSet):
             y = int((y0 + y1) / 2)
             assert 0 <= x < obj_classes.shape[1]
             assert 0 <= y < obj_classes.shape[0]
-            obj_classes[y, x] = obj_cls
-            del obj, obj_cls, chan, obj_height, obj_width, mask, x, y
+            obj_classes[y, x] = name2label[name]
+            del obj, chan, obj_height, obj_width, mask, x, y
 
         bbox = np.array(bbox, np.uint32)
         obj_types = np.array(obj_classes, np.uint32)
@@ -596,7 +603,8 @@ class FasterRcnnClassifier(DataSet):
         # The size of the returned images.
         dims = (chan, height, width)
 
-        label2name = {0: 'background', 1: 'box', 2: 'circle'}
+        label2name = {0: 'background', 1: 'box', 2: 'disc'}
+        name2label = {v: k for k, v in label2name.items()}
 
         # Location to data folder.
         data_path = os.path.dirname(os.path.abspath(__file__))
