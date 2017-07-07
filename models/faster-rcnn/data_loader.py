@@ -454,9 +454,10 @@ class FasterRcnnRpn(DataSet):
             del scale
 
             # Pick random position for upper left corner of object.
-            x0 = np.random.randint(0, width - obj_width)
-            y0 = np.random.randint(0, height - obj_height)
-            x1, y1 = x0 + obj_width, y0 + obj_height
+            x0 = np.random.randint(0, width - obj_width - 1)
+            y0 = np.random.randint(0, height - obj_height - 1)
+            x1 = x0 + obj_width
+            y1 = y0 + obj_height
             if np.max(box_img[y0:y1, x0:x1]) != 0:
                 miss += 1
                 if miss > 100:
