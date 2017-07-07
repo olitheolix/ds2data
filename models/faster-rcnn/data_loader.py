@@ -483,17 +483,6 @@ class FasterRcnnRpn(DataSet):
             del i, x0, x1, y0, y1, max_overlap
         del anchor
 
-        # Compute the size of each BBox in pixels. Add the size of the Anchor
-        # box to that number. The result is the maximum possible size of the
-        # union of the two shapes. We will need this when we compute the IoU
-        # ratio below.
-        sum_areas = np.zeros(len(bboxes), np.float32)
-        for i, (x0, x1, y0, y1) in enumerate(bboxes):
-            bbox_area = (x1 - x0) * (y1 - y0)
-            assert bbox_area > 0
-            sum_areas[i] = a_width * a_height + bbox_area
-            del i, x0, x1, y0, y1, bbox_area
-
         for y in range(ft_height):
             for x in range(ft_width):
                 # Compute anchor box coordinates in original image.
