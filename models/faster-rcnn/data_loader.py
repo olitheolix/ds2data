@@ -1,15 +1,12 @@
 """ A uniform interface to request images."""
 import os
 import glob
-import collections
 import scipy.signal
 import numpy as np
-import matplotlib.pyplot as plt
 
 from PIL import Image
 from config import NetConf
-
-MetaData = collections.namedtuple('MetaData', 'filename label name')
+from collections import namedtuple
 
 
 class DataSet:
@@ -39,10 +36,14 @@ class DataSet:
         conf.num_samples (int):
             Number of samples to use for each label. Use all if set to None.
     """
+    MetaData = namedtuple('MetaData', 'filename label name')
+
     def __init__(self, conf):
         # Sanity check.
         assert isinstance(conf, NetConf)
         self.conf = conf
+
+        # Define the MetaData container for this data set.
 
         # Set the random number generator.
         if conf.seed is not None:
@@ -193,7 +194,7 @@ class DataSet:
                 name = label2name[label]
                 x.append(i * np.ones(dims, np.uint8))
                 y.append(label)
-                meta.append(MetaData(f'file_{i}', label, name))
+                meta.append(self.MetaData(f'file_{i}', label, name))
         x = np.array(x, np.uint8)
         y = np.array(y, np.int32)
         return x, y, dims, label2name, meta
@@ -205,6 +206,11 @@ class DS2(DataSet):
     The parameters in the `conf` dictionary that is passed to the super class
     have the following meaning:
     """
+    MetaData = namedtuple('MetaData', 'filename label name')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def loadRawData(self):
         # Original attributes of the images in the DS2 dataset.
         N = self.conf.num_samples
@@ -269,7 +275,7 @@ class DS2(DataSet):
                 # Store the flattened image alongside its label and meta data.
                 all_labels.append(label_mr)
                 all_features.append(img)
-                meta.append(MetaData(fname, label_mr, label_hr))
+                meta.append(self.MetaData(fname, label_mr, label_hr))
 
         # Ensure that everything is a proper NumPy array.
         all_features = np.array(all_features, np.uint8)
@@ -300,6 +306,11 @@ class FasterRcnnRpn(DataSet):
     target values for the RPN. Specifically, it will provide the overlap of
     each BBox with the anchor and the precise dimensions of the BBox.
     """
+    MetaData = namedtuple('MetaData', 'filename mask obj_cls score')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def loadRawData(self):
         # Original attributes of the images in the DS2 dataset.
         N = self.conf.num_samples
@@ -638,21 +649,21 @@ class FasterRcnnClassifier(DataSet):
         idx = np.random.permutation(N)
         all_labels[:N] = 0
         all_features[:N] = background[idx]
-        meta += [MetaData(None, 0, None)] * N
+        meta += [self.MetaData(None, 0, None)] * N
 
         # The next N features are background images with the first object in
         # the foreground.
         idx = np.random.permutation(N)
         all_labels[N:2 * N] = 1
         all_features[N:2 * N] = self.makeShapeExamples(shapes[0], background[idx])
-        meta += [MetaData(None, 0, None)] * N
+        meta += [self.MetaData(None, 0, None)] * N
 
         # The next N features are background images with the second object in
         # the foreground.
         idx = np.random.permutation(N)
         all_labels[2 * N:] = 2
         all_features[2 * N:] = self.makeShapeExamples(shapes[1], background[idx])
-        meta += [MetaData(None, 0, None)] * N
+        meta += [self.MetaData(None, 0, None)] * N
 
         return all_features, all_labels, dims, label2name, meta
 
