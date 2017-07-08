@@ -311,7 +311,7 @@ class FasterRcnnRpn(DataSet):
     target values for the RPN. Specifically, it will provide the overlap of
     each BBox with the anchor and the precise dimensions of the BBox.
     """
-    MetaData = namedtuple('MetaData', 'filename mask obj_cls score')
+    MetaData = namedtuple('MetaData', 'filename mask label score')
 
     def loadRawData(self):
         # Original attributes of the images in the DS2 dataset.

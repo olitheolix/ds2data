@@ -650,7 +650,7 @@ def saveRpnPredictions(sess, conf):
                 if meta.score[iy, ix] < 0.3:
                     gt_label = 0
                 else:
-                    gt_label = meta.obj_cls[iy, ix]
+                    gt_label = meta.label[iy, ix]
                 gt_label = f'{gt_label:02d}'
 
                 # BBox in image coordinates.
@@ -802,7 +802,7 @@ def validate_rpn(sess, conf):
         plt.title('Pred BBoxes')
 
         plt.subplot(2, 3, 4)
-        plt.imshow(meta.obj_cls)
+        plt.imshow(meta.label)
         plt.title('GT Label')
 
         plt.subplot(2, 3, 5)
