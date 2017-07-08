@@ -26,7 +26,7 @@ def validateAll(sess, ds, batch_size, dset):
     g = tf.get_default_graph().get_tensor_by_name
     features, labels = g('x_in:0'), g('y_in:0')
     cor_tot = g('inference/corTot:0')
-    kpm = g('model/keep_prob:0')
+    kpm = g('detector/keep_prob:0')
 
     # Reset the data set and get the first batch.
     ds.reset(dset)
@@ -103,6 +103,54 @@ def inference(model_out, y_in):
         tf.reduce_mean(costfun(logits=model_out, labels=y_in), name='cost')
 
 
+def model(x_in, num_dense, num_classes):
+    """Build the classifier model.
+
+    This model is only useful if `x_in` is already the output of a conv-net
+    because we will just add dense layers here. In the context of Faster-RCNN,
+    the layers added here are the ones unique to the object detector, whereas
+    `x_in` is the output of the layer shared with the RPN network.
+
+    Args:
+        x_in: Tensor
+            Input features in NCHW format.
+        num_classes: int
+            number of output neurons
+        num_dense: int
+            Number of neurons in dense layer.
+    """
+    # Convenience
+    makeBias, makeWeight = shared_net.makeBias, shared_net.makeWeight
+
+    with tf.variable_scope('detector'):
+        # Default probability for dropout layer is 1. This ensures the mode is
+        # ready for inference without further configuration. However, users
+        # should lower the value during the training phase.
+        kp = tf.placeholder_with_default(1.0, None, 'keep_prob')
+
+        width, height, num_filters = x_in.shape.as_list()[1:]
+
+        # Flatten input features.
+        # Shape: [-1, 64, 16, 16] ---> [-1, 64 * 16 * 16]
+        # Features: 64
+        x_flat = tf.reshape(x_in, [-1, width * height * num_filters])
+
+        # Dense Layer
+        # Shape: [-1, 64 * 16 * 16] ---> [-1, num_dense]
+        b1 = makeBias([num_dense], value=0.0, name='b1')
+        W1 = makeWeight([width * height * num_filters, num_dense], name='W1')
+        dense = tf.nn.relu(tf.matmul(x_flat, W1) + b1)
+
+        # Dropout Layer
+        dense_drop = tf.nn.dropout(dense, keep_prob=kp)
+
+        # Output Layer
+        # Shape: [-1, num_dense) ---> [-1, num_labels]
+        b2 = makeBias([num_classes], name='b2')
+        W2 = makeWeight([num_dense, num_classes], name='W2')
+        return tf.add(tf.matmul(dense_drop, W2), b2, 'model_out')
+
+
 def trainEpoch(sess, ds, conf, log, optimiser):
     """Train the network for one full epoch.
 
@@ -119,7 +167,7 @@ def trainEpoch(sess, ds, conf, log, optimiser):
     g = tf.get_default_graph().get_tensor_by_name
     x_in, y_in, learn_rate = g('x_in:0'), g('y_in:0'), g('learn_rate:0')
     cost = tf.get_default_graph().get_tensor_by_name('inference/cost:0')
-    kpm = g('model/keep_prob:0')
+    kpm = g('detector/keep_prob:0')
 
     # Validate the performance on the entire test data set.
     cor_tot, total = validateAll(sess, ds, conf.batch_size, 'test')
@@ -141,11 +189,19 @@ def trainEpoch(sess, ds, conf, log, optimiser):
 
 def saveNetworkState(sess, log, conf):
     """Save the configuration, Tensorflow model, and log data to disk."""
-    # Query the network state (weights and biases).
+    # Query the state of the shared network (weights and biases).
     g = tf.get_default_graph().get_tensor_by_name
-    W1, b1 = sess.run([g('model/W1:0'), g('model/b1:0')])
-    W2, b2 = sess.run([g('model/W2:0'), g('model/b2:0')])
-    assert isinstance(W1, np.ndarray)
+    W1, b1 = sess.run([g('shared/W1:0'), g('shared/b1:0')])
+    W2, b2 = sess.run([g('shared/W2:0'), g('shared/b2:0')])
+    shared = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
+    del W1, b1, W2, b2
+
+    # Query the state of the detector network (weights and biases).
+    g = tf.get_default_graph().get_tensor_by_name
+    W1, b1 = sess.run([g('detector/W1:0'), g('detector/b1:0')])
+    W2, b2 = sess.run([g('detector/W2:0'), g('detector/b2:0')])
+    det = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
+    del W1, b1, W2, b2
 
     # Ensure the target directory exists.
     dst_dir = os.path.dirname(os.path.abspath(__file__))
@@ -160,12 +216,14 @@ def saveNetworkState(sess, log, conf):
     # Compile file names.
     fname_log = os.path.join(dst_dir, f'{ts}-log.pickle')
     fname_meta = os.path.join(dst_dir, f'{ts}-meta.json')
-    fname_netstate = os.path.join(dst_dir, f'{ts}-netstate.pickle')
+    fname_det = os.path.join(dst_dir, f'{ts}-det.pickle')
+    fname_shared = os.path.join(dst_dir, f'{ts}-shared.pickle')
 
     # Save the TF model, pickled log data, pickled weights/biases and meta data.
     pickle.dump(log, open(fname_log, 'wb'))
+    pickle.dump(det, open(fname_det, 'wb'))
+    pickle.dump(shared, open(fname_shared, 'wb'))
     json.dump({'conf': conf._asdict()}, open(fname_meta, 'w'))
-    pickle.dump({'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}, open(fname_netstate, 'wb'))
 
 
 def loadNetworkState(path, ts=None):
@@ -180,8 +238,9 @@ def loadNetworkState(path, ts=None):
     print(f'Loading time stamp <{ts}>-*')
 
     meta = json.load(open(f'{ts}-meta.json', 'r'))
-    state = pickle.load(open(f'{ts}-netstate.pickle', 'rb'))
-    return NetConf(**meta['conf']), state
+    shared = pickle.load(open(f'{ts}-shared.pickle', 'rb'))
+    det = pickle.load(open(f'{ts}-det.pickle', 'rb'))
+    return NetConf(**meta['conf']), shared, det
 
 
 def main():
@@ -201,9 +260,9 @@ def main():
     if False:
         bwt1 = bwt2 = (None, None, True)
     else:
-        _, state = loadNetworkState('saved/')
-        bwt1 = (state['b1'], state['W1'], False)
-        bwt2 = (state['b2'], state['W2'], False)
+        _, shared, det = loadNetworkState('saved/')
+        bwt1 = (shared['b1'], shared['W1'], False)
+        bwt2 = (shared['b2'], shared['W2'], False)
 
     # Load data set and dump some info about it into the terminal.
     ds = data_loader.Folder(conf)
@@ -218,7 +277,8 @@ def main():
     y_in = tf.placeholder(tf.int32, [None], name='y_in')
 
     # Compile the network as specified in `conf`.
-    model_out = shared_net.model(x_in, num_classes, conf.num_dense, bwt1, bwt2)
+    shared_out = shared_net.model(x_in, bwt1, bwt2)
+    model_out = model(shared_out, conf.num_dense, num_classes)
     inference(model_out, y_in)
     del x_in, y_in, chan, height, width, num_classes
 
