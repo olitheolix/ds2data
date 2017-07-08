@@ -158,14 +158,19 @@ def saveState(sess, conf, log, saver):
 
 
 def main_cls():
+    # Location to data folder.
+    data_path = os.path.dirname(os.path.abspath(__file__))
+    data_path = os.path.join(data_path, 'data', 'basic')
+
     # Network configuration.
     conf = NetConf(
         width=32, height=32, colour='rgb', seed=0, num_dense=32, keep_model=0.8,
+        path=data_path, names=['background', 'box', 'disc'],
         batch_size=16, num_epochs=20, train_rat=0.8, num_samples=1000
     )
 
     # Load data set and dump some info about it into the terminal.
-    ds = data_loader.FasterRcnnClassifier(conf)
+    ds = data_loader.Folder(conf)
     ds.printSummary()
     chan, height, width = ds.imageDimensions().tolist()
     num_classes = len(ds.classNames())

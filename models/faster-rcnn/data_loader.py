@@ -600,176 +600,85 @@ class FasterRcnnRpn(DataSet):
         return out, out[0], score_img, label_img
 
 
-class FasterRcnnClassifier(DataSet):
-    """ Create training set for object classification.
+class Folder(DataSet):
+    """ Load images from folder.
 
-    Each image features either one object over a generic background, or just
-    the background.
+    This class uses the following attributes of the `NetConf` attributes:
+        conf.num_samples (int):
+            Number of samples to load for each label (Use all if *None*).
+        conf.width, conf.height (int):
+            resize the image to these dimensions
+        conf.colour (str):
+            PIL image format. Must be 'L' or 'RGB'.
+        conf.path (str):
+            Path to data folder
+        conf.names (dict):
+            List of label names. the `conf.path` folder must have a sub-folder
+            with that name.
+            NOTE: the label2name mapping simply enumerates this list and puts
+            it into a dictionary. Therefore, if you have a 'background' label
+            that you want to map to the machine label 0, then specify it first,
+            eg. conf.names = ['background', 'dog', 'cat'].
     """
     def loadRawData(self):
-        # Original attributes of the images in the DS2 dataset.
         N = self.conf.num_samples
-        col_fmt = 'RGB'
 
+        # Unpack image dimensions and colour type.
         width = self.conf.width or 128
         height = self.conf.height or 128
         col_fmt = self.conf.colour or 'RGB'
         col_fmt = col_fmt.upper()
         assert col_fmt in {'RGB', 'L'}
+
+        # Ensure the #channels match the colour format.
         chan = 1 if col_fmt == 'L' else 3
 
         # The size of the returned images.
         dims = (chan, height, width)
 
-        label2name = {0: 'background', 1: 'box', 2: 'disc'}
-        name2label = {v: k for k, v in label2name.items()}
-
-        # Location to data folder.
-        data_path = os.path.dirname(os.path.abspath(__file__))
-        data_path = os.path.join(data_path, 'data', 'training')
-        data_path = 'data/background'
+        # Compile the label2name map. Also ensure that all paths exist.
+        assert os.path.exists(self.conf.path), self.conf.path
+        label2name = {}
+        for idx, name in enumerate(self.conf.names):
+            folder = os.path.join(self.conf.path, name)
+            assert os.path.exists(folder), folder
+            label2name[idx] = name
 
         # Iterate over all labels.
         all_labels, all_features, meta = [], [], []
+        for name_mr, name_hr in label2name.items():
+            # Compile path with feature images.
+            folder = os.path.join(self.conf.path, name_hr)
+            fnames = glob.glob(f'{folder}/*.jpg')
+            fnames.sort()
 
-        fnames = []
-        for ext in ['jpg', 'JPG', 'jpeg', 'JPEG']:
-            fnames.extend(glob.glob(f'{data_path}/*.' + ext))
-        del ext
+            # Load the images.
+            for idx, fname in enumerate(fnames):
+                # Load the image, enforce colour space, and resize if necessary.
+                img = Image.open(fname).convert(col_fmt)
+                if img.size != (width, height):
+                    img = img.resize((width, height), Image.BILINEAR)
 
-        # Abort if the data set does not exist.
-        if len(fnames) == 0:
-            # fixme: correct data path
-            print(f'\nError: No files in {data_path}')
-            print('\nPlease download '
-                  'https://github.com/olitheolix/ds2data/blob/master/ds2.tar.gz'
-                  '\nand unpack it to data/\n')
-            raise FileNotFoundError
-
-        # Determine how many background patches we have to cut out to create a
-        # data set with N boxes/circles/empty.
-        if 3 * N % len(fnames) == 0:
-            patches_per_image = (3 * N) // len(fnames)
-        else:
-            patches_per_image = 1 + int((3 * N) // len(fnames))
-
-        # Load each image, pre-process it (eg resize, RGB/Gray), and add it
-        # to the data set.
-        background = []
-        for i, fname in enumerate(fnames):
-            # Convert to correct colour format and resize.
-            img = Image.open(fname)
-            img = img.convert(col_fmt)
-
-            # We work in NumPy from now on.
-            img = np.array(img, np.uint8)
-
-            # Insert a dummy dimension for grayscale (2d images).
-            if img.ndim == 2:
-                img = np.expand_dims(img, axis=2)
-            img = np.transpose(img, [2, 0, 1])
-
-            assert img.shape[1] > height and img.shape[2] > width
-
-            # Sample the background.
-            for j in range(patches_per_image):
-                y0 = np.random.randint(0, img.shape[1] - height)
-                x0 = np.random.randint(0, img.shape[2] - width)
-                y1, x1 = y0 + height, x0 + width
-                background.append(img[:, y0:y1, x0:x1])
-                del j, y0, x0, y1, x1
-            del i, img
-
-            # Abort once we have enough background patches.
-            if len(background) >= 3 * N:
-                break
-
-        # Ensure we have the correct number of background patches.
-        background = background[:3 * N]
-        assert len(background) == 3 * N
-        background = np.array(background, np.uint8)
-
-        # Load the objects we want to place over the background.
-        shapes = loadObjects(N=32, chan=chan)
-
-        # Initialise output variables.
-        meta = []
-        all_labels = np.zeros(3 * N, np.int32)
-        all_features = np.zeros((3 * N, chan, height, width), np.uint8)
-
-        # The first N features are random background patches.
-        idx = np.random.permutation(N)
-        all_labels[:N] = 0
-        all_features[:N] = background[idx]
-        meta += [self.MetaData(None, 0, None)] * N
-
-        # Add N images for each object type. Each of these objects have a
-        # random background patch as, well, background.
-        start = N
-        for name, shape in shapes.items():
-            stop = start + N
-            idx = np.random.permutation(N)
-            all_labels[start:stop] = name2label[name]
-            all_features[start:stop] = self.makeShapeExamples(shape, background[idx])
-            meta += [self.MetaData(None, 0, None)] * N
-            start = stop
-
-        return all_features, all_labels, dims, label2name, meta
-
-    def makeShapeExamples(self, obj, background):
-        # Ensure obj and background have the same pixel dimensions and channels.
-        assert obj.shape == background.shape[1:]
-
-        # Convenience: image parameters. N is the number of background images
-        # to stamp.
-        N, chan, height, width = background.shape
-
-        # Extract the the image and convert it to HWC for colour.
-        if obj.shape[0] == 1:
-            obj = obj[0]
-        else:
-            obj = np.transpose(obj, [1, 2, 0])
-
-        # Stamp one object onto every background image.
-        out = np.array(background)
-        for i in range(N):
-            # Randomly scale the colour channel(s).
-            img = np.array(obj)
-            if img.ndim == 2:
-                img = img * np.random.uniform(0.3, 1)
-            else:
-                img[:, :, 0] = img[:, :, 0] * np.random.uniform(0.3, 1)
-                img[:, :, 1] = img[:, :, 0] * np.random.uniform(0.3, 1)
-                img[:, :, 2] = img[:, :, 0] * np.random.uniform(0.3, 1)
-            img = img.astype(np.uint8)
-
-            # Randomly scale down the image.
-            img = Image.fromarray(img)
-            scale = np.random.uniform(0.35, 1)
-            w, h = int(width * scale), int(height * scale)
-            img = img.resize((w, h), Image.BILINEAR)
-
-            # Convert from Pillow to NumPy and ensure that the new image is,
-            # again, in CHW format.
-            img = np.array(img, np.uint8)
-            if img.ndim == 2:
-                img = np.expand_dims(img, axis=0)
-            else:
+                # Convert to NumPy format and change to CHW.
+                img = np.array(img, np.uint8)
                 img = np.transpose(img, [2, 0, 1])
-            assert img.shape == (chan, h, w), img.shape
 
-            # Compute random position in background image.
-            x0 = np.random.randint(0, width - w)
-            y0 = np.random.randint(0, height - h)
-            x1, y1 = x0 + w, y0 + h
+                # Add it to the feature/label/meta list.
+                all_features.append(img)
+                all_labels.append(name_mr)
+                meta.append(self.MetaData(fname, name_mr, name_hr))
 
-            # Compute a mask to only copy the image portion that contains the
-            # object but not those that contain only the black background.
-            idx = np.nonzero(img > 30)
-            mask = np.zeros_like(img)
-            mask[idx] = 1
+                # Do not collect more than N samples.
+                if N is not None and idx >= N:
+                    break
 
-            # Stamp the object into the image.
-            img = (1 - mask) * out[i, :, y0:y1, x0:x1] + mask * img
-            out[i, :, y0:y1, x0:x1] = img
-        return out
+        # Convert everything to NumPy arrays.
+        all_features = np.array(all_features, np.uint8)
+        all_labels = np.array(all_labels, np.uint8)
+
+        # Sanity check: the number of features/labels/meta must match.
+        assert all_features.shape[1:] == dims
+        assert all_features.shape[0] == all_labels.shape[0] == len(meta)
+
+        # Return the data.
+        return all_features, all_labels, dims, label2name, meta
