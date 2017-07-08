@@ -242,7 +242,7 @@ def main():
         s_bwt1 = s_bwt2 = d_bwt1 = d_bwt2 = (None, None, True)
     else:
         os.makedirs(netstate_path, exist_ok=True)
-        ts = config.getLastTimestamp(netstate_path)
+        ts = config.getLastTimestamp(netstate_path, 'shared')
         print(f'Loading time stamp <{ts}>-*')
         det = loadState(ts)
         shared = shared_net.loadState(ts)
