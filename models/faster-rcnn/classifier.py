@@ -103,7 +103,21 @@ def inference(model_out, y_in):
         tf.reduce_mean(costfun(logits=model_out, labels=y_in), name='cost')
 
 
-def model(x_in, num_dense, num_classes):
+def varGauss(shape, name=None, init=None, train=True, stddev=0.1):
+    """Convenience: return Gaussian initialised tensor with ."""
+    if init is None:
+        init = tf.truncated_normal(stddev=stddev, shape=shape, dtype=tf.float32)
+    return tf.Variable(init, name=name, trainable=train)
+
+
+def varConst(shape, name=None, init=None, train=True, value=0.0):
+    """Convenience: return constant initialised tensor."""
+    if init is None:
+        init = tf.constant(value=value, shape=shape, dtype=tf.float32)
+    return tf.Variable(init, name=name, trainable=train)
+
+
+def model(x_in, conf, bwt1, bwt2):
     """Build the classifier model.
 
     This model is only useful if `x_in` is already the output of a conv-net
@@ -120,7 +134,8 @@ def model(x_in, num_dense, num_classes):
             Number of neurons in dense layer.
     """
     # Convenience
-    makeBias, makeWeight = shared_net.makeBias, shared_net.makeWeight
+    num_dense = conf.num_dense
+    num_classes = len(conf.names)
 
     with tf.variable_scope('detector'):
         # Default probability for dropout layer is 1. This ensures the mode is
@@ -128,27 +143,27 @@ def model(x_in, num_dense, num_classes):
         # should lower the value during the training phase.
         kp = tf.placeholder_with_default(1.0, None, 'keep_prob')
 
-        width, height, num_filters = x_in.shape.as_list()[1:]
+        chan, height, width = x_in.shape.as_list()[1:]
 
         # Flatten input features.
         # Shape: [-1, 64, 16, 16] ---> [-1, 64 * 16 * 16]
         # Features: 64
-        x_flat = tf.reshape(x_in, [-1, width * height * num_filters])
+        x_flat = tf.reshape(x_in, [-1, width * height * chan])
 
         # Dense Layer
         # Shape: [-1, 64 * 16 * 16] ---> [-1, num_dense]
-        b1 = makeBias([num_dense], value=0.0, name='b1')
-        W1 = makeWeight([width * height * num_filters, num_dense], name='W1')
+        b1 = varConst([num_dense], 'b1', bwt1[0], bwt1[2], 0.5)
+        W1 = varGauss([chan * height * width, num_dense], 'W1', bwt1[1], bwt1[2])
         dense = tf.nn.relu(tf.matmul(x_flat, W1) + b1)
 
         # Dropout Layer
-        dense_drop = tf.nn.dropout(dense, keep_prob=kp)
+        drop = tf.nn.dropout(dense, keep_prob=kp)
 
         # Output Layer
         # Shape: [-1, num_dense) ---> [-1, num_labels]
-        b2 = makeBias([num_classes], name='b2')
-        W2 = makeWeight([num_dense, num_classes], name='W2')
-        return tf.add(tf.matmul(dense_drop, W2), b2, 'model_out')
+        b2 = varConst([num_classes], 'b2', bwt2[0], bwt2[2], 0.5)
+        W2 = varGauss([num_dense, num_classes], 'W2', bwt2[1], bwt2[2])
+        return tf.add(tf.matmul(drop, W2), b2, 'model_out')
 
 
 def trainEpoch(sess, ds, conf, log, optimiser):
@@ -226,21 +241,27 @@ def saveNetworkState(sess, log, conf):
     json.dump({'conf': conf._asdict()}, open(fname_meta, 'w'))
 
 
-def loadNetworkState(path, ts=None):
-    # Find most recent state.
-    if ts is None:
-        fnames = glob.glob(f'{path}/*-meta.json')
-        assert len(fnames) > 0, f'Could not find a meta file in <{path}>'
-        fnames.sort()
-        ts = fnames[-1]
-        ts = ts[:-len('-meta.json')]
-        del fnames
-    print(f'Loading time stamp <{ts}>-*')
+def getLastTimestamp(path):
+    fnames = glob.glob(f'{path}/*-meta.json')
+    assert len(fnames) > 0, f'Could not find a meta file in <{path}>'
+    fnames.sort()
+    ts = fnames[-1]
+    ts = ts[:-len('-meta.json')]
+    return ts
 
+
+def loadDetectorState(ts):
+    # Find most recent state.
+    meta = json.load(open(f'{ts}-meta.json', 'r'))
+    det = pickle.load(open(f'{ts}-det.pickle', 'rb'))
+    return NetConf(**meta['conf']), det
+
+
+def loadSharedState(ts):
+    # Find most recent state.
     meta = json.load(open(f'{ts}-meta.json', 'r'))
     shared = pickle.load(open(f'{ts}-shared.pickle', 'rb'))
-    det = pickle.load(open(f'{ts}-det.pickle', 'rb'))
-    return NetConf(**meta['conf']), shared, det
+    return NetConf(**meta['conf']), shared
 
 
 def main():
@@ -258,11 +279,17 @@ def main():
     )
 
     if False:
-        bwt1 = bwt2 = (None, None, True)
+        s_bwt1 = s_bwt2 = d_bwt1 = d_bwt2 = (None, None, True)
     else:
-        _, shared, det = loadNetworkState('saved/')
-        bwt1 = (shared['b1'], shared['W1'], False)
-        bwt2 = (shared['b2'], shared['W2'], False)
+        ts = getLastTimestamp('saved/')
+        print(f'Loading time stamp <{ts}>-*')
+        _, det = loadDetectorState(ts)
+        _, shared = loadSharedState(ts)
+        s_bwt1 = (shared['b1'], shared['W1'], True)
+        s_bwt2 = (shared['b2'], shared['W2'], True)
+        d_bwt1 = (det['b1'], det['W1'], True)
+        d_bwt2 = (det['b2'], det['W2'], True)
+        del det, shared
 
     # Load data set and dump some info about it into the terminal.
     ds = data_loader.Folder(conf)
@@ -277,8 +304,8 @@ def main():
     y_in = tf.placeholder(tf.int32, [None], name='y_in')
 
     # Compile the network as specified in `conf`.
-    shared_out = shared_net.model(x_in, bwt1, bwt2)
-    model_out = model(shared_out, conf.num_dense, num_classes)
+    shared_out = shared_net.model(x_in, s_bwt1, s_bwt2)
+    model_out = model(shared_out, conf, d_bwt1, d_bwt2)
     inference(model_out, y_in)
     del x_in, y_in, chan, height, width, num_classes
 
@@ -291,7 +318,7 @@ def main():
     # Initialise the graph.
     sess.run(tf.global_variables_initializer())
 
-    # Create Empty logging dictionary.
+    # Create empty logging dictionary.
     log = collections.defaultdict(list)
 
     # Train the network for several epochs.
