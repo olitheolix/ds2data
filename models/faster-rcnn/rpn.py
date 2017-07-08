@@ -12,7 +12,7 @@ import PIL.Image as Image
 import matplotlib.pyplot as plt
 
 
-def build_rpn_model(conf, x_in, y_in, bwt):
+def buildRpnModel(conf, x_in, y_in, bwt):
     # Convenience: shared arguments for bias variable, conv2d, and max-pool.
     convpool_opts = dict(padding='SAME', data_format='NCHW')
     num_filters = x_in.shape.as_list()[1]
@@ -298,7 +298,7 @@ def train_rpn(sess, conf, log):
     del s_bwt1, s_bwt2
 
     # Attach the RPN classifer to the output of the shared network.
-    build_rpn_model(conf, shared_out, y_in, (None, None, True))
+    buildRpnModel(conf, shared_out, y_in, (None, None, True))
 
     # Define optimisation problem and initialise the graph.
     lrate_in = tf.placeholder(tf.float32)
@@ -360,7 +360,7 @@ def saveRpnPredictions(sess, conf):
     b2 = net_vars['b2']
     W3 = net_vars.get('w3', None)
     b3 = net_vars.get('b3', None)
-    build_rpn_model(conf, (b1, W1, True), (b2, W2, True), (b3, W3, True))
+    buildRpnModel(conf, (b1, W1, True), (b2, W2, True), (b3, W3, True))
     sess.run(tf.global_variables_initializer())
     del b1, b2, b3, W1, W2, W3, net_vars
 
@@ -497,7 +497,7 @@ def validate_rpn(sess, conf):
     prefix = config.getLastTimestamp(netstate_path, 'rpn')
     net = loadState(prefix)
     r_bwt = (net['b1'], net['W1'], True)
-    net_out = build_rpn_model(conf, shared_out, y_in, r_bwt)
+    net_out = buildRpnModel(conf, shared_out, y_in, r_bwt)
     del prefix, net, r_bwt
 
     # Finalise graph setup.
