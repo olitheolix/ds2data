@@ -1,6 +1,5 @@
 import os
 import time
-import model
 import pickle
 import collections
 import data_loader
@@ -11,6 +10,18 @@ import PIL.Image as Image
 import matplotlib.pyplot as plt
 
 from config import NetConf
+
+
+def weights(shape, name=None):
+    """Convenience function to construct weight tensors."""
+    init = tf.truncated_normal(stddev=0.1, shape=shape, dtype=tf.float32)
+    return tf.Variable(init, name=name)
+
+
+def bias(shape, value=0.0, name=None):
+    """Convenience function to construct bias tensors."""
+    init = tf.constant(value=value, shape=shape, dtype=tf.float32)
+    return tf.Variable(init, name=name)
 
 
 def build_rpn_model(conf, bwt1, bwt2, bwt3):
@@ -57,13 +68,13 @@ def build_rpn_model(conf, bwt1, bwt2, bwt3):
         # Shape: [-1, 64, 64, 64] ---> [-1, 6, 64, 64]
         # Kernel: 5x5  Features: 6
         if b3 is None:
-            b3 = model.bias([6, 1, 1], 'b3', 0.5)
+            b3 = bias([6, 1, 1], 0.5, 'b3')
         else:
             b3 = tf.Variable(b3, name='b3', trainable=train3)
         print(f'b3: Trained={b3 is not None}  Trainable={train3}  Shape={b3.shape}')
 
         if W3 is None:
-            W3 = model.weights([15, 15, num_filters, 6], 'W3')
+            W3 = weights([15, 15, num_filters, 6], 'W3')
         else:
             W3 = tf.Variable(W3, name='W3', trainable=train3)
         print(f'W3: Trained={W3 is not None}  Trainable={train3}  Shape={W3.shape}')
