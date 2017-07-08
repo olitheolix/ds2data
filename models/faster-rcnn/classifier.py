@@ -74,6 +74,35 @@ def logAccuracy(sess, ds, log, epoch):
     return rat_trn, rat_tst
 
 
+def inference(model_out, y_in):
+    """Add inference nodes to network.
+
+    This method merely avoids code duplication in `train.py` and `validate.py`.
+
+    Args:
+    model_out: tensor [N, num_labels]
+        The on-hot-label output of the network. This is most likely the return
+        from `netConv2Maxpool`.
+    y_in: tensor [N]
+        Ground truth labels for the corresponding entry in `model_out`.
+    """
+    with tf.name_scope('inference'):
+        # Softmax model to predict the most likely label.
+        pred = tf.nn.softmax(model_out, name='pred')
+        pred = tf.argmax(pred, 1, name='pred-argmax')
+
+        # Determine if the label matches.
+        pred = tf.equal(tf.cast(pred, tf.int32), y_in, name='corInd')
+
+        # Count the total/average number of correctly classified images.
+        tf.reduce_sum(tf.cast(pred, tf.int32), name='corTot')
+        tf.reduce_mean(tf.cast(pred, tf.float32), name='corAvg')
+
+        # Use cross entropy as cost function.
+        costfun = tf.nn.sparse_softmax_cross_entropy_with_logits
+        tf.reduce_mean(costfun(logits=model_out, labels=y_in), name='cost')
+
+
 def trainEpoch(sess, ds, conf, log, optimiser):
     """Train the network for one full epoch.
 
@@ -169,7 +198,7 @@ def main():
         batch_size=16, num_epochs=20, train_rat=0.8, num_samples=1000
     )
 
-    if True:
+    if False:
         bwt1 = bwt2 = (None, None, True)
     else:
         _, state = loadNetworkState('saved/')
@@ -190,7 +219,7 @@ def main():
 
     # Compile the network as specified in `conf`.
     model_out = shared_net.model(x_in, num_classes, conf.num_dense, bwt1, bwt2)
-    shared_net.inference(model_out, y_in)
+    inference(model_out, y_in)
     del x_in, y_in, chan, height, width, num_classes
 
     # Create optimiser.
