@@ -202,15 +202,33 @@ def trainEpoch(sess, ds, conf, log, optimiser):
         log['Cost'].append(cost_val)
 
 
-def saveNetworkState(sess, log, conf):
-    """Save the configuration, Tensorflow model, and log data to disk."""
+def getLastTimestamp(path):
+    fnames = glob.glob(f'{path}/*-meta.json')
+    assert len(fnames) > 0, f'Could not find a meta file in <{path}>'
+    fnames.sort()
+    ts = fnames[-1]
+    return ts[:-len('-meta.json')]
+
+
+def makeTimestamp():
+    d = datetime.datetime.now()
+    ts = f'{d.year}-{d.month:02d}-{d.day:02d}'
+    ts += f'-{d.hour:02d}:{d.minute:02d}:{d.second:02d}'
+    return ts
+
+
+def saveSharedState(ts, sess):
     # Query the state of the shared network (weights and biases).
     g = tf.get_default_graph().get_tensor_by_name
     W1, b1 = sess.run([g('shared/W1:0'), g('shared/b1:0')])
     W2, b2 = sess.run([g('shared/W2:0'), g('shared/b2:0')])
     shared = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
-    del W1, b1, W2, b2
 
+    # Save the state.
+    pickle.dump(shared, open(f'{ts}-shared.pickle', 'wb'))
+
+
+def saveDetectorState(ts, sess):
     # Query the state of the detector network (weights and biases).
     g = tf.get_default_graph().get_tensor_by_name
     W1, b1 = sess.run([g('detector/W1:0'), g('detector/b1:0')])
@@ -218,58 +236,39 @@ def saveNetworkState(sess, log, conf):
     det = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
     del W1, b1, W2, b2
 
-    # Ensure the target directory exists.
-    dst_dir = os.path.dirname(os.path.abspath(__file__))
-    dst_dir = os.path.join(dst_dir, 'saved')
-    os.makedirs(dst_dir, exist_ok=True)
-
-    # Compile time stamp (will be the file name prefix).
-    d = datetime.datetime.now()
-    ts = f'{d.year}-{d.month:02d}-{d.day:02d}'
-    ts += f'-{d.hour:02d}:{d.minute:02d}:{d.second:02d}'
-
-    # Compile file names.
-    fname_log = os.path.join(dst_dir, f'{ts}-log.pickle')
-    fname_meta = os.path.join(dst_dir, f'{ts}-meta.json')
-    fname_det = os.path.join(dst_dir, f'{ts}-det.pickle')
-    fname_shared = os.path.join(dst_dir, f'{ts}-shared.pickle')
-
-    # Save the TF model, pickled log data, pickled weights/biases and meta data.
-    pickle.dump(log, open(fname_log, 'wb'))
-    pickle.dump(det, open(fname_det, 'wb'))
-    pickle.dump(shared, open(fname_shared, 'wb'))
-    json.dump({'conf': conf._asdict()}, open(fname_meta, 'w'))
+    # Save the state.
+    pickle.dump(det, open(f'{ts}-det.pickle', 'wb'))
 
 
-def getLastTimestamp(path):
-    fnames = glob.glob(f'{path}/*-meta.json')
-    assert len(fnames) > 0, f'Could not find a meta file in <{path}>'
-    fnames.sort()
-    ts = fnames[-1]
-    ts = ts[:-len('-meta.json')]
-    return ts
+def saveMeta(ts, conf):
+    json.dump({'conf': conf._asdict()}, open(f'{ts}-meta.json', 'w'))
+
+
+def saveLog(ts, log):
+    pickle.dump(log, open(f'{ts}-log.pickle', 'wb'))
+
+
+def loadMeta(ts):
+    meta = json.load(open(f'{ts}-meta.json', 'r'))
+    return NetConf(**meta['conf'])
 
 
 def loadDetectorState(ts):
-    # Find most recent state.
-    meta = json.load(open(f'{ts}-meta.json', 'r'))
-    det = pickle.load(open(f'{ts}-det.pickle', 'rb'))
-    return NetConf(**meta['conf']), det
+    return pickle.load(open(f'{ts}-det.pickle', 'rb'))
 
 
 def loadSharedState(ts):
-    # Find most recent state.
-    meta = json.load(open(f'{ts}-meta.json', 'r'))
-    shared = pickle.load(open(f'{ts}-shared.pickle', 'rb'))
-    return NetConf(**meta['conf']), shared
+    return pickle.load(open(f'{ts}-shared.pickle', 'rb'))
 
 
 def main():
     sess = tf.Session()
 
     # Location to data folder.
-    data_path = os.path.dirname(os.path.abspath(__file__))
-    data_path = os.path.join(data_path, 'data', 'basic')
+    base = os.path.dirname(os.path.abspath(__file__))
+    data_path = os.path.join(base, 'data', 'basic')
+    netstate_path = os.path.join(base, 'saved')
+    del base
 
     # Network configuration.
     conf = NetConf(
@@ -281,15 +280,16 @@ def main():
     if False:
         s_bwt1 = s_bwt2 = d_bwt1 = d_bwt2 = (None, None, True)
     else:
-        ts = getLastTimestamp('saved/')
+        os.makedirs(netstate_path, exist_ok=True)
+        ts = getLastTimestamp(netstate_path)
         print(f'Loading time stamp <{ts}>-*')
-        _, det = loadDetectorState(ts)
-        _, shared = loadSharedState(ts)
+        det = loadDetectorState(ts)
+        shared = loadSharedState(ts)
         s_bwt1 = (shared['b1'], shared['W1'], True)
         s_bwt2 = (shared['b2'], shared['W2'], True)
         d_bwt1 = (det['b1'], det['W1'], True)
         d_bwt2 = (det['b2'], det['W2'], True)
-        del det, shared
+        del det, shared, ts
 
     # Load data set and dump some info about it into the terminal.
     ds = data_loader.Folder(conf)
@@ -332,9 +332,14 @@ def main():
         # Record the actual number of epochs we have trained.
         conf = conf._replace(num_epochs=epoch)
 
-    # Save network state.
+    # Print final accuracy.
     logAccuracy(sess, ds, log, epoch + 1)
-    saveNetworkState(sess, log, conf)
+
+    # Save the network states.
+    prefix = os.path.join(netstate_path, makeTimestamp())
+    saveMeta(prefix, conf)
+    saveSharedState(prefix, sess)
+    saveDetectorState(prefix, sess)
 
 
 if __name__ == '__main__':
