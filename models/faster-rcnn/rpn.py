@@ -1,6 +1,8 @@
 import os
 import time
+import config
 import pickle
+import shared_net
 import collections
 import data_loader
 import scipy.signal
@@ -8,8 +10,6 @@ import numpy as np
 import tensorflow as tf
 import PIL.Image as Image
 import matplotlib.pyplot as plt
-
-from config import NetConf
 
 
 def weights(shape, name=None):
@@ -24,63 +24,31 @@ def bias(shape, value=0.0, name=None):
     return tf.Variable(init, name=name)
 
 
-def build_rpn_model(conf, bwt1, bwt2, bwt3):
-    b1, W1, train1 = bwt1
-    b2, W2, train2 = bwt2
-    b3, W3, train3 = bwt3
-    del bwt1, bwt2, bwt3
-
-    # Input variables.
-    _, _, chan, num_filters = W1.shape
-    x_in = tf.placeholder(
-        tf.float32, [None, chan, conf.height, conf.width], name='x_in')
-    y_in = tf.placeholder(tf.float32, [None, 7, 128, 128], name='y_in')
+def build_rpn_model(conf, x_in, y_in, bwt):
+    b1, W1, train = bwt
+    del bwt
 
     # Convenience: shared arguments for bias variable, conv2d, and max-pool.
-    pool_pad = mp_stride = [1, 1, 2, 2]
     convpool_opts = dict(padding='SAME', data_format='NCHW')
-    width, height = conf.width, conf.height
-
+    num_filters = x_in.shape.as_list()[1]
     with tf.variable_scope('rpn'):
-        W1 = tf.Variable(W1, name='W1', trainable=train1)
-        b1 = tf.Variable(b1, name='b1', trainable=train1)
-        W2 = tf.Variable(W2, name='W2', trainable=train2)
-        b2 = tf.Variable(b2, name='b2', trainable=train2)
-
-        # Examples dimensions assume 128x128 RGB images.
-        # Convolution Layer #1
-        # Shape: [-1, 3, 128, 128] ---> [-1, 64, 64, 64]
-        # Kernel: 5x5  Features: 64  Pool: 2x2
-        conv1 = tf.nn.conv2d(x_in, W1, [1, 1, 1, 1], **convpool_opts)
-        conv1 = tf.nn.relu(conv1 + b1)
-        conv1_pool = tf.nn.max_pool(conv1, pool_pad, mp_stride, **convpool_opts)
-        width, height = width // 2, height // 2
-
-        # Convolution Layer #2
-        # Shape: [-1, 64, 64, 64] ---> [-1, 64, 32, 32]
-        # Kernel: 5x5  Features: 64  Pool: 2x2
-        conv2 = tf.nn.conv2d(conv1_pool, W2, [1, 1, 1, 1], **convpool_opts)
-        conv2 = tf.nn.relu(conv2 + b2)
-        conv2_pool = tf.nn.max_pool(conv2, pool_pad, mp_stride, **convpool_opts)
-        width, height = width // 2, height // 2
-
         # Convolution layer to learn the anchor boxes.
         # Shape: [-1, 64, 64, 64] ---> [-1, 6, 64, 64]
         # Kernel: 5x5  Features: 6
-        if b3 is None:
-            b3 = bias([6, 1, 1], 0.5, 'b3')
+        if b1 is None:
+            b1 = bias([6, 1, 1], 0.5, 'b1')
         else:
-            b3 = tf.Variable(b3, name='b3', trainable=train3)
-        print(f'b3: Trained={b3 is not None}  Trainable={train3}  Shape={b3.shape}')
+            b1 = tf.Variable(b1, name='b1', trainable=train)
+        print(f'b1: Trained={b1 is not None}  Trainable={train}  Shape={b1.shape}')
 
-        if W3 is None:
-            W3 = weights([15, 15, num_filters, 6], 'W3')
+        if W1 is None:
+            W1 = weights([15, 15, num_filters, 6], 'W1')
         else:
-            W3 = tf.Variable(W3, name='W3', trainable=train3)
-        print(f'W3: Trained={W3 is not None}  Trainable={train3}  Shape={W3.shape}')
+            W1 = tf.Variable(W1, name='W1', trainable=train)
+        print(f'W1: Trained={W1 is not None}  Trainable={train}  Shape={W1.shape}')
 
-        conv3 = tf.nn.conv2d(conv2_pool, W3, [1, 1, 1, 1], **convpool_opts)
-        conv3 = tf.add(conv3, b3, name='net_out')
+        conv3 = tf.nn.conv2d(x_in, W1, [1, 1, 1, 1], **convpool_opts)
+        conv3 = tf.add(conv3, b1, name='net_out')
 
         mask = tf.slice(y_in, [0, 0, 0, 0], [-1, 1, -1, -1])
         mask = tf.squeeze(mask, 1, name='mask')
@@ -298,30 +266,53 @@ def printTrainingStatistics(sess, feed_dict, log):
     return s1 + s2 + s3
 
 
-def saveNetworkWeights(sess):
-    # Save all the weights and biases of the network.
+def saveState(prefix, sess):
+    """ Save all network variables to a file prefixed by `prefix`.
+
+    Args:
+        prefix: str
+           A file prefix. Typically, this is a (relative or absolute) path that
+           ends with a time stamp, eg 'foo/bar/2017-10-10-10:11:12'
+        sess: Tensorflow Session
+    """
+    # Query the state of the shared network (weights and biases).
     g = tf.get_default_graph().get_tensor_by_name
-    W1, b1 = g('rpn/W1:0'), g('rpn/b1:0')
-    W2, b2 = g('rpn/W2:0'), g('rpn/b2:0')
-    W3, b3 = g('rpn/W3:0'), g('rpn/b3:0')
-    net_vars = dict(
-        w1=sess.run(W1), b1=sess.run(b1),
-        w2=sess.run(W2), b2=sess.run(b2),
-        w3=sess.run(W3), b3=sess.run(b3),
-    )
-    pickle.dump(net_vars, open('/tmp/dump2.pickle', 'wb'))
+    W1, b1 = sess.run([g('rpn/W1:0'), g('rpn/b1:0')])
+    shared = {'W1': W1, 'b1': b1}
+
+    # Save the state.
+    pickle.dump(shared, open(f'{prefix}-rpn.pickle', 'wb'))
 
 
 def train_rpn(sess, conf, log):
-    # Load the filters of the pre-trained model.
-    net_vars = pickle.load(open('/tmp/dump.pickle', 'rb'))
-    assert 'w3' not in net_vars and 'b3' not in net_vars
+    base = os.path.dirname(os.path.abspath(__file__))
+    netstate_path = os.path.join(base, 'saved')
+    prefix = os.path.join(netstate_path, config.makeTimestamp())
+    del base
+
+    # Load data set and dump some info about it into the terminal.
+    ds = data_loader.FasterRcnnRpn(conf)
+    ds.printSummary()
+
+    # Input variables.
+    chan, height, width = ds.imageDimensions().tolist()
+    x_in = tf.placeholder(tf.float32, [None, chan, height, width], name='x_in')
+    y_in = tf.placeholder(tf.float32, [None, 7, 128, 128], name='y_in')
+
+    if False:
+        print(f'Loading time stamp <{prefix}>-*')
+        shared = shared_net.loadState(prefix)
+        s_bwt1 = (shared['b1'], shared['W1'], True)
+        s_bwt2 = (shared['b2'], shared['W2'], True)
+        del shared
+    else:
+        s_bwt1 = s_bwt2 = (None, None, True)
+
+    shared_out = shared_net.model(x_in, s_bwt1, s_bwt2)
+    del s_bwt1, s_bwt2
 
     # Build the pre-trained model.
-    W1, b1 = net_vars['w1'], net_vars['b1']
-    W2, b2 = net_vars['w2'], net_vars['b2']
-    build_rpn_model(conf, (b1, W1, True), (b2, W2, True), (None, None, True))
-    del b1, b2, W1, W2, net_vars
+    build_rpn_model(conf, shared_out, y_in, (None, None, True))
 
     # TF node handles.
     g = tf.get_default_graph().get_tensor_by_name
@@ -334,10 +325,6 @@ def train_rpn(sess, conf, log):
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
     sess.run(tf.global_variables_initializer())
 
-    # Load data set and dump some info about it into the terminal.
-    ds = data_loader.FasterRcnnRpn(conf)
-    ds.printSummary()
-
     batch, epoch = 0, 0
     first = True
     print(f'\nTraining for {conf.num_epochs} epochs')
@@ -347,7 +334,8 @@ def train_rpn(sess, conf, log):
         # over with a new epoch.
         x, y, _ = ds.nextBatch(1, 'train')
         if len(y) == 0 or first:
-            saveNetworkWeights(sess)
+            saveState(prefix, sess)
+            config.saveMeta(prefix, conf)
 
             # Time to abort training?
             if epoch >= conf.num_epochs:
