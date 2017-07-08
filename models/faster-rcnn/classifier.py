@@ -44,7 +44,7 @@ def validateAll(sess, ds, batch_size, dset):
 
 
 def logAccuracy(sess, ds, conf, log, epoch):
-    """ Print and return the accuracy for _all_ training/test data.
+    """ Print and return the accuracy for _entire_ training/test set.
 
     Args:
         sess: Tensorflow session
@@ -52,6 +52,12 @@ def logAccuracy(sess, ds, conf, log, epoch):
         conf (tuple): NetConf instance.
         log (TFLogger): instantiated TFLogger
         epoch (int): current epoch
+
+    Returns:
+        rat_trn: float
+            Percentage of correctly identified features from training set
+        rat_tst: float
+            Percentage of correctly identified features from test set
     """
     correct, total = validateAll(sess, ds, 100, 'test')
     rat_tst = 100 * (correct / total)
