@@ -1,7 +1,9 @@
 import os
 import json
-import model
+import glob
+import pickle
 import datetime
+import shared_net
 import collections
 import data_loader
 import numpy as np
@@ -43,13 +45,12 @@ def validateAll(sess, ds, batch_size, dset):
     return correct, total
 
 
-def logAccuracy(sess, ds, conf, log, epoch):
+def logAccuracy(sess, ds, log, epoch):
     """ Print and return the accuracy for _entire_ training/test set.
 
     Args:
         sess: Tensorflow session
         ds: handle to DataSet instance.
-        conf (tuple): NetConf instance.
         log (TFLogger): instantiated TFLogger
         epoch (int): current epoch
 
@@ -73,7 +74,7 @@ def logAccuracy(sess, ds, conf, log, epoch):
     return rat_trn, rat_tst
 
 
-def trainEpoch(sess, ds, conf, log, epoch, optimiser):
+def trainEpoch(sess, ds, conf, log, optimiser):
     """Train the network for one full epoch.
 
     Args:
@@ -81,7 +82,6 @@ def trainEpoch(sess, ds, conf, log, epoch, optimiser):
         ds: handle to DataSet instance.
         conf (tuple): NetConf instance.
         log (TFLogger): instantiated TFLogger
-        epoch (int): current epoch
         optimiser: the optimiser node in graph.
 
     Returns:
@@ -110,53 +110,54 @@ def trainEpoch(sess, ds, conf, log, epoch, optimiser):
         log['Cost'].append(cost_val)
 
 
-def saveState(sess, conf, log, saver):
+def saveNetworkState(sess, log, conf):
     """Save the configuration, Tensorflow model, and log data to disk."""
+    # Query the network state (weights and biases).
     g = tf.get_default_graph().get_tensor_by_name
-    w1, b1 = sess.run([g('model/W1:0'), g('model/b1:0')])
-    w2, b2 = sess.run([g('model/W2:0'), g('model/b2:0')])
-    assert isinstance(w1, np.ndarray)
-    import pickle
-    data = {'w1': w1, 'b1': b1, 'w2': w2, 'b2': b2}
-    pickle.dump(data, open('/tmp/dump.pickle', 'wb'))
-    saver.save(sess, '/tmp/foo')
-    return
+    W1, b1 = sess.run([g('model/W1:0'), g('model/b1:0')])
+    W2, b2 = sess.run([g('model/W2:0'), g('model/b2:0')])
+    assert isinstance(W1, np.ndarray)
 
-    # Ensure the directory for the checkpoint files exists.
+    # Ensure the target directory exists.
     dst_dir = os.path.dirname(os.path.abspath(__file__))
     dst_dir = os.path.join(dst_dir, 'saved')
     os.makedirs(dst_dir, exist_ok=True)
 
-    # Compile time stamp.
+    # Compile time stamp (will be the file name prefix).
     d = datetime.datetime.now()
     ts = f'{d.year}-{d.month:02d}-{d.day:02d}'
     ts += f'-{d.hour:02d}:{d.minute:02d}:{d.second:02d}'
 
-    # File names with time stamp.
-    fname_meta = f'_meta.json'
-    fname_log = f'log-{ts}.pickle'
-    fname_ckpt = f'model-{ts}.ckpt'
-    del d
+    # Compile file names.
+    fname_log = os.path.join(dst_dir, f'{ts}-log.pickle')
+    fname_meta = os.path.join(dst_dir, f'{ts}-meta.json')
+    fname_netstate = os.path.join(dst_dir, f'{ts}-netstate.pickle')
 
-    # Load meta data.
-    try:
-        meta = json.loads(open(fname_meta, 'r').read())
-    except FileNotFoundError:
-        meta = {}
+    # Save the TF model, pickled log data, pickled weights/biases and meta data.
+    pickle.dump(log, open(fname_log, 'wb'))
+    json.dump({'conf': conf._asdict()}, open(fname_meta, 'w'))
+    pickle.dump({'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}, open(fname_netstate, 'wb'))
 
-    # Save the Tensorflow model.
-    saver.save(sess, os.path.join(dst_dir, fname_ckpt))
 
-    # Save the log data (and only the log data, not the entire class).
-    # fixme: save the pickled dict
-    # log.save(os.path.join(dst_dir, fname_log))
+def loadNetworkState(path, ts=None):
+    # Find most recent state.
+    if ts is None:
+        fnames = glob.glob(f'{path}/*-meta.json')
+        assert len(fnames) > 0, f'Could not find a meta file in <{path}>'
+        fnames.sort()
+        ts = fnames[-1]
+        ts = ts[:-len('-meta.json')]
+        del fnames
+    print(f'Loading time stamp <{ts}>-*')
 
-    # Update the meta information.
-    meta[ts] = {'conf': conf._asdict(), 'checkpoint': fname_ckpt, 'log': fname_log}
-    open(os.path.join(dst_dir, fname_meta), 'w').write(json.dumps(meta))
+    meta = json.load(open(f'{ts}-meta.json', 'r'))
+    state = pickle.load(open(f'{ts}-netstate.pickle', 'rb'))
+    return NetConf(**meta['conf']), state
 
 
 def main():
+    sess = tf.Session()
+
     # Location to data folder.
     data_path = os.path.dirname(os.path.abspath(__file__))
     data_path = os.path.join(data_path, 'data', 'basic')
@@ -168,9 +169,18 @@ def main():
         batch_size=16, num_epochs=20, train_rat=0.8, num_samples=1000
     )
 
+    if True:
+        bwt1 = bwt2 = (None, None, True)
+    else:
+        _, state = loadNetworkState('saved/')
+        bwt1 = (state['b1'], state['W1'], False)
+        bwt2 = (state['b2'], state['W2'], False)
+
     # Load data set and dump some info about it into the terminal.
     ds = data_loader.Folder(conf)
     ds.printSummary()
+    print(f'\nConfiguration: {conf}\n')
+
     chan, height, width = ds.imageDimensions().tolist()
     num_classes = len(ds.classNames())
 
@@ -179,8 +189,8 @@ def main():
     y_in = tf.placeholder(tf.int32, [None], name='y_in')
 
     # Compile the network as specified in `conf`.
-    model_out = model.netConv2Maxpool(x_in, num_classes, num_dense=conf.num_dense)
-    model.inference(model_out, y_in)
+    model_out = shared_net.model(x_in, num_classes, conf.num_dense, bwt1, bwt2)
+    shared_net.inference(model_out, y_in)
     del x_in, y_in, chan, height, width, num_classes
 
     # Create optimiser.
@@ -189,30 +199,26 @@ def main():
     opt = tf.train.AdamOptimizer(learning_rate=lr).minimize(cost)
     del lr
 
-    # Initialise the session and graph. Then dump some info into the terminal.
-    sess = tf.Session()
+    # Initialise the graph.
     sess.run(tf.global_variables_initializer())
-    print(f'\nConfiguration: {conf}\n')
-    ds.printSummary()
 
-    # Initialise Logger and Tensorflow Saver.
+    # Create Empty logging dictionary.
     log = collections.defaultdict(list)
-
-    saver = tf.train.Saver()
 
     # Train the network for several epochs.
     print(f'\nWill train for {conf.num_epochs:,} epochs')
     try:
         # Train the model for several epochs.
         for epoch in range(conf.num_epochs):
-            _, accuracy_tst = logAccuracy(sess, ds, conf, log, epoch)
-            trainEpoch(sess, ds, conf, log, epoch, opt)
+            _, accuracy_tst = logAccuracy(sess, ds, log, epoch)
+            trainEpoch(sess, ds, conf, log, opt)
     except KeyboardInterrupt:
-        pass
+        # Record the actual number of epochs we have trained.
+        conf = conf._replace(num_epochs=epoch)
 
-    # Save results.
-    logAccuracy(sess, ds, conf, log, epoch + 1)
-    saveState(sess, conf, log, saver)
+    # Save network state.
+    logAccuracy(sess, ds, log, epoch + 1)
+    saveNetworkState(sess, log, conf)
 
 
 if __name__ == '__main__':
