@@ -498,11 +498,29 @@ class FasterRcnnRpn(DataSet):
         overlap_rat = np.zeros_like(overlap)
         anchor = np.ones((a_height, a_width), np.float32)
         for i, (x0, x1, y0, y1) in enumerate(bboxes):
+            # Stamp a BBox sized region into the otherwise empty image. This
+            # "box" is what we will convolve with the anchor to compute the
+            # overlap.
             overlap[i, y0:y1, x0:x1] = 1
-            overlap[i] = scipy.signal.fftconvolve(overlap[i], anchor, mode='same')
 
+            # Convolve the BBox with the anchor box. The FFT version is much
+            # faster but also introduces numerical artefacts which we (should)
+            # get rid of.
+            tmp = scipy.signal.fftconvolve(overlap[i], anchor, mode='same')
+            tmp = np.abs(tmp)
+            tmp[np.nonzero(tmp < 1E-3)] = 0
+            overlap[i] = tmp
+
+            # BBox size in pixels.
             bbox_area = (x1 - x0) * (y1 - y0)
             assert bbox_area > 0
+
+            # To compute the ratio of overlap we need to know which box (BBox
+            # or anchor) is smaller. We need this because if one box is fully
+            # inside the other we would like the overlap metric to be 1.0 (ie
+            # 100%), and the convolution at that point will be identical to the
+            # area of the smaller box. Therefore, find out which box has the
+            # smaller area. Then compute the overlap ratio.
             max_overlap = min(a_width * a_height, bbox_area)
             overlap_rat[i] = overlap[i] / max_overlap
             del i, x0, x1, y0, y1, max_overlap
