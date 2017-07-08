@@ -470,7 +470,7 @@ def saveRpnPredictions(sess, conf):
                 img_cnt[gt_label] += 1
 
 
-def validate_rpn(sess, conf):
+def validateRpn(sess, conf):
     # Path where the network state will be stored.
     base = os.path.dirname(os.path.abspath(__file__))
     netstate_path = os.path.join(base, 'saved')
@@ -609,7 +609,7 @@ def main():
     log = collections.defaultdict(list)
     if train:
         # Train the network with the specified configuration.
-        train_rpn(sess, conf, log)
+        trainRpn(sess, conf, log)
 
         # Compare the BBox centre position.
         gt_bbox = log['gt_bbox']
@@ -647,7 +647,7 @@ def main():
         plt.show()
     else:
         # Run trained network on test data.
-        # validate_rpn(sess, conf)
+        # validateRpn(sess, conf)
         saveRpnPredictions(sess, conf)
 
 
