@@ -22,8 +22,8 @@ def build_rpn_model(conf, x_in, y_in, bwt):
         # Kernel: 5x5  Features: 6
         b1 = shared_net.varConst([6, 1, 1], 'b1', bwt[0], bwt[2], 0.5)
         W1 = shared_net.varGauss([15, 15, num_filters, 6], 'W1', bwt[1], bwt[2])
-        conv3 = tf.nn.conv2d(x_in, W1, [1, 1, 1, 1], **convpool_opts)
-        conv3 = tf.add(conv3, b1, name='net_out')
+        net_out = tf.nn.conv2d(x_in, W1, [1, 1, 1, 1], **convpool_opts)
+        net_out = tf.add(net_out, b1, name='net_out')
 
         mask = tf.slice(y_in, [0, 0, 0, 0], [-1, 1, -1, -1])
         mask = tf.squeeze(mask, 1, name='mask')
@@ -33,7 +33,7 @@ def build_rpn_model(conf, x_in, y_in, bwt):
         # In:  [N, 2, 128, 128]
         # Out: [N, 128, 128]
         gt_obj = tf.slice(y_in, [0, 1, 0, 0], [-1, 2, -1, -1])
-        pred_obj = tf.slice(conv3, [0, 0, 0, 0], [-1, 2, -1, -1])
+        pred_obj = tf.slice(net_out, [0, 0, 0, 0], [-1, 2, -1, -1])
         cost_ce = tf.nn.softmax_cross_entropy_with_logits
         gt_obj = tf.transpose(gt_obj, [0, 2, 3, 1], name='gt_obj')
         pred_obj = tf.transpose(pred_obj, [0, 2, 3, 1], name='pred_obj')
@@ -48,7 +48,7 @@ def build_rpn_model(conf, x_in, y_in, bwt):
         # In:  [N, 6, 128, 128]
         # Out: [N, 128, 128, 4]
         gt_bbox = tf.slice(y_in, [0, 3, 0, 0], [-1, 4, -1, -1])
-        pred_bbox = tf.slice(conv3, [0, 2, 0, 0], [-1, 4, -1, -1])
+        pred_bbox = tf.slice(net_out, [0, 2, 0, 0], [-1, 4, -1, -1])
         gt_bbox = tf.transpose(gt_bbox, [0, 2, 3, 1], name='gt_bbox')
         pred_bbox = tf.transpose(pred_bbox, [0, 2, 3, 1], name='pred_bbox')
         cost_bbox = tf.abs(gt_bbox - pred_bbox)
@@ -78,6 +78,7 @@ def build_rpn_model(conf, x_in, y_in, bwt):
         cost_bbox = tf.multiply(cost_bbox, is_obj)
 
         tf.reduce_sum(cost_cls + cost_bbox, name='cost')
+    return net_out
 
 
 def equaliseBBoxTrainingData(y, N):
