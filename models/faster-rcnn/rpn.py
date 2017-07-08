@@ -12,7 +12,31 @@ import PIL.Image as Image
 import matplotlib.pyplot as plt
 
 
-def buildRpnModel(conf, x_in, y_in, bwt):
+def setupSharedModel(ds, prefix):
+    chan, height, width = ds.imageDimensions().tolist()
+    x_in = tf.placeholder(tf.float32, [None, chan, height, width], name='x_in')
+    y_in = tf.placeholder(tf.float32, [None, 7, 128, 128], name='y_in')
+
+    if prefix is None:
+        s_bwt1 = s_bwt2 = (None, None, True)
+    else:
+        print(f'Loading time stamp <{prefix}>-*')
+        shared = shared_net.loadState(prefix)
+        s_bwt1 = (shared['b1'], shared['W1'], True)
+        s_bwt2 = (shared['b2'], shared['W2'], True)
+        del shared
+    return x_in, y_in, shared_net.model(x_in, s_bwt1, s_bwt2)
+
+
+def buildRpnModel(x_in, y_in, prefix):
+    # Attach the RPN classifer to the output of the shared network and
+    # initialise its weights.
+    if prefix is None:
+        bwt = (None, None, True)
+    else:
+        net = loadState(prefix)
+        bwt = (net['b1'], net['W1'], True)
+
     # Convenience: shared arguments for bias variable, conv2d, and max-pool.
     convpool_opts = dict(padding='SAME', data_format='NCHW')
     num_filters = x_in.shape.as_list()[1]
@@ -264,47 +288,30 @@ def loadState(prefix):
     return pickle.load(open(f'{prefix}-rpn.pickle', 'rb'))
 
 
-def train_rpn(sess, conf, log):
+def trainRpn(sess, conf, log):
     # Path where the network state will be stored.
     base = os.path.dirname(os.path.abspath(__file__))
     netstate_path = os.path.join(base, 'saved')
     del base
 
-    # Create time stamped prefix for save file.
-    prefix = os.path.join(netstate_path, config.makeTimestamp())
-
     # Load data set and dump some info about it into the terminal.
     ds = data_loader.FasterRcnnRpn(conf)
     ds.printSummary()
 
-    # Input variables.
-    chan, height, width = ds.imageDimensions().tolist()
-    x_in = tf.placeholder(tf.float32, [None, chan, height, width], name='x_in')
-    y_in = tf.placeholder(tf.float32, [None, 7, 128, 128], name='y_in')
-
-    pretrained_shared = False
-
-    if pretrained_shared:
-        print(f'Loading time stamp <{prefix}>-*')
-        shared = shared_net.loadState(prefix)
-        s_bwt1 = (shared['b1'], shared['W1'], True)
-        s_bwt2 = (shared['b2'], shared['W2'], True)
-        del shared
-    else:
-        s_bwt1 = s_bwt2 = (None, None, True)
-
-    # Build and initialise the shared layers.
-    shared_out = shared_net.model(x_in, s_bwt1, s_bwt2)
-    del s_bwt1, s_bwt2
-
     # Attach the RPN classifer to the output of the shared network.
-    buildRpnModel(conf, shared_out, y_in, (None, None, True))
+    prefix = config.getLastTimestamp(netstate_path, 'shared')
+    x_in, y_in, net_out = setupSharedModel(ds, prefix)
+    buildRpnModel(net_out, y_in, prefix=None)
+    del prefix
 
     # Define optimisation problem and initialise the graph.
     lrate_in = tf.placeholder(tf.float32)
     cost = tf.get_default_graph().get_tensor_by_name('rpn/cost:0')
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
     sess.run(tf.global_variables_initializer())
+
+    # Create time stamped prefix for save file.
+    prefix = os.path.join(netstate_path, config.makeTimestamp())
 
     batch, epoch = 0, 0
     first = True
@@ -349,30 +356,24 @@ def train_rpn(sess, conf, log):
 
 
 def saveRpnPredictions(sess, conf):
-    # Load the network weights.
-    net_vars = pickle.load(open('/tmp/dump2.pickle', 'rb'))
-    assert 'w3' in net_vars and 'b3' in net_vars
-
-    # Build model with pre-trained weights.
-    W1 = net_vars['w1']
-    b1 = net_vars['b1']
-    W2 = net_vars['w2']
-    b2 = net_vars['b2']
-    W3 = net_vars.get('w3', None)
-    b3 = net_vars.get('b3', None)
-    buildRpnModel(conf, (b1, W1, True), (b2, W2, True), (b3, W3, True))
-    sess.run(tf.global_variables_initializer())
-    del b1, b2, b3, W1, W2, W3, net_vars
-
-    # Handles to the TF nodes for data input/output.
-    g = tf.get_default_graph().get_tensor_by_name
-    x_in = g('x_in:0')
-    net_out = g('rpn/net_out:0')
+    # Path where the network state will be stored.
+    base = os.path.dirname(os.path.abspath(__file__))
+    netstate_path = os.path.join(base, 'saved')
+    del base
 
     # Load data set and dump some info about it into the terminal.
     ds = data_loader.FasterRcnnRpn(conf)
     ds.printSummary()
-    chan, height, width = ds.imageDimensions().tolist()
+
+    # Attach the RPN classifer to the output of the shared network.
+    prefix = config.getLastTimestamp(netstate_path, 'shared')
+    x_in, y_in, net_out = setupSharedModel(ds, prefix)
+    prefix = config.getLastTimestamp(netstate_path, 'rpn')
+    buildRpnModel(net_out, y_in, prefix)
+    del prefix
+
+    # Finalise graph setup.
+    sess.run(tf.global_variables_initializer())
 
     while True:
         # Get next batch. If there is no next batch, save the current weights,
@@ -479,26 +480,12 @@ def validate_rpn(sess, conf):
     ds = data_loader.FasterRcnnRpn(conf)
     ds.printSummary()
 
-    # Input variables.
-    chan, height, width = ds.imageDimensions().tolist()
-    x_in = tf.placeholder(tf.float32, [None, chan, height, width], name='x_in')
-    y_in = tf.placeholder(tf.float32, [None, 7, 128, 128], name='y_in')
-
-    # Load the pre-trained shared layers.
+    # Attach the RPN classifer to the output of the shared network.
     prefix = config.getLastTimestamp(netstate_path, 'shared')
-    net = shared_net.loadState(prefix)
-    s_bwt1 = (net['b1'], net['W1'], True)
-    s_bwt2 = (net['b2'], net['W2'], True)
-    shared_out = shared_net.model(x_in, s_bwt1, s_bwt2)
-    del prefix, net, s_bwt1, s_bwt2
-
-    # Attach the RPN classifer to the output of the shared network and
-    # initialise its weights.
+    x_in, y_in, net_out = setupSharedModel(ds, prefix)
     prefix = config.getLastTimestamp(netstate_path, 'rpn')
-    net = loadState(prefix)
-    r_bwt = (net['b1'], net['W1'], True)
-    net_out = buildRpnModel(conf, shared_out, y_in, r_bwt)
-    del prefix, net, r_bwt
+    buildRpnModel(net_out, y_in, prefix)
+    del prefix
 
     # Finalise graph setup.
     sess.run(tf.global_variables_initializer())
