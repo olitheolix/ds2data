@@ -56,7 +56,7 @@ def createBiasWeigthTrainable(bias, weight, train, num_in, num_out, name):
     return b, W
 
 
-def sharedLayers(x_img, num_classes, num_dense, bwt1, bwt2):
+def model(x_img, num_classes, num_dense, bwt1, bwt2):
     """ Build DNN and return output tensor.
 
     The model comprises 2 convolution layers and one dense layer.
