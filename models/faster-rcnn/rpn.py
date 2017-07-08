@@ -265,10 +265,13 @@ def loadState(prefix):
 
 
 def train_rpn(sess, conf, log):
+    # Path where the network state will be stored.
     base = os.path.dirname(os.path.abspath(__file__))
     netstate_path = os.path.join(base, 'saved')
-    prefix = os.path.join(netstate_path, config.makeTimestamp())
     del base
+
+    # Create time stamped prefix for save file.
+    prefix = os.path.join(netstate_path, config.makeTimestamp())
 
     # Load data set and dump some info about it into the terminal.
     ds = data_loader.FasterRcnnRpn(conf)
@@ -279,7 +282,9 @@ def train_rpn(sess, conf, log):
     x_in = tf.placeholder(tf.float32, [None, chan, height, width], name='x_in')
     y_in = tf.placeholder(tf.float32, [None, 7, 128, 128], name='y_in')
 
-    if False:
+    pretrained_shared = False
+
+    if pretrained_shared:
         print(f'Loading time stamp <{prefix}>-*')
         shared = shared_net.loadState(prefix)
         s_bwt1 = (shared['b1'], shared['W1'], True)
@@ -288,20 +293,16 @@ def train_rpn(sess, conf, log):
     else:
         s_bwt1 = s_bwt2 = (None, None, True)
 
+    # Build and initialise the shared layers.
     shared_out = shared_net.model(x_in, s_bwt1, s_bwt2)
     del s_bwt1, s_bwt2
 
-    # Build the pre-trained model.
+    # Attach the RPN classifer to the output of the shared network.
     build_rpn_model(conf, shared_out, y_in, (None, None, True))
-
-    # TF node handles.
-    g = tf.get_default_graph().get_tensor_by_name
-    x_in, y_in = g('x_in:0'), g('y_in:0')
-    cost = g('rpn/cost:0')
-    del g
 
     # Define optimisation problem and initialise the graph.
     lrate_in = tf.placeholder(tf.float32)
+    cost = tf.get_default_graph().get_tensor_by_name('rpn/cost:0')
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
     sess.run(tf.global_variables_initializer())
 
@@ -314,6 +315,7 @@ def train_rpn(sess, conf, log):
         # over with a new epoch.
         x, y, _ = ds.nextBatch(1, 'train')
         if len(y) == 0 or first:
+            # Save network state and meta information.
             saveState(prefix, sess)
             config.saveMeta(prefix, conf)
 
