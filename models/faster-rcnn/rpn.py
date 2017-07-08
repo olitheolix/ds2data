@@ -11,6 +11,7 @@ import data_loader
 import scipy.signal
 import numpy as np
 import tensorflow as tf
+import PIL.Image as Image
 import matplotlib.pyplot as plt
 
 from config import NetConf
@@ -564,6 +565,127 @@ def train_rpn(sess, conf, log):
         print(f'  {batch:,}: Cost: {out[1]:.2E}  {stat}')
 
 
+def saveRpnPredictions(sess, conf):
+    # Load the network weights.
+    net_vars = pickle.load(open('/tmp/dump2.pickle', 'rb'))
+    assert 'w3' in net_vars and 'b3' in net_vars
+
+    # Build model with pre-trained weights.
+    W1 = net_vars['w1']
+    b1 = net_vars['b1']
+    W2 = net_vars['w2']
+    b2 = net_vars['b2']
+    W3 = net_vars.get('w3', None)
+    b3 = net_vars.get('b3', None)
+    build_rpn_model(conf, (b1, W1, True), (b2, W2, True), (b3, W3, True))
+    sess.run(tf.global_variables_initializer())
+    del b1, b2, b3, W1, W2, W3, net_vars
+
+    # Handles to the TF nodes for data input/output.
+    g = tf.get_default_graph().get_tensor_by_name
+    x_in = g('x_in:0')
+    net_out = g('rpn/net_out:0')
+
+    # Load data set and dump some info about it into the terminal.
+    ds = data_loader.FasterRcnnRpn(conf)
+    ds.printSummary()
+    chan, height, width = ds.imageDimensions().tolist()
+
+    while True:
+        # Get next batch. If there is no next batch, save the current weights,
+        # reset the data source, and start over.
+        x, y, meta_idx = ds.nextBatch(1, 'test')
+        if len(y) == 0:
+            break
+
+        # Unpack the meta data for the one element we just retrieved.
+        meta = ds.getMeta(meta_idx)
+        meta = meta[meta_idx[0]]
+        del meta_idx
+
+        # Either run the network to predict the positions and BBoxes, or use
+        # the ground truth label directly. The second option is only useful to
+        # verify the plots below work as intended.
+        t0 = time.perf_counter()
+        if True:
+            out = sess.run(net_out, feed_dict={x_in: x})
+        else:
+            out = y[:, 1:, :, :]
+        etime = int(1000 * (time.perf_counter() - t0))
+        print(f'\nElapsed: {etime:,}ms')
+
+        # Unpack the image and convert it to HWC format for Matplotlib later.
+        img = np.transpose(x[0], [1, 2, 0])
+        img_src = (255 * img).astype(np.uint8)
+        im_height, im_width = img_src.shape[:2]
+        del img
+
+        # The class label is a one-hot-label encoding for is-object and
+        # is-not-object. Determine which option the network deemed more likely.
+        obj = out[0, :2, :, :]
+        obj = np.argmax(obj, axis=0)
+        ft_height, ft_width = obj.shape
+
+        # Unpack the BBox parameters: centre x, centre y, width, height.
+        bbox = out[0, 2:6, :, :]
+
+        # Iterate over every position of the feature map and determine if the
+        # network found an object. Add the estimated BBox if it did.
+        img_cnt = collections.Counter()
+        base_dir = '/tmp/delme'
+        os.makedirs(base_dir, exist_ok=True)
+        for fy in range(ft_height):
+            for fx in range(ft_width):
+                if obj[fy, fx] == 0:
+                    continue
+
+                # Convert the current feature map position to the corresponding
+                # image coordinates. The following formula assumes that the
+                # image was down-sampled twice (hence the factor 4).
+                ix, iy = fx * 4 + 2, fy * 4 + 2
+
+                # If the overlap between anchor and BBox is less than 30% then
+                # consider this region as "background", otherwise use the true
+                # label.
+                if meta.score[iy, ix] < 0.3:
+                    gt_label = 0
+                else:
+                    gt_label = meta.obj_cls[iy, ix]
+                gt_label = f'{gt_label:02d}'
+
+                # BBox in image coordinates.
+                ibxc, ibyc, ibw, ibh = bbox[:, fy, fx]
+
+                # The BBox parameters are relative to the anchor position and
+                # size. Here we convert those relative values back to absolute
+                # values in the original image.
+                xc = int(ibxc + ix)
+                yc = int(ibyc + iy)
+                hw = int(32 + ibw) // 2
+                hh = int(32 + ibh) // 2
+
+                # Ignore invalid BBoxes.
+                if hw < 2 or hh < 2:
+                    continue
+
+                # Compute corner coordinates for BBox to draw the rectangle and
+                # clip them to the image boundaries.
+                x0, y0 = xc - hw, yc - hh
+                x1, y1 = xc + hw, yc + hh
+                x0, x1 = np.clip([x0, x1], 0, im_width - 1)
+                y0, y1 = np.clip([y0, y1], 0, im_height - 1)
+
+                # Create folder for label if it does not exist yet.
+                folder = os.path.join(base_dir, gt_label)
+                if img_cnt[gt_label] == 0:
+                    os.makedirs(folder, exist_ok=True)
+
+                # Save the image patch.
+                img = Image.fromarray(img_src[y0:y1, x0:x1, :])
+                img.save(f'{folder}/{img_cnt[gt_label]:04d}.png')
+                img_cnt[gt_label] += 1
+
+
 def validate_rpn(sess, conf):
     # Load the network weights.
     net_vars = pickle.load(open('/tmp/dump2.pickle', 'rb'))
@@ -746,7 +868,8 @@ def main_rpn():
         plt.show()
     else:
         # Run trained network on test data.
-        validate_rpn(sess, conf)
+        # validate_rpn(sess, conf)
+        saveRpnPredictions(sess, conf)
 
 
 def main():
