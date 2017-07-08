@@ -529,14 +529,14 @@ class FasterRcnnRpn(DataSet):
         # Compute the best overlap score (by any BBox) at every location.
         score_img = np.amax(overlap_rat, axis=0)
 
-        # Compute which shape (if any) got the highest score at each position.
-        idx = np.nonzero(score_img >= 0.9)
+        # For each position, determine which shape got the highest score and
+        # store its label. Afterwards, delete all those labels (ie give them
+        # label Zero) for which the score was zero (ie the BBox did not overlap
+        # with anchor anywhere).
         best_bbox = np.argmax(overlap_rat, axis=0)
-        bbox_label = bbox_labels[best_bbox[idx]]
-
-        label_img = np.zeros_like(score_img).astype(np.uint32)
-        label_img[idx] = bbox_label
-        del best_bbox, bbox_label, idx
+        label_img = bbox_labels[best_bbox]
+        label_img[np.nonzero(score_img == 0)] = 0
+        del best_bbox
 
         # Compute the BBox parameters that the network will ultimately learn.
         # These are two values to encode the BBox centre (relative to the
