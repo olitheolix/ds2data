@@ -260,6 +260,10 @@ def saveState(prefix, sess):
     pickle.dump(shared, open(f'{prefix}-rpn.pickle', 'wb'))
 
 
+def loadState(prefix):
+    return pickle.load(open(f'{prefix}-rpn.pickle', 'rb'))
+
+
 def train_rpn(sess, conf, log):
     base = os.path.dirname(os.path.abspath(__file__))
     netstate_path = os.path.join(base, 'saved')
