@@ -4,57 +4,18 @@ Build a DNN with two convolution layers and one dense layer.
 import tensorflow as tf
 
 
-def makeWeight(shape, name=None):
-    """Convenience: return Gaussian initialised weight tensor with ."""
-    init = tf.truncated_normal(stddev=0.1, shape=shape, dtype=tf.float32)
-    return tf.Variable(init, name=name)
+def varGauss(shape, name=None, init=None, train=True, stddev=0.1):
+    """Convenience: return Gaussian initialised tensor with ."""
+    if init is None:
+        init = tf.truncated_normal(stddev=stddev, shape=shape, dtype=tf.float32)
+    return tf.Variable(init, name=name, trainable=train)
 
 
-def makeBias(shape, value=0.0, name=None):
-    """Convenience: return constant bias tensor."""
-    init = tf.constant(value=value, shape=shape, dtype=tf.float32)
-    return tf.Variable(init, name=name)
-
-
-def createBiasWeigthTrainable(bias, weight, train, num_in, num_out, name):
-    """ Return specified bias and weight tensor.
-
-    Args:
-        bias: None or NumPy array
-            Restore bias from NumPy array or create a default one.
-        weight: None or NumPy array
-            Restore weight from NumPy array or create a default one.
-        trainable: bool
-            Whether or not the variable is trainable.
-        num_in: int
-            number of input features
-        num_out: int
-            number of output features
-        name: str
-            Will be appended to all variable names. For example, if name="5"
-            then the names of the bias and weight tensors will be "b5" and
-            "W5", respectively.
-    """
-    # Variable names in Tensorflow graph.
-    name_b, name_W = f'b{name}', f'W{name}'
-
-    # Build/restore bias variable.
-    if bias is None:
-        b = makeBias([num_out, 1, 1], value=0.5, name=name_b)
-    else:
-        b = tf.Variable(bias, name=name_b, trainable=train)
-
-    # Build/restore weight variable.
-    if weight is None:
-        W = makeWeight([5, 5, num_in, num_out], name=name_W)
-    else:
-        W = tf.Variable(weight, name=name_W, trainable=train)
-
-    # Dump info to terminal and return.
-    ptb, ptw = bias is not None, weight is not None
-    print(f'{name_b}: Pretrained={ptb}  Trainable={train}  Shape={b.shape}')
-    print(f'{name_W}: Pretrained={ptw}  Trainable={train}  Shape={W.shape}')
-    return b, W
+def varConst(shape, name=None, init=None, train=True, value=0.0):
+    """Convenience: return constant initialised tensor."""
+    if init is None:
+        init = tf.constant(value=value, shape=shape, dtype=tf.float32)
+    return tf.Variable(init, name=name, trainable=train)
 
 
 def model(x_img, bwt1, bwt2):
@@ -87,8 +48,10 @@ def model(x_img, bwt1, bwt2):
 
     with tf.variable_scope('shared'):
         # Create or restore the weights and biases.
-        b1, W1 = createBiasWeigthTrainable(*bwt1, chan, num_filters, '1')
-        b2, W2 = createBiasWeigthTrainable(*bwt2, num_filters, num_filters, '2')
+        b1 = varConst([num_filters, 1, 1], 'b1', bwt1[0], bwt1[2], 0.5)
+        b2 = varConst([num_filters, 1, 1], 'b2', bwt2[0], bwt2[2], 0.5)
+        W1 = varGauss([5, 5, chan, num_filters], 'W1', bwt1[1], bwt1[2])
+        W2 = varGauss([5, 5, num_filters, num_filters], 'W2', bwt2[1], bwt2[2])
 
         # Examples dimensions assume 128x128 RGB images.
         # Convolution Layer #1
