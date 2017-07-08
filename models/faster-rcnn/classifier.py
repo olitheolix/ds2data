@@ -1,15 +1,11 @@
 import os
-import json
-import glob
+import config
 import pickle
-import datetime
 import shared_net
 import collections
 import data_loader
 import numpy as np
 import tensorflow as tf
-
-from config import NetConf
 
 
 def validateAll(sess, ds, batch_size, dset):
@@ -202,33 +198,15 @@ def trainEpoch(sess, ds, conf, log, optimiser):
         log['Cost'].append(cost_val)
 
 
-def getLastTimestamp(path):
-    fnames = glob.glob(f'{path}/*-meta.json')
-    assert len(fnames) > 0, f'Could not find a meta file in <{path}>'
-    fnames.sort()
-    ts = fnames[-1]
-    return ts[:-len('-meta.json')]
+def saveState(prefix, sess):
+    """ Save all network variables to a file prefixed by `prefix`.
 
-
-def makeTimestamp():
-    d = datetime.datetime.now()
-    ts = f'{d.year}-{d.month:02d}-{d.day:02d}'
-    ts += f'-{d.hour:02d}:{d.minute:02d}:{d.second:02d}'
-    return ts
-
-
-def saveSharedState(ts, sess):
-    # Query the state of the shared network (weights and biases).
-    g = tf.get_default_graph().get_tensor_by_name
-    W1, b1 = sess.run([g('shared/W1:0'), g('shared/b1:0')])
-    W2, b2 = sess.run([g('shared/W2:0'), g('shared/b2:0')])
-    shared = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
-
-    # Save the state.
-    pickle.dump(shared, open(f'{ts}-shared.pickle', 'wb'))
-
-
-def saveDetectorState(ts, sess):
+    Args:
+        prefix: str
+           A file prefix. Typically, this is a (relative or absolute) path that
+           ends with a time stamp, eg 'foo/bar/2017-10-10-10:11:12'
+        sess: Tensorflow Session
+    """
     # Query the state of the detector network (weights and biases).
     g = tf.get_default_graph().get_tensor_by_name
     W1, b1 = sess.run([g('detector/W1:0'), g('detector/b1:0')])
@@ -237,28 +215,11 @@ def saveDetectorState(ts, sess):
     del W1, b1, W2, b2
 
     # Save the state.
-    pickle.dump(det, open(f'{ts}-det.pickle', 'wb'))
+    pickle.dump(det, open(f'{prefix}-det.pickle', 'wb'))
 
 
-def saveMeta(ts, conf):
-    json.dump({'conf': conf._asdict()}, open(f'{ts}-meta.json', 'w'))
-
-
-def saveLog(ts, log):
-    pickle.dump(log, open(f'{ts}-log.pickle', 'wb'))
-
-
-def loadMeta(ts):
-    meta = json.load(open(f'{ts}-meta.json', 'r'))
-    return NetConf(**meta['conf'])
-
-
-def loadDetectorState(ts):
-    return pickle.load(open(f'{ts}-det.pickle', 'rb'))
-
-
-def loadSharedState(ts):
-    return pickle.load(open(f'{ts}-shared.pickle', 'rb'))
+def loadState(prefix):
+    return pickle.load(open(f'{prefix}-det.pickle', 'rb'))
 
 
 def main():
@@ -271,7 +232,7 @@ def main():
     del base
 
     # Network configuration.
-    conf = NetConf(
+    conf = config.NetConf(
         width=32, height=32, colour='rgb', seed=0, num_dense=32, keep_model=0.8,
         path=data_path, names=['background', 'box', 'disc'],
         batch_size=16, num_epochs=20, train_rat=0.8, num_samples=1000
@@ -281,10 +242,10 @@ def main():
         s_bwt1 = s_bwt2 = d_bwt1 = d_bwt2 = (None, None, True)
     else:
         os.makedirs(netstate_path, exist_ok=True)
-        ts = getLastTimestamp(netstate_path)
+        ts = config.getLastTimestamp(netstate_path)
         print(f'Loading time stamp <{ts}>-*')
-        det = loadDetectorState(ts)
-        shared = loadSharedState(ts)
+        det = loadState(ts)
+        shared = shared_net.loadState(ts)
         s_bwt1 = (shared['b1'], shared['W1'], True)
         s_bwt2 = (shared['b2'], shared['W2'], True)
         d_bwt1 = (det['b1'], det['W1'], True)
@@ -336,10 +297,10 @@ def main():
     logAccuracy(sess, ds, log, epoch + 1)
 
     # Save the network states.
-    prefix = os.path.join(netstate_path, makeTimestamp())
-    saveMeta(prefix, conf)
-    saveSharedState(prefix, sess)
-    saveDetectorState(prefix, sess)
+    prefix = os.path.join(netstate_path, config.makeTimestamp())
+    saveState(prefix, sess)
+    config.saveMeta(prefix, conf)
+    shared_net.saveState(prefix, sess)
 
 
 if __name__ == '__main__':

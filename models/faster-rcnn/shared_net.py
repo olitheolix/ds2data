@@ -1,6 +1,7 @@
 """
 Build a DNN with two convolution layers and one dense layer.
 """
+import pickle
 import tensorflow as tf
 
 
@@ -67,3 +68,26 @@ def model(x_img, bwt1, bwt2):
         l2 = tf.nn.conv2d(l1, W2, [1, 1, 1, 1], **opts)
         l2 = tf.nn.relu(l2 + b2)
         return tf.nn.max_pool(l2, pool_pad, mp_stride, **opts, name='shared_out')
+
+
+def saveState(prefix, sess):
+    """ Save all network variables to a file prefixed by `prefix`.
+
+    Args:
+        prefix: str
+           A file prefix. Typically, this is a (relative or absolute) path that
+           ends with a time stamp, eg 'foo/bar/2017-10-10-10:11:12'
+        sess: Tensorflow Session
+    """
+    # Query the state of the shared network (weights and biases).
+    g = tf.get_default_graph().get_tensor_by_name
+    W1, b1 = sess.run([g('shared/W1:0'), g('shared/b1:0')])
+    W2, b2 = sess.run([g('shared/W2:0'), g('shared/b2:0')])
+    shared = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
+
+    # Save the state.
+    pickle.dump(shared, open(f'{prefix}-shared.pickle', 'wb'))
+
+
+def loadState(prefix):
+    return pickle.load(open(f'{prefix}-shared.pickle', 'rb'))
