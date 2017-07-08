@@ -12,22 +12,7 @@ import PIL.Image as Image
 import matplotlib.pyplot as plt
 
 
-def weights(shape, name=None):
-    """Convenience function to construct weight tensors."""
-    init = tf.truncated_normal(stddev=0.1, shape=shape, dtype=tf.float32)
-    return tf.Variable(init, name=name)
-
-
-def bias(shape, value=0.0, name=None):
-    """Convenience function to construct bias tensors."""
-    init = tf.constant(value=value, shape=shape, dtype=tf.float32)
-    return tf.Variable(init, name=name)
-
-
 def build_rpn_model(conf, x_in, y_in, bwt):
-    b1, W1, train = bwt
-    del bwt
-
     # Convenience: shared arguments for bias variable, conv2d, and max-pool.
     convpool_opts = dict(padding='SAME', data_format='NCHW')
     num_filters = x_in.shape.as_list()[1]
@@ -35,18 +20,8 @@ def build_rpn_model(conf, x_in, y_in, bwt):
         # Convolution layer to learn the anchor boxes.
         # Shape: [-1, 64, 64, 64] ---> [-1, 6, 64, 64]
         # Kernel: 5x5  Features: 6
-        if b1 is None:
-            b1 = bias([6, 1, 1], 0.5, 'b1')
-        else:
-            b1 = tf.Variable(b1, name='b1', trainable=train)
-        print(f'b1: Trained={b1 is not None}  Trainable={train}  Shape={b1.shape}')
-
-        if W1 is None:
-            W1 = weights([15, 15, num_filters, 6], 'W1')
-        else:
-            W1 = tf.Variable(W1, name='W1', trainable=train)
-        print(f'W1: Trained={W1 is not None}  Trainable={train}  Shape={W1.shape}')
-
+        b1 = shared_net.varConst([6, 1, 1], 'b1', bwt[0], bwt[2], 0.5)
+        W1 = shared_net.varGauss([15, 15, num_filters, 6], 'W1', bwt[1], bwt[2])
         conv3 = tf.nn.conv2d(x_in, W1, [1, 1, 1, 1], **convpool_opts)
         conv3 = tf.add(conv3, b1, name='net_out')
 
