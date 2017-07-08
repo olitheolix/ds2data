@@ -470,30 +470,38 @@ def saveRpnPredictions(sess, conf):
 
 
 def validate_rpn(sess, conf):
-    # Load the network weights.
-    net_vars = pickle.load(open('/tmp/dump2.pickle', 'rb'))
-    assert 'w3' in net_vars and 'b3' in net_vars
-
-    # Build model with pre-trained weights.
-    W1 = net_vars['w1']
-    b1 = net_vars['b1']
-    W2 = net_vars['w2']
-    b2 = net_vars['b2']
-    W3 = net_vars.get('w3', None)
-    b3 = net_vars.get('b3', None)
-    build_rpn_model(conf, (b1, W1, True), (b2, W2, True), (b3, W3, True))
-    sess.run(tf.global_variables_initializer())
-    del b1, b2, b3, W1, W2, W3, net_vars
-
-    # Handles to the TF nodes for data input/output.
-    g = tf.get_default_graph().get_tensor_by_name
-    x_in = g('x_in:0')
-    net_out = g('rpn/net_out:0')
+    # Path where the network state will be stored.
+    base = os.path.dirname(os.path.abspath(__file__))
+    netstate_path = os.path.join(base, 'saved')
+    del base
 
     # Load data set and dump some info about it into the terminal.
     ds = data_loader.FasterRcnnRpn(conf)
     ds.printSummary()
+
+    # Input variables.
     chan, height, width = ds.imageDimensions().tolist()
+    x_in = tf.placeholder(tf.float32, [None, chan, height, width], name='x_in')
+    y_in = tf.placeholder(tf.float32, [None, 7, 128, 128], name='y_in')
+
+    # Load the pre-trained shared layers.
+    prefix = config.getLastTimestamp(netstate_path, 'shared')
+    net = shared_net.loadState(prefix)
+    s_bwt1 = (net['b1'], net['W1'], True)
+    s_bwt2 = (net['b2'], net['W2'], True)
+    shared_out = shared_net.model(x_in, s_bwt1, s_bwt2)
+    del prefix, net, s_bwt1, s_bwt2
+
+    # Attach the RPN classifer to the output of the shared network and
+    # initialise its weights.
+    prefix = config.getLastTimestamp(netstate_path, 'rpn')
+    net = loadState(prefix)
+    r_bwt = (net['b1'], net['W1'], True)
+    net_out = build_rpn_model(conf, shared_out, y_in, r_bwt)
+    del prefix, net, r_bwt
+
+    # Finalise graph setup.
+    sess.run(tf.global_variables_initializer())
 
     while True:
         # Get next batch. If there is no next batch, save the current weights,
