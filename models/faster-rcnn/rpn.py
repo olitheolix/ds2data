@@ -671,12 +671,25 @@ def validate_rpn(sess, conf):
         # Show the image with BBoxes, without BBoxes, and the predicted object
         # class (with-object, without-object).
         plt.figure()
-        plt.subplot(1, 3, 1)
-        plt.imshow(img_out)
-        plt.subplot(1, 3, 2)
+        plt.subplot(2, 3, 1)
         plt.imshow(img)
-        plt.subplot(1, 3, 3)
+        plt.title('Original Image')
+
+        plt.subplot(2, 3, 2)
+        plt.imshow(img_out)
+        plt.title('Pred BBoxes')
+
+        plt.subplot(2, 3, 4)
+        plt.imshow(meta.obj_cls)
+        plt.title('GT Label')
+
+        plt.subplot(2, 3, 5)
+        plt.imshow(meta.score, cmap='hot')
+        plt.title('GT Score')
+
+        plt.subplot(2, 3, 6)
         plt.imshow(obj, cmap='gray')
+        plt.title('Pred Object or Not')
 
     plt.show()
 
