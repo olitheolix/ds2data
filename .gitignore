@@ -1,4 +1,14 @@
 __pycache__/
 /docs/Gemfile*
-/models/simple/saved/
+
 /models/simple/data/
+/models/simple/saved/
+/models/simple/.cache/
+
+/models/faster-rcnn/data/
+/models/faster-rcnn/saved/
+/models/faster-rcnn/.cache/
+
+/models/ssd/data/
+/models/ssd/saved/
+/models/ssd/.cache/
