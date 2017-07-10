@@ -596,10 +596,10 @@ def validateRpn(sess, conf):
 
 def main():
     # Network configuration.
-    conf = NetConf(
+    conf = config.NetConf(
         width=512, height=512, colour='rgb', seed=0, num_dense=32, keep_model=0.8,
         path=None, names=None,
-        batch_size=16, num_epochs=1, train_rat=0.8, num_samples=20
+        batch_size=16, num_epochs=10, train_rat=0.8, num_samples=2
     )
 
     # Select training/validation mode.
