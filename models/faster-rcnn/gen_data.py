@@ -129,8 +129,8 @@ def generateImages(N, width, height, dst):
         img = Image.fromarray(background[idx])
         img.save(os.path.join(folder, f'{cnt:04d}.jpg'))
 
-    # Add N images for each object type. Each of these objects have a
-    # random background patch as, well, background.
+    # Add N images for each object type. Each of these images shows an object
+    # in front of a random background patch.
     for name, shape in shapes.items():
         folder = os.path.join(dst, name)
         os.makedirs(folder, exist_ok=True)
