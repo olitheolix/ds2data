@@ -12,12 +12,20 @@ NetConf = collections.namedtuple(
 )
 
 
-def getLastTimestamp(path):
-    fnames = glob.glob(f'{path}/*-meta.json')
-    assert len(fnames) > 0, f'Could not find a meta file in <{path}>'
+def getLastTimestamp(path, dtype):
+    assert dtype in ['meta', 'log', 'shared', 'rpn', 'detector']
+    post = f'{dtype}.json' if dtype == 'meta' else f'{dtype}.pickle'
+
+    # Find all matching files and sort them. This guarantees that the last
+    # element is the most recent because every file begins with a time stamp.
+    fnames = glob.glob(f'{path}/*-{post}')
+    assert len(fnames) > 0, f'Found no <{dtype}> files in <{path}>'
     fnames.sort()
     ts = fnames[-1]
-    return ts[:-len('-meta.json')]
+
+    # Strip off the postfix to leave only the time path and time stamp.
+    l = len(post) + 1
+    return ts[:-l]
 
 
 def makeTimestamp():
