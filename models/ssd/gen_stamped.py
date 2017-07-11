@@ -7,6 +7,7 @@ stamped into the image.
 import os
 import glob
 import json
+import random
 import numpy as np
 
 from PIL import Image
@@ -54,7 +55,7 @@ def stampImage(background, fg_shapes, N, xmin, xmax, ymin, ymax):
     # Background and shape images must be RGB.
     assert background.ndim == 3
     assert background.shape[2] == 3
-    for fg in fg_shapes:
+    for fg in fg_shapes.values():
         assert fg.ndim == 3
         assert fg.shape[2] == 3
 
@@ -83,7 +84,7 @@ def stampImage(background, fg_shapes, N, xmin, xmax, ymin, ymax):
         stencil[y0:y1, x0:x1] = 1
 
         # Pick a random foreground image.
-        label = np.random.randint(0, len(fg_shapes))
+        label = random.choice(list(fg_shapes.keys()))
         labels.append(label)
         bboxes.append([x0, y0, x1, y1])
         fg = np.array(fg_shapes[label])
@@ -107,34 +108,28 @@ def stampImage(background, fg_shapes, N, xmin, xmax, ymin, ymax):
     return out, bboxes, labels
 
 
-def generateImages(dst_path, bg_fnames, shapes, N):
+def generateImages(dst_path, bg_fnames, fg_shapes, int2name, num_img, num_stamps):
     """Create N stamped background images and save them."""
-    num_stamps = 20
-
-    # Put shapes into a list and store the map from index to name.
-    idx2name = {idx: name for idx, name in enumerate(sorted(shapes))}
-    fg_shapes = [v for k, v in sorted(shapes.items())]
-
-    xmax = max([_.shape[1] for _ in fg_shapes])
-    ymax = max([_.shape[0] for _ in fg_shapes])
+    xmax = max([_.shape[1] for _ in fg_shapes.values()])
+    ymax = max([_.shape[0] for _ in fg_shapes.values()])
     xmin, ymin = int(0.5 * xmax), int(0.5 * ymax)
     dims = (xmin, xmax, ymin, ymax)
 
     # Create N images.
-    for i in range(N):
+    for i in range(num_img):
         # Load background image as NumPy array.
         img = Image.open(bg_fnames[i % len(bg_fnames)]).convert('RGB')
         img = np.array(img, np.uint8)
 
         # Stamp foreground shapes into background image.
         img, bboxes, labels = stampImage(img, fg_shapes, num_stamps, *dims)
-        labels = [idx2name[_] for _ in labels]
 
         # File name prefix for image and meta data.
         fname = os.path.join(dst_path, f'{i:04d}')
 
         # Save meta data.
-        json.dump({'bboxes': bboxes, 'labels': labels}, open(fname + '.json', 'w'))
+        meta = {'bboxes': bboxes, 'labels': labels, 'int2name': int2name}
+        json.dump(meta, open(fname + '.json', 'w'))
 
         # Save the stamped image.
         Image.fromarray(img).save(fname + '.jpg')
@@ -157,8 +152,13 @@ def main():
     # Load the foreground objects.
     shapes = createForegroundShapes(width=32, height=32)
 
+    # Compile a map to convert a label ID to its human readable name. Note that
+    # this is 1-based because label 0 will always be reserved for the
+    # background (ie no-object) label in later stages.
+    int2name = {idx + 1: name for idx, name in enumerate(shapes)}
+
     # Stamp the foreground objects into the background images.
-    generateImages(dst_path, bg_fnames, shapes, N=2)
+    generateImages(dst_path, bg_fnames, shapes, int2name, num_img=2, num_stamps=20)
 
 
 if __name__ == '__main__':
