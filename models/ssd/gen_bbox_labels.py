@@ -48,7 +48,7 @@ def computeScore(meta, img_dim_hw, bboxes):
     return bbox_score
 
 
-def genLabels(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim):
+def genLabels(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh):
     # Compute the BBox parameters that the network will ultimately learn.
     # These are two values to encode the BBox centre (relative to the
     # anchor in the full image), and another two value to encode the
@@ -81,7 +81,7 @@ def genLabels(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim):
             y0, y1 = int(anchor_centre_y - ofs), int(anchor_centre_y + ofs)
             tmp = bbox_score[:, y0:y1, x0:x1]
             best = np.argmax(np.amax(np.amax(tmp, axis=2), axis=1))
-            if bbox_score[best, anchor_centre_y, anchor_centre_x] <= 0.8:
+            if bbox_score[best, anchor_centre_y, anchor_centre_x] <= thresh:
                 continue
             del x0, x1, y0, y1, tmp
 
@@ -158,7 +158,7 @@ def drawBBoxes(img, y_bbox, anchor_dim):
 
 
 def main():
-    # Folders with background images and for output images.
+    # Folders with background images, and folder where to put output images.
     base = os.path.dirname(os.path.abspath(__file__))
     base = os.path.join(base, 'data')
     src_path = os.path.join(base, 'stamped')
@@ -172,6 +172,9 @@ def main():
 
     # Sampling ratio between original image and feature map.
     sample_rat = 4
+
+    # If BBox score must exceed this value to be considered valid.
+    thresh = 0.8
 
     fnames = glob.glob(os.path.join(src_path, '*.jpg'))
     fnames = [_[:-4] for _ in sorted(fnames)]
@@ -194,7 +197,8 @@ def main():
 
         # Compute the score map for each individual bounding box.
         bbox_score = computeScore(meta, im_dim, bboxes)
-        y_bbox, y_score = genLabels(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim)
+        y_bbox, y_score = genLabels(
+            bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh)
         assert y_bbox.shape == (5, *ft_dim)
         assert y_score.shape == (bboxes.shape[0], *im_dim), y_score.shape
 
