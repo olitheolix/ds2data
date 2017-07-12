@@ -1,6 +1,7 @@
 import os
 import glob
 import json
+import pickle
 import scipy.signal
 import matplotlib.pyplot as plt
 
@@ -211,7 +212,7 @@ def main():
     # need to load meta file with the same prefix).
     fnames = glob.glob(os.path.join(src_path, '*.jpg'))
     fnames = [_[:-4] for _ in sorted(fnames)]
-    for fname in fnames:
+    for i, fname in enumerate(fnames):
         # Load meta data and the image, then convert the image to CHW.
         meta = json.load(open(fname + '.json', 'r'))
         img = np.array(Image.open(fname + '.jpg', 'r').convert('RGB'), np.uint8)
@@ -234,9 +235,13 @@ def main():
         assert y_bbox.shape == (5, *ft_dim)
         assert y_score.shape == (bboxes.shape[0], *im_dim), y_score.shape
 
-        # Convert image to HWC for Matplotlib.
+        # Convert image to HWC and save it.
         img = np.transpose(img, [1, 2, 0])
-        break
+        fname = os.path.join(dst_path, f'{i:04d}')
+        Image.fromarray(img).convert('RGB').save(fname + '.jpg')
+
+        # Save the expected training output in a meta data file.
+        pickle.dump({'y_bbox': y_bbox}, open(fname + '.pickle', 'wb'))
 
     # Show debug data for last image.
     showData(img, y_bbox, y_score)
