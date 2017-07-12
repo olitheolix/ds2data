@@ -1,3 +1,15 @@
+""" Load stamped images and produce the training output for the network.
+
+The training output `y` is a feature map with 5 features. Its size is one
+quarter of the stamped input images because this script assumes there are two
+pooling layers. The 5 features are: label, BBox centre relative to anchor, and
+BBox width/height (absolute, not relative to anchor).
+
+Example: if the input image is 512x512, then y = (5, 128, 128).
+
+The label values, ie the entries in y[0, :, :], are non-negative integers. A
+label of zero always means background.
+"""
 import os
 import glob
 import json
