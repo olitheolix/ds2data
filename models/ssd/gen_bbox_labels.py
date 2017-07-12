@@ -102,7 +102,7 @@ def genLabels(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh):
     return out, bbox_score
 
 
-def drawBBoxes(img, y_bbox, anchor_dim):
+def drawBBoxes(img, y_bbox):
     assert img.ndim == 3
     assert img.shape[2] == 3
 
@@ -157,6 +157,34 @@ def drawBBoxes(img, y_bbox, anchor_dim):
     return img
 
 
+def showData(img, y_bbox, y_score):
+    assert img.ndim == 3
+    assert img.shape[2] == 3
+
+    # Draw BBoxes into images.
+    img = np.array(img)
+    img_bbox = drawBBoxes(img, y_bbox)
+
+    plt.figure()
+    plt.subplot(2, 2, 1)
+    plt.imshow(img)
+    plt.title('Original Image')
+
+    plt.subplot(2, 2, 2)
+    plt.imshow(img_bbox)
+    plt.title('Pred BBoxes')
+
+    plt.subplot(2, 2, 3)
+    plt.imshow(y_bbox[0].astype(np.float32))
+    plt.title('GT Label')
+
+    plt.subplot(2, 2, 4)
+    plt.imshow(np.amax(y_score, axis=0), cmap='hot')
+    plt.title('GT Score')
+
+    plt.show()
+
+
 def main():
     # Folders with background images, and folder where to put output images.
     base = os.path.dirname(os.path.abspath(__file__))
@@ -167,15 +195,16 @@ def main():
     # Ensure output path exists.
     os.makedirs(dst_path, exist_ok=True)
 
-    # Anchor dimension in pixels of the original (input) image.
+    # If BBox overlaps more than `thresh` with anchor then the location will be
+    # marked as containing the respective object.
+    thresh = 0.8
     anchor_dim = (16, 16)
 
     # Sampling ratio between original image and feature map.
     sample_rat = 4
 
-    # If BBox score must exceed this value to be considered valid.
-    thresh = 0.8
-
+    # Find all background image files and strip of the file extension (we will
+    # need to load meta file with the same prefix).
     fnames = glob.glob(os.path.join(src_path, '*.jpg'))
     fnames = [_[:-4] for _ in sorted(fnames)]
     for fname in fnames:
@@ -203,29 +232,10 @@ def main():
 
         # Convert image to HWC for Matplotlib.
         img = np.transpose(img, [1, 2, 0])
-        img_bbox = drawBBoxes(img, y_bbox, anchor_dim)
-
-        # Show the image with BBoxes, without BBoxes, and the predicted object
-        # class (with-object, without-object).
-        plt.figure()
-        plt.subplot(2, 2, 1)
-        plt.imshow(img)
-        plt.title('Original Image')
-
-        plt.subplot(2, 2, 2)
-        plt.imshow(img_bbox)
-        plt.title('Pred BBoxes')
-
-        plt.subplot(2, 2, 3)
-        plt.imshow(y_bbox[0].astype(np.float32))
-        plt.title('GT Label')
-
-        plt.subplot(2, 2, 4)
-        plt.imshow(np.amax(y_score, axis=0), cmap='hot')
-        plt.title('GT Score')
-
-        plt.show()
         break
+
+    # Show debug data for last image.
+    showData(img, y_bbox, y_score)
 
 
 if __name__ == '__main__':
