@@ -5,7 +5,6 @@ images is inhomogeneous and depends on the BBox size.
 """
 import os
 import glob
-import json
 import tqdm
 import pickle
 import gen_bbox_labels
@@ -20,15 +19,14 @@ def saveBBoxPatches(fnames, bbox_path):
     tot_label_cnt = Counter()
 
     for i, fname in enumerate(tqdm.tqdm(fnames)):
-        # Load meta data and clean up the JSON idiosyncracy that converts
-        # integers to strings when used as keys in a map.
-        meta = json.load(open(fname + '.json', 'r'))
-        int2name = {int(k): v for k, v in meta['int2name'].items()}
+        # Load label mapping.
+        meta = pickle.load(open(fname + '-meta.pickle', 'rb'))
+        int2name = meta['int2name']
 
         # Load the BBox data for the current image. Then load the Image itself
         # into a Numpy array.
-        y_bbox = pickle.load(open(fname + '.pickle', 'rb'))['y_bbox']
-        img = np.array(Image.open(fname + '.jpg', 'r').convert('RGB'), np.uint8)
+        y_bbox = pickle.load(open(fname + '-bbox.pickle', 'rb'))['y_bbox']
+        img = np.array(Image.open(fname + '.jpg').convert('RGB'), np.uint8)
         height, width = img.shape[:2]
 
         # Compile the BBox positions from the training data.

@@ -1,12 +1,13 @@
-""" Load background images, stamp shapes into it and save them as new images.
+"""Load background images, stamp shapes into it and save them as new images.
 
-Each image will be saved as JPG alongside a JSON file with the same name. The
-JSON file contains information about the BBox and label of each object that was
-stamped into the image.
+Each image will be saved as JPG alongside a '*-meta.pickle' file. The meta file
+contains information about the BBox and label of each object that was stamped
+into the image.
+
 """
 import os
 import glob
-import json
+import pickle
 import tqdm
 import random
 import numpy as np
@@ -130,7 +131,7 @@ def generateImages(dst_path, bg_fnames, fg_shapes, int2name, num_img, num_stamps
 
         # Save meta data.
         meta = {'bboxes': bboxes, 'labels': labels, 'int2name': int2name}
-        json.dump(meta, open(fname + '.json', 'w'))
+        pickle.dump(meta, open(fname + '-meta.pickle', 'wb'))
 
         # Save the stamped image.
         Image.fromarray(img).save(fname + '.jpg')

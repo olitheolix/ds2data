@@ -12,7 +12,6 @@ label of zero always means background.
 """
 import os
 import glob
-import json
 import tqdm
 import pickle
 import scipy.signal
@@ -60,8 +59,6 @@ def computeScore(meta, img_dim_hw, bboxes):
 
 
 def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh):
-    assert {isinstance(_, int) for _ in bbox_labels} == {True}
-
     # Compute the BBox parameters that the network will ultimately learn.
     # These are two values to encode the BBox centre (relative to the
     # anchor in the full image), and another two value to encode the
@@ -230,10 +227,9 @@ def main():
 
     for i, fname in enumerate(tqdm.tqdm(fnames)):
         # Load meta data and the image, then convert the image to CHW.
-        meta = json.load(open(fname + '.json', 'r'))
+        meta = pickle.load(open(fname + '-meta.pickle', 'rb'))
         img = np.array(Image.open(fname + '.jpg', 'r').convert('RGB'), np.uint8)
         img = np.transpose(img, [2, 0, 1])
-        int2name = {int(k): v for k, v in meta['int2name'].items()}
 
         # Define the image- and feature dimensions.
         im_dim = img.shape[1:]
@@ -241,7 +237,7 @@ def main():
 
         # Unpack the BBox data and map the human readable labels to numeric ones.
         bboxes = np.array(meta['bboxes'], np.int32)
-        name2int = {v: k for k, v in int2name.items()}
+        name2int = {v: k for k, v in meta['int2name'].items()}
         bbox_labels = [name2int[_] for _ in meta['labels']]
         assert 0 not in meta['int2name'], 'Zero is reserved for background'
 
@@ -253,7 +249,7 @@ def main():
         assert y_score.shape == (bboxes.shape[0], *im_dim), y_score.shape
 
         # Save the expected training output in a meta data file.
-        fname = os.path.join(stamped_path, f'{i:04d}.pickle')
+        fname = os.path.join(stamped_path, f'{i:04d}-bbox.pickle')
         pickle.dump({'y_bbox': y_bbox}, open(fname, 'wb'))
 
     # Show debug data for last image.
