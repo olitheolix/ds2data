@@ -185,15 +185,14 @@ def main():
         img = np.transpose(img, [2, 0, 1])
 
         # Define the image- and feature dimensions.
-        chan, height, width = img.shape
-        ft_dim = (height // sample_rat, width // sample_rat)
-        im_dim = (height, width)
-        del chan, height, width
+        im_dim = img.shape[1:]
+        ft_dim = (np.array(im_dim) / sample_rat).astype(np.int32).tolist()
 
         # Unpack the BBox data and map the human readable labels to numeric ones.
         bboxes = np.array(meta['bboxes'], np.int32)
         name2int = {v: k for k, v in meta['int2name'].items()}
         bbox_labels = [name2int[_] for _ in meta['labels']]
+        assert 0 not in meta['int2name'], 'Zero is reserved for background'
 
         # Compute the score map for each individual bounding box.
         bbox_score = computeScore(meta, im_dim, bboxes)
@@ -209,19 +208,19 @@ def main():
         # Show the image with BBoxes, without BBoxes, and the predicted object
         # class (with-object, without-object).
         plt.figure()
-        plt.subplot(2, 3, 1)
+        plt.subplot(2, 2, 1)
         plt.imshow(img)
         plt.title('Original Image')
 
-        plt.subplot(2, 3, 2)
+        plt.subplot(2, 2, 2)
         plt.imshow(img_bbox)
         plt.title('Pred BBoxes')
 
-        plt.subplot(2, 3, 4)
+        plt.subplot(2, 2, 3)
         plt.imshow(y_bbox[0].astype(np.float32))
         plt.title('GT Label')
 
-        plt.subplot(2, 3, 5)
+        plt.subplot(2, 2, 4)
         plt.imshow(np.amax(y_score, axis=0), cmap='hot')
         plt.title('GT Score')
 
