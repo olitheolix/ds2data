@@ -202,11 +202,8 @@ def main():
     # Folders with background images, and folder where to put output images.
     base = os.path.dirname(os.path.abspath(__file__))
     base = os.path.join(base, 'data')
-    src_path = os.path.join(base, 'stamped')
-    dst_path = os.path.join(base, 'bbox')
-
-    # Ensure output path exists.
-    os.makedirs(dst_path, exist_ok=True)
+    bg_path = os.path.join(base, 'stamped')
+    bbox_path = os.path.join(base, 'bbox')
 
     # If BBox overlaps more than `thresh` with anchor then the location will be
     # marked as containing the respective object.
@@ -218,7 +215,7 @@ def main():
 
     # Find all background image files and strip of the file extension (we will
     # need to load meta file with the same prefix).
-    fnames = glob.glob(os.path.join(src_path, '*.jpg'))
+    fnames = glob.glob(os.path.join(bg_path, '*.jpg'))
     fnames = [_[:-4] for _ in sorted(fnames)]
     for i, fname in enumerate(tqdm.tqdm(fnames)):
         # Load meta data and the image, then convert the image to CHW.
@@ -245,7 +242,7 @@ def main():
         assert y_score.shape == (bboxes.shape[0], *im_dim), y_score.shape
 
         # Save the expected training output in a meta data file.
-        fname = os.path.join(src_path, f'{i:04d}.pickle')
+        fname = os.path.join(bg_path, f'{i:04d}.pickle')
         pickle.dump({'y_bbox': y_bbox}, open(fname, 'wb'))
 
     # Show debug data for last image.
