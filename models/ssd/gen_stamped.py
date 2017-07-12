@@ -7,6 +7,7 @@ stamped into the image.
 import os
 import glob
 import json
+import tqdm
 import random
 import numpy as np
 
@@ -116,7 +117,7 @@ def generateImages(dst_path, bg_fnames, fg_shapes, int2name, num_img, num_stamps
     dims = (xmin, xmax, ymin, ymax)
 
     # Create N images.
-    for i in range(num_img):
+    for i in tqdm.tqdm(range(num_img)):
         # Load background image as NumPy array.
         img = Image.open(bg_fnames[i % len(bg_fnames)]).convert('RGB')
         img = np.array(img, np.uint8)
@@ -158,7 +159,7 @@ def main():
     int2name = {idx + 1: name for idx, name in enumerate(shapes)}
 
     # Stamp the foreground objects into the background images.
-    generateImages(dst_path, bg_fnames, shapes, int2name, num_img=2, num_stamps=20)
+    generateImages(dst_path, bg_fnames, shapes, int2name, num_img=10, num_stamps=20)
 
 
 if __name__ == '__main__':

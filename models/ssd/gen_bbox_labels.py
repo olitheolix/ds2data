@@ -1,6 +1,7 @@
 import os
 import glob
 import json
+import tqdm
 import pickle
 import scipy.signal
 import matplotlib.pyplot as plt
@@ -212,7 +213,7 @@ def main():
     # need to load meta file with the same prefix).
     fnames = glob.glob(os.path.join(src_path, '*.jpg'))
     fnames = [_[:-4] for _ in sorted(fnames)]
-    for i, fname in enumerate(fnames):
+    for i, fname in enumerate(tqdm.tqdm(fnames)):
         # Load meta data and the image, then convert the image to CHW.
         meta = json.load(open(fname + '.json', 'r'))
         img = np.array(Image.open(fname + '.jpg', 'r').convert('RGB'), np.uint8)
