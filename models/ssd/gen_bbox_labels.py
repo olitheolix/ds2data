@@ -50,7 +50,7 @@ def computeScore(meta, img_dim_hw, bboxes):
     return bbox_score
 
 
-def genLabels(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh):
+def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh):
     assert {isinstance(_, int) for _ in bbox_labels} == {True}
 
     # Compute the BBox parameters that the network will ultimately learn.
@@ -106,7 +106,7 @@ def genLabels(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh):
     return out, bbox_score
 
 
-def train2BBoxdata(im_dim, y_bbox):
+def bboxFromTrainingData(im_dim, y_bbox):
     assert y_bbox.ndim == 3
     assert y_bbox.shape[0] == 5
 
@@ -159,12 +159,12 @@ def train2BBoxdata(im_dim, y_bbox):
     return np.array(np.round(out), np.int16)
 
 
-def showData(img, y_bbox, y_score):
+def showBBoxData(img, y_bbox, y_score):
     assert img.ndim == 3
     assert img.shape[2] == 3
 
     # Convert the training output to BBox positions.
-    bboxes = train2BBoxdata(img.shape[:2], y_bbox)
+    bboxes = bboxFromTrainingData(img.shape[:2], y_bbox)
 
     # Insert the BBox rectangle into the image.
     img_bbox = np.array(img)
@@ -215,7 +215,7 @@ def saveBBoxPatches(fnames, bbox_path):
         height, width = img.shape[:2]
 
         # Compile the BBox positions from the training data.
-        bboxes = train2BBoxdata((height, width), y_bbox)
+        bboxes = bboxFromTrainingData((height, width), y_bbox)
 
         # A simple method to identify occupied regions.
         mask = np.zeros((height, width))
@@ -298,7 +298,7 @@ def main():
 
         # Compute the score map for each individual bounding box.
         bbox_score = computeScore(meta, im_dim, bboxes)
-        y_bbox, y_score = genLabels(
+        y_bbox, y_score = genBBoxData(
             bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh)
         assert y_bbox.shape == (5, *ft_dim)
         assert y_score.shape == (bboxes.shape[0], *im_dim), y_score.shape
@@ -309,7 +309,7 @@ def main():
 
     # Show debug data for last image.
     img = np.transpose(img, [1, 2, 0])
-    showData(img, y_bbox, y_score)
+    showBBoxData(img, y_bbox, y_score)
 
 
 if __name__ == '__main__':
