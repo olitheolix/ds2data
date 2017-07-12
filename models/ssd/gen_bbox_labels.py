@@ -104,24 +104,24 @@ def genLabels(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh):
     return out, bbox_score
 
 
-def drawBBoxes(img, y_bbox):
-    assert img.ndim == 3
-    assert img.shape[2] == 3
+def train2BBoxdata(im_dim, y_bbox):
+    assert y_bbox.ndim == 3
+    assert y_bbox.shape[0] == 5
 
-    im_height, im_width = img.shape[:2]
+    im_height, im_width = im_dim
     ft_height, ft_width = y_bbox[0].shape
 
     mul = im_height / ft_height
     ofs = mul / 2
-    label = y_bbox[0]
-    bboxes = y_bbox[1:]
+    labels, bboxes = y_bbox[0], y_bbox[1:]
 
     # Iterate over every position of the feature map and determine if the
     # network found an object. Add the estimated BBox if it did.
-    img = np.array(img)
+    out = []
     for fy in range(ft_height):
         for fx in range(ft_width):
-            if label[fy, fx] == 0:
+            label = labels[fy, fx]
+            if label == 0:
                 continue
 
             # Convert the current feature map position to the corresponding
@@ -148,24 +148,26 @@ def drawBBoxes(img, y_bbox):
             # Compute BBox corners and clip them at the image boundaries.
             x0, y0 = bbox_x - bbox_half_width, bbox_y - bbox_half_height
             x1, y1 = bbox_x + bbox_half_width, bbox_y + bbox_half_height
-            x0, x1 = np.clip([x0, x1], 0, img.shape[1] - 1)
-            y0, y1 = np.clip([y0, y1], 0, img.shape[0] - 1)
-
-            # Draw the rectangle.
-            img[y0:y1, x0, :] = 255
-            img[y0:y1, x1, :] = 255
-            img[y0, x0:x1, :] = 255
-            img[y1, x0:x1, :] = 255
-    return img
+            x0, x1 = np.clip([x0, x1], 0, im_dim[1] - 1)
+            y0, y1 = np.clip([y0, y1], 0, im_dim[0] - 1)
+            out.append([label, x0, y0, x1, y1])
+    return np.array(np.round(out), np.int16)
 
 
 def showData(img, y_bbox, y_score):
     assert img.ndim == 3
     assert img.shape[2] == 3
 
-    # Draw BBoxes into images.
-    img = np.array(img)
-    img_bbox = drawBBoxes(img, y_bbox)
+    # Convert the training output for the network to BBox positions.
+    bboxes = train2BBoxdata(img.shape[:2], y_bbox)
+
+    # Insert the BBox rectangle into the image.
+    img_bbox = np.array(img)
+    for (label, x0, y0, x1, y1) in bboxes:
+        img_bbox[y0:y1, x0, :] = 255
+        img_bbox[y0:y1, x1, :] = 255
+        img_bbox[y0, x0:x1, :] = 255
+        img_bbox[y1, x0:x1, :] = 255
 
     # Maptlotlib cannot deal with float16, so convert it.
     y_bbox = y_bbox.astype(np.float32)
