@@ -311,6 +311,10 @@ def main():
         fname = os.path.join(bg_path, f'{i:04d}.pickle')
         pickle.dump({'y_bbox': y_bbox}, open(fname, 'wb'))
 
+    # Save images patches from inside BBox regions. This will be useful to
+    # pre-train the first layers of the model.
+    saveBBoxPatches(fnames, bbox_path)
+
     # Show debug data for last image.
     img = np.transpose(img, [1, 2, 0])
     showBBoxData(img, y_bbox, y_score)
