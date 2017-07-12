@@ -17,7 +17,7 @@ def computeScore(meta, img_dim_hw, bboxes):
     # Find out where the anchor box will overlap with each BBox. To do
     # this by stamping a block of 1's into the image and convolve it
     # with the anchor box.
-    bbox_score = np.zeros((len(bboxes), *img_dim_hw), np.float32)
+    bbox_score = np.zeros((len(bboxes), *img_dim_hw), np.float16)
     for i, (x0, y0, x1, y1) in enumerate(bboxes):
         # BBox size in pixels.
         bbox_area = (x1 - x0) * (y1 - y0)
@@ -165,6 +165,10 @@ def showData(img, y_bbox, y_score):
     img = np.array(img)
     img_bbox = drawBBoxes(img, y_bbox)
 
+    # Maptlotlib cannot deal with float16, so convert it.
+    y_bbox = y_bbox.astype(np.float32)
+    y_score = y_score.astype(np.float32)
+
     plt.figure()
     plt.subplot(2, 2, 1)
     plt.imshow(img)
@@ -175,7 +179,7 @@ def showData(img, y_bbox, y_score):
     plt.title('Pred BBoxes')
 
     plt.subplot(2, 2, 3)
-    plt.imshow(y_bbox[0].astype(np.float32))
+    plt.imshow(y_bbox[0])
     plt.title('GT Label')
 
     plt.subplot(2, 2, 4)
