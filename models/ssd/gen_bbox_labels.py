@@ -279,6 +279,10 @@ def main():
     # need to load meta file with the same prefix).
     fnames = glob.glob(os.path.join(bg_path, '*.jpg'))
     fnames = [_[:-4] for _ in sorted(fnames)]
+    if len(fnames) == 0:
+        print(f'Warning: found no images in {bg_path}')
+        return
+
     for i, fname in enumerate(tqdm.tqdm(fnames)):
         # Load meta data and the image, then convert the image to CHW.
         meta = json.load(open(fname + '.json', 'r'))
