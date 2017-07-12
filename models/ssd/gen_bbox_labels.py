@@ -51,6 +51,8 @@ def computeScore(meta, img_dim_hw, bboxes):
 
 
 def genLabels(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh):
+    assert {isinstance(_, int) for _ in bbox_labels} == {True}
+
     # Compute the BBox parameters that the network will ultimately learn.
     # These are two values to encode the BBox centre (relative to the
     # anchor in the full image), and another two value to encode the
@@ -223,6 +225,7 @@ def main():
         meta = json.load(open(fname + '.json', 'r'))
         img = np.array(Image.open(fname + '.jpg', 'r').convert('RGB'), np.uint8)
         img = np.transpose(img, [2, 0, 1])
+        int2name = {int(k): v for k, v in meta['int2name'].items()}
 
         # Define the image- and feature dimensions.
         im_dim = img.shape[1:]
@@ -230,7 +233,7 @@ def main():
 
         # Unpack the BBox data and map the human readable labels to numeric ones.
         bboxes = np.array(meta['bboxes'], np.int32)
-        name2int = {v: k for k, v in meta['int2name'].items()}
+        name2int = {v: k for k, v in int2name.items()}
         bbox_labels = [name2int[_] for _ in meta['labels']]
         assert 0 not in meta['int2name'], 'Zero is reserved for background'
 
