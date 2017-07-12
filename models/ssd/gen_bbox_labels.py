@@ -125,8 +125,7 @@ def train2BBoxdata(im_dim, y_bbox):
                 continue
 
             # Convert the current feature map position to the corresponding
-            # image coordinates. The following formula assumes that the
-            # image was down-sampled twice (hence the factor 4).
+            # image coordinates.
             anchor_x = fx * mul + ofs
             anchor_y = fy * mul + ofs
 
@@ -162,7 +161,7 @@ def showData(img, y_bbox, y_score):
     assert img.ndim == 3
     assert img.shape[2] == 3
 
-    # Convert the training output for the network to BBox positions.
+    # Convert the training output to BBox positions.
     bboxes = train2BBoxdata(img.shape[:2], y_bbox)
 
     # Insert the BBox rectangle into the image.
@@ -173,7 +172,7 @@ def showData(img, y_bbox, y_score):
         img_bbox[y0, x0:x1, :] = 255
         img_bbox[y1, x0:x1, :] = 255
 
-    # Maptlotlib cannot deal with float16, so convert it.
+    # Matplotlib cannot deal with float16, so convert it.
     y_bbox = y_bbox.astype(np.float32)
     y_score = y_score.astype(np.float32)
 
