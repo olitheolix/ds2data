@@ -236,15 +236,12 @@ def main():
         assert y_bbox.shape == (5, *ft_dim)
         assert y_score.shape == (bboxes.shape[0], *im_dim), y_score.shape
 
-        # Convert image to HWC and save it.
-        img = np.transpose(img, [1, 2, 0])
-        fname = os.path.join(dst_path, f'{i:04d}')
-        Image.fromarray(img).convert('RGB').save(fname + '.jpg')
-
         # Save the expected training output in a meta data file.
-        pickle.dump({'y_bbox': y_bbox}, open(fname + '.pickle', 'wb'))
+        fname = os.path.join(src_path, f'{i:04d}.pickle')
+        pickle.dump({'y_bbox': y_bbox}, open(fname, 'wb'))
 
     # Show debug data for last image.
+    img = np.transpose(img, [1, 2, 0])
     showData(img, y_bbox, y_score)
 
 
