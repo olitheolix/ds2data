@@ -20,9 +20,6 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 import PIL.Image as Image
-from collections import namedtuple
-
-MetaData = namedtuple('MetaData', 'filename score')
 
 
 def computeScore(meta, img_dim_hw, bboxes):
