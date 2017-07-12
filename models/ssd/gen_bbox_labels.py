@@ -127,8 +127,8 @@ def train2BBoxdata(im_dim, y_bbox):
             # Convert the current feature map position to the corresponding
             # image coordinates. The following formula assumes that the
             # image was down-sampled twice (hence the factor 4).
-            anchor_x = int(fx * mul + ofs)
-            anchor_y = int(fy * mul + ofs)
+            anchor_x = fx * mul + ofs
+            anchor_y = fy * mul + ofs
 
             # BBox in image coordinates.
             bbox = bboxes[:, fy, fx]
@@ -136,10 +136,10 @@ def train2BBoxdata(im_dim, y_bbox):
             # The BBox parameters are relative to the anchor position and
             # size. Here we convert those relative values back to absolute
             # values in the original image.
-            bbox_x = int(bbox[0] + anchor_x)
-            bbox_y = int(bbox[1] + anchor_y)
-            bbox_half_width = int(bbox[2] / 2)
-            bbox_half_height = int(bbox[3] / 2)
+            bbox_x = bbox[0] + anchor_x
+            bbox_y = bbox[1] + anchor_y
+            bbox_half_width = bbox[2] / 2
+            bbox_half_height = bbox[3] / 2
 
             # Ignore invalid BBoxes.
             if bbox_half_width < 2 or bbox_half_height < 2:
@@ -151,6 +151,10 @@ def train2BBoxdata(im_dim, y_bbox):
             x0, x1 = np.clip([x0, x1], 0, im_dim[1] - 1)
             y0, y1 = np.clip([y0, y1], 0, im_dim[0] - 1)
             out.append([label, x0, y0, x1, y1])
+
+    # The BBox label and corner coordinates are integers, even though we used
+    # floating point numbers to compute them. Here we convert all data to
+    # integer precision.
     return np.array(np.round(out), np.int16)
 
 
