@@ -188,11 +188,9 @@ def main():
     else:
         log = collections.defaultdict(list)
         conf = config.NetConf(
-            width=512, height=512, colour='rgb',
-            seed=0, num_dense=32, keep_model=0.8,
-            path=data_path, names=None,
-            batch_size=16, num_epochs=1000,
-            train_rat=0.8, num_samples=10
+            seed=0, width=512, height=512, colour='rgb',
+            keep_prob=0.8, path=data_path, train_rat=0.8,
+            dtype='float32', num_epochs=1000, num_samples=10
         )
         print('\n----- New Configuration -----')
     print(conf)
