@@ -217,13 +217,19 @@ def main():
     im_dim = ds.imageDimensions().tolist()
     ft_dim = (128, 128)
 
-    # Input/output/parameter tensors for network.
-    dtype = tf.float32
-    x_in = tf.placeholder(dtype, [None, *im_dim], name='x_in')
+    # Precision.
+    if conf.dtype == 'float32':
+        tf_dtype, np_dtype = tf.float32, np.float32
+    elif conf.dtype == 'float16':
+        tf_dtype, np_dtype = tf.float16, np.float16
+    else:
+        print(f'Error: unknown data type <{conf.dtype}>')
+        return 1
 
     # Build the shared layers and connect it to the RPN layers.
-    shared_out = shared_net.setup(fnames['shared_net'], True, x_in, np.float32)
-    rpn_out = rpn_net.setup(fnames['rpn_net'], True, shared_out, num_cls, np.float32)
+    x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
+    shared_out = shared_net.setup(fnames['shared_net'], True, x_in, np_dtype)
+    rpn_out = rpn_net.setup(fnames['rpn_net'], True, shared_out, num_cls, np_dtype)
     sess.run(tf.global_variables_initializer())
 
     # Plot learning information as well as the last used mask for reference.
