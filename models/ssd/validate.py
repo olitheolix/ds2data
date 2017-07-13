@@ -29,11 +29,11 @@ def plotMasks(img_chw, mask_cls, mask_bbox):
     plt.title('Input Image')
 
     plt.subplot(2, 2, 2)
-    plt.imshow(mask_cls, cmap='gray')
+    plt.imshow(mask_cls, cmap='gray', clim=[0, 1])
     plt.title('Active Regions')
 
     plt.subplot(2, 2, 3)
-    plt.imshow(mask_bbox, cmap='gray')
+    plt.imshow(mask_bbox, cmap='gray', clim=[0, 1])
     plt.title('Valid BBox in Active Regions')
 
 
