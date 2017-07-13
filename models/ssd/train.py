@@ -197,6 +197,13 @@ def validate(log, sess, ds, ft_dim, x_in, rpn_out):
     print(f'  W: {bb_med[2]:.1f} {bb_med[2]:.1f}')
     print(f'  H: {bb_med[3]:.1f} {bb_med[3]:.1f}')
 
+    # Show one mask set specimen.
+    ds.reset()
+    x, y, meta = ds.nextBatch(1, 'train')
+    assert len(x) > 0
+    pred = sess.run(rpn_out, feed_dict={x_in: x})
+    mask_cls, mask_bbox = computeMasks(y)
+    showMask(x[0], mask_cls[0], mask_bbox[0])
 
 def main():
     sess = tf.Session()
@@ -299,7 +306,6 @@ def main():
 
     # Plot learning information as well as the last used mask for reference.
     showLogs(log)
-#    showMask(x[0], mask_cls[0], mask_bbox[0])
     validate(log, sess, ds, ft_dim, x_in, rpn_out)
 
     plt.show()
