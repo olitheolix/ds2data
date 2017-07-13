@@ -200,8 +200,13 @@ def validate(log, sess, ds, ft_dim, x_in, rpn_out):
 
 def main():
     sess = tf.Session()
-    data_path = os.path.dirname(os.path.abspath(__file__))
-    data_path = os.path.join(data_path, 'data', 'stamped')
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
+    net_path = os.path.join(cur_dir, 'netstate')
+    data_path = os.path.join(cur_dir, 'data', 'stamped')
+    os.makedirs(net_path, exist_ok=True)
+
+    fname_rpn_net = os.path.join(net_path, 'rpn-net.pickle')
+    fname_shared_net = os.path.join(net_path, 'shared-net.pickle')
 
     # Network configuration.
     conf = config.NetConf(
@@ -226,8 +231,8 @@ def main():
     lrate_in = tf.placeholder(dtype, name='lrate')
 
     # Build the shared layers and connect it to the RPN layers.
-    shared_out = shared_net.setup(None, True, x_in)
-    rpn_out = rpn_net.setup(None, True, shared_out)
+    shared_out = shared_net.setup(fname_shared_net, True, x_in)
+    rpn_out = rpn_net.setup(fname_rpn_net, True, shared_out)
     rpn_cost = rpn_net.cost(rpn_out, y_in, num_classes, mask_cls_in, mask_bbox_in)
 
     # Select the optimiser and initialise the TF graph.
@@ -246,6 +251,8 @@ def main():
                 first = False
                 ds.reset()
                 epoch += 1
+                rpn_net.save(fname_rpn_net, sess)
+                shared_net.save(fname_shared_net, sess)
                 continue
             else:
                 batch += 1
