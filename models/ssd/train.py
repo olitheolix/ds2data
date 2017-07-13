@@ -107,25 +107,99 @@ def accuracy(log, gt, pred, mask_cls, mask_bbox):
     return bbox_err, cls_err
 
 
+def trainEpoch(conf, ds, sess, log, opt, lrate):
+    g = tf.get_default_graph().get_tensor_by_name
+
+    lrate_in = g('lrate:0')
+    rpn_out = g('rpn/net_out:0')
+    rpn_cost = g('rpn-cost/cost:0')
+    x_in, y_in = g('x_in:0'), g('y_in:0')
+    mask_cls_in, mask_bbox_in = g('mask_cls:0'), g('mask_bbox:0')
+
+    batch = -1
+    while True:
+        batch += 1
+
+        # Get the next image or reset the data store if we have reached the
+        # end of an epoch.
+        x, y, meta = ds.nextBatch(1, 'train')
+        if len(x) == 0:
+            return
+
+        # Determine the mask for the cost function because we only want to
+        # learn BBoxes where there are objects. Similarly, we also do not
+        # want to learn the class label at every location since most
+        # correspond to the 'background' class and bias the training.
+        mask_cls, mask_bbox = computeMasks(y)
+        assert mask_cls.shape == mask_bbox.shape
+        assert mask_cls.shape[0] == 1
+
+        # Predict. Ensure there are no NaN in the output.
+        pred = sess.run(rpn_out, feed_dict={x_in: x})
+        assert not np.any(np.isnan(pred))
+
+        # Run optimiser and log the cost.
+        fd = {
+            x_in: x, y_in: y, lrate_in: lrate,
+            mask_cls_in: mask_cls, mask_bbox_in: mask_bbox,
+        }
+        cost, _ = sess.run([rpn_cost, opt], feed_dict=fd)
+        log['cost'].append(cost)
+
+        # Compute training statistics.
+        bb_err, cls_err = accuracy(log, y[0], pred[0], mask_cls[0], mask_bbox[0])
+        bb_max = np.max(bb_err, axis=1)
+        bb_med = np.median(bb_err, axis=1)
+
+        # Log training stats for plotting later.
+        log['cls'].append(cls_err)
+        log['x'].append([bb_med[0], bb_max[0]])
+        log['y'].append([bb_med[1], bb_max[1]])
+        log['w'].append([bb_med[2], bb_max[2]])
+        log['h'].append([bb_med[3], bb_max[3]])
+
+        # Print progress report to terminal.
+        s1 = f'ClsErr={100 * cls_err:.1f}%  '
+        s2 = f'X={bb_med[0]:.1f}, {bb_max[0]:.1f}  '
+        s3 = f'W={bb_med[2]:.1f}, {bb_max[2]:.1f}  '
+        print(f'  {batch:,}: Cost: {int(cost):,}  ' + s1 + s2 + s3)
+
+
 def main():
     sess = tf.Session()
+
+    # File names.
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     net_path = os.path.join(cur_dir, 'netstate')
     data_path = os.path.join(cur_dir, 'data', 'stamped')
     os.makedirs(net_path, exist_ok=True)
+    fnames = {
+        'meta': os.path.join(net_path, 'rpn-meta.pickle'),
+        'rpn_net': os.path.join(net_path, 'rpn-net.pickle'),
+        'shared_net': os.path.join(net_path, 'shared-net.pickle'),
+    }
 
-    fname_logs = os.path.join(net_path, 'log.pickle')
-    fname_rpn_net = os.path.join(net_path, 'rpn-net.pickle')
-    fname_shared_net = os.path.join(net_path, 'shared-net.pickle')
-
-    # Network configuration.
-    conf = config.NetConf(
-        width=512, height=512, colour='rgb', seed=0, num_dense=32, keep_model=0.8,
-        path=data_path, names=None,
-        batch_size=16, num_epochs=1000, train_rat=0.8, num_samples=10
-    )
+    # Restore the configuration if it exists, otherwise create a new one.
+    restore = os.path.exists(fnames['meta'])
+    if restore:
+        meta = pickle.load(open(fnames['meta'], 'rb'))
+        conf, log = meta['conf'], meta['log']
+        print('\n----- Restored Configuration -----')
+    else:
+        log = collections.defaultdict(list)
+        conf = config.NetConf(
+            width=512, height=512, colour='rgb',
+            seed=0, num_dense=32, keep_model=0.8,
+            path=data_path, names=None,
+            batch_size=16, num_epochs=1000,
+            train_rat=0.8, num_samples=10
+        )
+        print('\n----- New Configuration -----')
+    print(conf)
+    del cur_dir, net_path, data_path
 
     # Load the BBox training data.
+    print('\n----- Data Set -----')
     ds = data_loader.BBox(conf)
     ds.printSummary()
     num_classes = len(ds.classNames())
@@ -133,79 +207,39 @@ def main():
     ft_dim = (128, 128)
 
     # Input/output/parameter tensors for network.
+    print('\n----- Network -----')
     dtype = tf.float32
     x_in = tf.placeholder(dtype, [None, *im_dim], name='x_in')
     y_in = tf.placeholder(dtype, [None, 4 + num_classes, *ft_dim], name='y_in')
-    mask_cls_in = tf.placeholder(dtype, [None, *ft_dim])
-    mask_bbox_in = tf.placeholder(dtype, [None, *ft_dim])
+    mask_cls_in = tf.placeholder(dtype, [None, *ft_dim], name='mask_cls')
+    mask_bbox_in = tf.placeholder(dtype, [None, *ft_dim], name='mask_bbox')
     lrate_in = tf.placeholder(dtype, name='lrate')
 
     # Build the shared layers and connect it to the RPN layers.
-    shared_out = shared_net.setup(fname_shared_net, True, x_in)
-    rpn_out = rpn_net.setup(fname_rpn_net, True, shared_out)
+    if restore:
+        shared_out = shared_net.setup(fnames['shared_net'], True, x_in)
+        rpn_out = rpn_net.setup(fnames['rpn_net'], True, shared_out)
+    else:
+        shared_out = shared_net.setup(None, True, x_in)
+        rpn_out = rpn_net.setup(None, True, shared_out)
     rpn_cost = rpn_net.cost(rpn_out, y_in, num_classes, mask_cls_in, mask_bbox_in)
 
     # Select the optimiser and initialise the TF graph.
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(rpn_cost)
     sess.run(tf.global_variables_initializer())
 
-    log = collections.defaultdict(list)
-    epoch, batch, first = 0, -1, True
+    print(f'\n----- Training for {conf.num_epochs} Epochs -----')
     try:
-        while epoch <= conf.num_epochs:
-            # Get the next image or reset the data store if we have reached the
-            # end of an epoch.
-            x, y, meta = ds.nextBatch(1, 'train')
-            if len(x) == 0 or first:
-                print(f'\nEpoch {epoch}')
-                first = False
-                ds.reset()
-                epoch += 1
-                rpn_net.save(fname_rpn_net, sess)
-                shared_net.save(fname_shared_net, sess)
-                meta = {'conf': conf, 'log': log}
-                pickle.dump(meta, open(fname_logs, 'wb'))
-                continue
-            else:
-                batch += 1
+        for epoch in range(conf.num_epochs):
+            print(f'\nEpoch {epoch}')
+            ds.reset()
+            lrate = 1E-4
+            trainEpoch(conf, ds, sess, log, opt, lrate)
 
-            # Determine the mask for the cost function because we only want to
-            # learn BBoxes where there are objects. Similarly, we also do not
-            # want to learn the class label at every location since most
-            # correspond to the 'background' class and bias the training.
-            mask_cls, mask_bbox = computeMasks(y)
-            assert mask_cls.shape == mask_bbox.shape
-            assert mask_cls.shape[0] == 1
-
-            # Predict. Ensure there are no NaN in the output.
-            pred = sess.run(rpn_out, feed_dict={x_in: x})
-            assert not np.any(np.isnan(pred))
-
-            # Run optimiser and log the cost.
-            fd = {
-                x_in: x, y_in: y, lrate_in: 1E-4,
-                mask_cls_in: mask_cls, mask_bbox_in: mask_bbox,
-            }
-            cost, _ = sess.run([rpn_cost, opt], feed_dict=fd)
-            log['cost'].append(cost)
-
-            # Compute training statistics.
-            bb_err, cls_err = accuracy(log, y[0], pred[0], mask_cls[0], mask_bbox[0])
-            bb_max = np.max(bb_err, axis=1)
-            bb_med = np.median(bb_err, axis=1)
-
-            # Log training stats for plotting later.
-            log['cls'].append(cls_err)
-            log['x'].append([bb_med[0], bb_max[0]])
-            log['y'].append([bb_med[1], bb_max[1]])
-            log['w'].append([bb_med[2], bb_max[2]])
-            log['h'].append([bb_med[3], bb_max[3]])
-
-            # Print progress report to terminal.
-            s1 = f'ClsErr={100 * cls_err:.1f}%  '
-            s2 = f'X={bb_med[0]:.1f}, {bb_max[0]:.1f}  '
-            s3 = f'W={bb_med[2]:.1f}, {bb_max[2]:.1f}  '
-            print(f'  {batch:,}: Cost: {int(cost):,}  ' + s1 + s2 + s3)
+            rpn_net.save(fnames['rpn_net'], sess)
+            shared_net.save(fnames['shared_net'], sess)
+            meta = {'conf': conf, 'log': log}
+            pickle.dump(meta, open(fnames['meta'], 'wb'))
     except KeyboardInterrupt:
         pass
 
