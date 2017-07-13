@@ -1,7 +1,6 @@
 """
 Build a DNN with two convolution layers and one dense layer.
 """
-import os
 import pickle
 import numpy as np
 import tensorflow as tf
