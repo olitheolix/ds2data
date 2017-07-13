@@ -76,31 +76,46 @@ def plotTrainingProgress(log):
 
 
 def validateTestEpoch(log, sess, ds, ft_dim, x_in, rpn_out):
+    # We want to predict the label at every location. However, we only want to
+    # predict the BBox where there are actually objects, which is why we will
+    # compute that mask for each image (see inside loop).
+    mask_cls = np.ones(ft_dim, np.float32)
+
+    # Predict the BBoxes for every image in the test data set and accumulate
+    # error statistics.
     ds.reset()
-    mask_cls = mask_bbox = np.ones(ft_dim, np.float32)
     bb_max, bb_med, cls_cor = [], [], []
     while True:
         x, y, meta = ds.nextBatch(1, 'test')
         if len(x) == 0:
             break
 
-        # Predict. Ensure there are no NaN in the output.
+        # Predict the BBoxes and ensure there are no NaNs in the output.
+        _, mask_bbox = train.computeMasks(y)
         pred = sess.run(rpn_out, feed_dict={x_in: x})
-        bb_err, cls_err = train.accuracy(log, y[0], pred[0], mask_cls, mask_bbox)
+        bb_err, cls_err = train.accuracy(log, y[0], pred[0], mask_cls, mask_bbox[0])
+
+        # Store the ratio of correct/total labels, as well as median and max
+        # stats for the BBox position/size error.
         cls_cor.append(1 - cls_err)
         bb_max.append(np.max(bb_err, axis=1))
         bb_med.append(np.median(bb_err, axis=1))
 
+    # Compute the average class prediction error.
     cls_cor = 100 * np.mean(cls_cor)
+
+    # Compute the worst case BBox pos/size error, and the average median value.
     bb_max = np.max(bb_max, axis=0)
     bb_med = np.mean(bb_med, axis=0)
+
+    # Dump the stats to the terminal.
     print(f'  Correct Class: {cls_cor:.1f}%')
     print(f'  X: {bb_med[0]:.1f} {bb_med[0]:.1f}')
     print(f'  Y: {bb_med[1]:.1f} {bb_med[1]:.1f}')
     print(f'  W: {bb_med[2]:.1f} {bb_med[2]:.1f}')
     print(f'  H: {bb_med[3]:.1f} {bb_med[3]:.1f}')
 
-    # Show one mask set specimen.
+    # Plot a class/bbox mask.
     ds.reset()
     x, y, meta = ds.nextBatch(1, 'test')
     assert len(x) > 0
