@@ -239,7 +239,6 @@ def main():
         bboxes = np.array(meta['bboxes'], np.int32)
         name2int = {v: k for k, v in meta['int2name'].items()}
         bbox_labels = [name2int[_] for _ in meta['labels']]
-        assert 0 not in meta['int2name'], 'Zero is reserved for background'
 
         # Compute the score map for each individual bounding box.
         bbox_score = computeScore(meta, im_dim, bboxes)

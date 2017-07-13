@@ -158,6 +158,7 @@ def main():
     # this is 1-based because label 0 will always be reserved for the
     # background (ie no-object) label in later stages.
     int2name = {idx + 1: name for idx, name in enumerate(shapes)}
+    int2name[0] = 'background'
 
     # Stamp the foreground objects into the background images.
     generateImages(dst_path, bg_fnames, shapes, int2name, num_img=10, num_stamps=20)
