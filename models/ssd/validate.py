@@ -80,7 +80,7 @@ def validateTestEpoch(log, sess, ds, ft_dim, x_in, rpn_out):
     mask_cls = mask_bbox = np.ones(ft_dim, np.float32)
     bb_max, bb_med, cls_cor = [], [], []
     while True:
-        x, y, meta = ds.nextBatch(1, 'train')
+        x, y, meta = ds.nextBatch(1, 'test')
         if len(x) == 0:
             break
 
