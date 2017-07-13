@@ -1,3 +1,4 @@
+import os
 import pickle
 import shared_net
 import tensorflow as tf
@@ -28,8 +29,6 @@ def cost(pred_net, gt_net, num_classes, mask_cls, mask_bbox):
     height, width = mask_bbox.shape.as_list()[1:]
     assert gt_net.shape.as_list()[1:] == [4 + num_classes, height, width]
     assert pred_net.shape.as_list()[1:] == [4 + num_classes, height, width]
-
-    #return tf.reduce_sum(pred_net, name='cost')
 
     cost_ce = tf.nn.softmax_cross_entropy_with_logits
     with tf.variable_scope('rpn-cost'):
@@ -94,13 +93,12 @@ def cost(pred_net, gt_net, num_classes, mask_cls, mask_bbox):
     return cost_tot
 
 
-def saveState(prefix, sess):
-    """ Save all network variables to a file prefixed by `prefix`.
+def save(fname, sess):
+    """ Save all pickled network variables to a `fname`.
 
     Args:
-        prefix: str
-           A file prefix. Typically, this is a (relative or absolute) path that
-           ends with a time stamp, eg 'foo/bar/2017-10-10-10:11:12'
+        fname: str
+           Name of pickle file.
         sess: Tensorflow Session
     """
     # Query the state of the shared network (weights and biases).
@@ -109,19 +107,21 @@ def saveState(prefix, sess):
     shared = {'W1': W1, 'b1': b1}
 
     # Save the state.
-    pickle.dump(shared, open(f'{prefix}-rpn.pickle', 'wb'))
+    pickle.dump(shared, open(fname, 'wb'))
 
 
-def loadState(prefix):
-    return pickle.load(open(f'{prefix}-rpn.pickle', 'rb'))
+def load(fname):
+    return pickle.load(open(fname, 'rb'))
 
 
-def setup(prefix, trainable, x_in):
+def setup(fname, trainable, x_in):
     # Attach the RPN classifer to the output of the shared network and
     # initialise its weights.
-    if prefix is None:
+    if fname is None or not os.path.exists(fname):
+        print('RPN: random init')
         bwt1 = (None, None, True)
     else:
-        net = loadState(prefix)
+        print(f'RPN: restored from <{fname}>')
+        net = load(fname)
         bwt1 = (net['b1'], net['W1'], trainable)
     return model(x_in, bwt1)

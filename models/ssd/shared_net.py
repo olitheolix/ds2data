@@ -1,6 +1,7 @@
 """
 Build a DNN with two convolution layers and one dense layer.
 """
+import os
 import pickle
 import numpy as np
 import tensorflow as tf
@@ -77,13 +78,12 @@ def model(x_img, bwt1, bwt2):
         return tf.nn.max_pool(l2, pool_pad, mp_stride, **opts, name='shared_out')
 
 
-def saveState(prefix, sess):
-    """ Save all network variables to a file prefixed by `prefix`.
+def save(fname, sess):
+    """ Save all pickled network variables to a `fname`.
 
     Args:
-        prefix: str
-           A file prefix. Typically, this is a (relative or absolute) path that
-           ends with a time stamp, eg 'foo/bar/2017-10-10-10:11:12'
+        fname: str
+           Name of pickle file.
         sess: Tensorflow Session
     """
     # Query the state of the shared network (weights and biases).
@@ -93,19 +93,20 @@ def saveState(prefix, sess):
     shared = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
 
     # Save the state.
-    pickle.dump(shared, open(f'{prefix}-shared.pickle', 'wb'))
+    pickle.dump(shared, open(fname, 'wb'))
 
 
-def loadState(prefix):
-    return pickle.load(open(f'{prefix}-shared.pickle', 'rb'))
+def load(fname):
+    return pickle.load(open(fname, 'rb'))
 
 
-def setup(prefix, trainable, x_in):
-    if prefix is None:
+def setup(fname, trainable, x_in):
+    if fname is None or not os.path.exists(fname):
+        print('Shared: random init')
         bwt1 = bwt2 = (None, None, True)
     else:
-        print(f'Loading net state <{prefix}>-*')
-        shared = loadState(prefix)
+        print(f'Shared: restored from <{fname}>')
+        shared = load(fname)
         bwt1 = (shared['b1'], shared['W1'], trainable)
         bwt2 = (shared['b2'], shared['W2'], trainable)
     return model(x_in, bwt1, bwt2)
