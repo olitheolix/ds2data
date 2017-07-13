@@ -1,19 +1,18 @@
 import os
 import pickle
-import shared_net
+import numpy as np
 import tensorflow as tf
 
 
 def model(x_in, bwt1):
     # Convenience: shared arguments for bias variable, conv2d, and max-pool.
     convpool_opts = dict(padding='SAME', data_format='NCHW')
-    num_filters = x_in.shape.as_list()[1]
     with tf.variable_scope('rpn'):
         # Convolution layer to learn the anchor boxes.
         # Shape: [-1, 64, 64, 64] ---> [-1, 5, 64, 64]
         # Kernel: 5x5  Features: 6
-        b1 = shared_net.varConst([7, 1, 1], 'b1', bwt1[0], bwt1[2], 0.5)
-        W1 = shared_net.varGauss([15, 15, num_filters, 7], 'W1', bwt1[1], bwt1[2])
+        b1 = tf.Variable(bwt1[0], trainable=bwt1[2], name='b1')
+        W1 = tf.Variable(bwt1[1], trainable=bwt1[2], name='W1')
         net_out = tf.nn.conv2d(x_in, W1, [1, 1, 1, 1], **convpool_opts)
         net_out = tf.add(net_out, b1, name='net_out')
     return net_out
@@ -114,14 +113,22 @@ def load(fname):
     return pickle.load(open(fname, 'rb'))
 
 
-def setup(fname, trainable, x_in):
-    # Attach the RPN classifer to the output of the shared network and
-    # initialise its weights.
-    if fname is None or not os.path.exists(fname):
+def setup(fname, trainable, x_in, num_classes, dtype):
+    chan = 4 + num_classes
+    num_filters = x_in.shape.as_list()[1]
+
+    b1_dim = (chan, 1, 1)
+    W1_dim = (15, 15, num_filters, chan)
+
+    if fname is None:
         print('RPN: random init')
-        bwt1 = (None, None, True)
+        b1 = 0.5 + np.zeros(b1_dim).astype(dtype)
+        W1 = np.random.normal(0.0, 0.1, W1_dim).astype(dtype)
     else:
         print(f'RPN: restored from <{fname}>')
         net = load(fname)
-        bwt1 = (net['b1'], net['W1'], trainable)
-    return model(x_in, bwt1)
+        b1, W1 = net['b1'], net['W1']
+
+    assert b1.dtype == W1.dtype == dtype
+    assert b1.shape == b1_dim and W1.shape == W1_dim
+    return model(x_in, (b1, W1, trainable))

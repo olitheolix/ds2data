@@ -7,26 +7,6 @@ import numpy as np
 import tensorflow as tf
 
 
-def varGauss(shape, name=None, init=None, train=True, stddev=0.1):
-    """Convenience: return Gaussian initialised tensor with ."""
-    if init is None:
-        init = tf.truncated_normal(stddev=stddev, shape=shape, dtype=tf.float32)
-    else:
-        assert isinstance(init, np.ndarray)
-        init = init.astype(np.float32)
-    return tf.Variable(init, name=name, trainable=train)
-
-
-def varConst(shape, name=None, init=None, train=True, value=0.0):
-    """Convenience: return constant initialised tensor."""
-    if init is None:
-        init = tf.constant(value=value, shape=shape, dtype=tf.float32)
-    else:
-        assert isinstance(init, np.ndarray)
-        init = init.astype(np.float32)
-    return tf.Variable(init, name=name, trainable=train)
-
-
 def model(x_img, bwt1, bwt2):
     """ Build DNN and return output tensor.
 
@@ -46,10 +26,8 @@ def model(x_img, bwt1, bwt2):
         Network output.
     """
     assert len(x_img.shape) == 4
-    _, chan, height, width = x_img.shape.as_list()
 
     # Network parameters.
-    num_filters = 64
     pool_pad = mp_stride = [1, 1, 2, 2]
 
     # Convenience: shared arguments for bias, conv2d, and max-pool.
@@ -57,10 +35,10 @@ def model(x_img, bwt1, bwt2):
 
     with tf.variable_scope('shared'):
         # Create or restore the weights and biases.
-        b1 = varConst([num_filters, 1, 1], 'b1', bwt1[0], bwt1[2], 0.5)
-        b2 = varConst([num_filters, 1, 1], 'b2', bwt2[0], bwt2[2], 0.5)
-        W1 = varGauss([5, 5, chan, num_filters], 'W1', bwt1[1], bwt1[2])
-        W2 = varGauss([5, 5, num_filters, num_filters], 'W2', bwt2[1], bwt2[2])
+        b1 = tf.Variable(bwt1[0], trainable=bwt1[2], name='b1')
+        b2 = tf.Variable(bwt2[0], trainable=bwt2[2], name='b2')
+        W1 = tf.Variable(bwt1[1], trainable=bwt1[2], name='W1')
+        W2 = tf.Variable(bwt2[1], trainable=bwt2[2], name='W2')
 
         # Examples dimensions assume 128x128 RGB images.
         # Convolution Layer #1
@@ -100,13 +78,28 @@ def load(fname):
     return pickle.load(open(fname, 'rb'))
 
 
-def setup(fname, trainable, x_in):
-    if fname is None or not os.path.exists(fname):
+def setup(fname, trainable, x_in, dtype):
+    num_filters = 64
+    _, chan, _, _ = x_in.shape.as_list()
+
+    b1_dim = b2_dim = (num_filters, 1, 1)
+    W1_dim = (5, 5, chan, num_filters)
+    W2_dim = (5, 5, num_filters, num_filters)
+
+    if fname is None:
         print('Shared: random init')
-        bwt1 = bwt2 = (None, None, True)
+        b1 = 0.5 + np.zeros(b1_dim).astype(dtype)
+        b2 = 0.5 + np.zeros(b2_dim).astype(dtype)
+        W1 = np.random.normal(0.0, 0.1, W1_dim).astype(dtype)
+        W2 = np.random.normal(0.0, 0.1, W2_dim).astype(dtype)
     else:
         print(f'Shared: restored from <{fname}>')
-        shared = load(fname)
-        bwt1 = (shared['b1'], shared['W1'], trainable)
-        bwt2 = (shared['b2'], shared['W2'], trainable)
-    return model(x_in, bwt1, bwt2)
+        net = load(fname)
+        b1, W1 = net['b1'], net['W1']
+        b2, W2 = net['b2'], net['W2']
+
+    assert b1.dtype == W1.dtype == dtype
+    assert b2.dtype == W2.dtype == dtype
+    assert b1.shape == b1_dim and W1.shape == W1_dim
+    assert b2.shape == b2_dim and W2.shape == W2_dim
+    return model(x_in, (b1, W1, trainable), (b2, W2, trainable))
