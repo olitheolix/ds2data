@@ -4,6 +4,7 @@ import pickle
 import rpn_net
 import shared_net
 import data_loader
+import gen_bbox_labels
 
 import numpy as np
 import tensorflow as tf
@@ -112,11 +113,8 @@ def validateTestEpoch(log, sess, ds, ft_dim, x_in, rpn_out):
 
 
 def drawBBoxes(img_chw, pred):
+    assert pred.ndim == 3
     assert img_chw.ndim == 3 and img_chw.shape[0] == 3
-    assert pred.ndim == 3, pred.shape
-
-    im_height, im_width = img_chw.shape[1:]
-    ft_height, ft_width = pred.shape[1:]
 
     # Unpack the image and convert it to HWC format for Matplotlib later.
     img = np.transpose(img_chw, [1, 2, 0])
@@ -124,52 +122,16 @@ def drawBBoxes(img_chw, pred):
 
     # The class label is a one-hot-label encoding for is-object and
     # is-not-object. Determine which option the network deemed more likely.
-    bboxes = pred[:4, :, :]
-    labels = pred[4:, :, :]
+    bboxes, labels = pred[:4], pred[4:]
     labels = np.argmax(labels, axis=0)
 
-    mul = im_height / ft_height
-    ofs = mul / 2
-
-    # Iterate over every position of the feature map and determine if the
-    # network found an object. Add the estimated BBox if it did.
-    out = []
-    for fy in range(ft_height):
-        for fx in range(ft_width):
-            label = labels[fy, fx]
-            if label == 0:
-                continue
-
-            # Convert the current feature map position to the corresponding
-            # image coordinates.
-            anchor_x = fx * mul + ofs
-            anchor_y = fy * mul + ofs
-
-            # BBox in image coordinates.
-            bbox = bboxes[:, fy, fx]
-
-            # The BBox parameters are relative to the anchor position and
-            # size. Here we convert those relative values back to absolute
-            # values in the original image.
-            bbox_x = bbox[0] + anchor_x
-            bbox_y = bbox[1] + anchor_y
-            bbox_half_width = bbox[2] / 2
-            bbox_half_height = bbox[3] / 2
-
-            # Ignore invalid BBoxes.
-            if bbox_half_width < 2 or bbox_half_height < 2:
-                continue
-
-            # Compute BBox corners and clip them at the image boundaries.
-            x0, y0 = bbox_x - bbox_half_width, bbox_y - bbox_half_height
-            x1, y1 = bbox_x + bbox_half_width, bbox_y + bbox_half_height
-            x0, x1 = np.clip([x0, x1], 0, im_width - 1)
-            y0, y1 = np.clip([y0, y1], 0, im_height - 1)
-            out.append(np.array([label, x0, y0, x1, y1], np.int32))
+    # Compile BBox data from network output.
+    im_dim = img_chw.shape[1:]
+    bboxes = gen_bbox_labels.bboxFromNetOutput(im_dim, bboxes, labels)
 
     img_bbox = np.array(img)
-    img_label = np.zeros((im_height, im_width), np.float32)
-    for label, x0, y0, x1, y1 in out:
+    img_label = np.zeros(im_dim, np.float32)
+    for label, x0, y0, x1, y1 in bboxes:
         cx = int(np.mean([x0, x1]))
         cy = int(np.mean([y0, y1]))
         img_label[cy, cx] = label
