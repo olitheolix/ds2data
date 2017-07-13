@@ -202,29 +202,37 @@ def main():
     print('\n----- Data Set -----')
     ds = data_loader.BBox(conf)
     ds.printSummary()
-    num_classes = len(ds.classNames())
+    num_cls = len(ds.classNames())
     im_dim = ds.imageDimensions().tolist()
-    ft_dim = (128, 128)
 
     # Input/output/parameter tensors for network.
-    print('\n----- Network -----')
-    dtype = tf.float32
-    x_in = tf.placeholder(dtype, [None, *im_dim], name='x_in')
-    y_in = tf.placeholder(dtype, [None, 4 + num_classes, *ft_dim], name='y_in')
-    mask_cls_in = tf.placeholder(dtype, [None, *ft_dim], name='mask_cls')
-    mask_bbox_in = tf.placeholder(dtype, [None, *ft_dim], name='mask_bbox')
-    lrate_in = tf.placeholder(dtype, name='lrate')
+    print('\n----- Network Setup -----')
+    tf_dtype, np_dtype = tf.float32, np.float32
 
-    # Build the shared layers and connect it to the RPN layers.
+    # Determine which network state to restore, if any.
     if restore:
-        shared_out = shared_net.setup(fnames['shared_net'], True, x_in)
-        rpn_out = rpn_net.setup(fnames['rpn_net'], True, shared_out)
+        fn_sh = fnames['shared_net']
+        fn_rpn = fnames['rpn_net']
     else:
-        shared_out = shared_net.setup(None, True, x_in)
-        rpn_out = rpn_net.setup(None, True, shared_out)
-    rpn_cost = rpn_net.cost(rpn_out, y_in, num_classes, mask_cls_in, mask_bbox_in)
+        fn_sh = fn_rpn = None
 
-    # Select the optimiser and initialise the TF graph.
+    # Create the input variable, the shared network and the RPN.
+    x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
+    shared_out = shared_net.setup(fn_sh, True, x_in, np_dtype)
+    rpn_out = rpn_net.setup(fn_rpn, True, shared_out, num_cls, np_dtype)
+    del fn_sh, fn_rpn
+
+    # The size of the shared-net output determines the size of the RPN input.
+    # We only need this for training purposes in order to create the masks and
+    # desired output 'y'.
+    ft_dim = tuple(shared_out.shape.as_list()[2:])
+    y_in = tf.placeholder(tf_dtype, [None, 4 + num_cls, *ft_dim], name='y_in')
+    mask_cls_in = tf.placeholder(tf_dtype, [None, *ft_dim], name='mask_cls')
+    mask_bbox_in = tf.placeholder(tf_dtype, [None, *ft_dim], name='mask_bbox')
+    lrate_in = tf.placeholder(tf_dtype, name='lrate')
+
+    # Select cost function, optimiser and initialise the TF graph.
+    rpn_cost = rpn_net.cost(rpn_out, y_in, num_cls, mask_cls_in, mask_bbox_in)
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(rpn_cost)
     sess.run(tf.global_variables_initializer())
 
@@ -236,6 +244,7 @@ def main():
             lrate = 1E-4
             trainEpoch(conf, ds, sess, log, opt, lrate)
 
+            # Save the network states and log data.
             rpn_net.save(fnames['rpn_net'], sess)
             shared_net.save(fnames['shared_net'], sess)
             meta = {'conf': conf, 'log': log}
