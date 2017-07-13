@@ -180,10 +180,6 @@ def showBBoxData(img, y_bbox, y_score):
         img_bbox[y0, x0:x1, :] = 255
         img_bbox[y1, x0:x1, :] = 255
 
-    # Matplotlib cannot deal with float16, so convert it.
-    y_bbox = y_bbox.astype(np.float32)
-    y_score = y_score.astype(np.float32)
-
     plt.figure()
     plt.subplot(2, 2, 1)
     plt.imshow(img)
@@ -194,11 +190,12 @@ def showBBoxData(img, y_bbox, y_score):
     plt.title('Pred BBoxes')
 
     plt.subplot(2, 2, 3)
-    plt.imshow(y_bbox[0])
+    plt.imshow(labels.astype(np.float32))
     plt.title('GT Label')
 
+    score = np.amax(y_score, axis=0).astype(np.float32)
     plt.subplot(2, 2, 4)
-    plt.imshow(np.amax(y_score, axis=0), cmap='hot')
+    plt.imshow(score, cmap='hot')
     plt.title('GT Score')
 
     plt.show()
@@ -217,7 +214,7 @@ def main():
     # Sampling ratio between original image and feature map.
     sample_rat = 4
 
-    # Find all background image files and strip of the file extension (we will
+    # Find all background image files and strip off the file extension (we will
     # need to load meta file with the same prefix).
     fnames = glob.glob(os.path.join(stamped_path, '*.jpg'))
     fnames = [_[:-4] for _ in sorted(fnames)]
