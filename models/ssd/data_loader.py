@@ -2,7 +2,6 @@
 import os
 import glob
 import pickle
-import scipy.signal
 import numpy as np
 
 from PIL import Image
