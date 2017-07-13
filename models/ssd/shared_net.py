@@ -79,7 +79,7 @@ def model(x_img, bwt1, bwt2):
 
 
 def save(fname, sess):
-    """ Save all pickled network variables to a `fname`.
+    """ Save the pickled network state to `fname`.
 
     Args:
         fname: str

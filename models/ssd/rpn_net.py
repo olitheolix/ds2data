@@ -94,7 +94,7 @@ def cost(pred_net, gt_net, num_classes, mask_cls, mask_bbox):
 
 
 def save(fname, sess):
-    """ Save all pickled network variables to a `fname`.
+    """ Save the pickled network state to `fname`.
 
     Args:
         fname: str
