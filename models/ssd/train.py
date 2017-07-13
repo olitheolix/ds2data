@@ -135,7 +135,7 @@ def showMask(img_chw, mask_cls, mask_bbox):
 
 def showLogs(log):
     plt.figure()
-    plt.subplot(1, 4, 1)
+    plt.subplot(2, 2, 1)
     cost_filt = np.convolve(log['cost'], np.ones(7) / 7, mode='same')
     plt.plot(log['cost'])
     plt.plot(cost_filt, '--r')
@@ -143,7 +143,7 @@ def showLogs(log):
     plt.title('Cost')
     plt.ylim(0, max(log['cost']))
 
-    plt.subplot(1, 4, 2)
+    plt.subplot(2, 2, 2)
     cls_correct = 100 * (1 - np.array(log['cls']))
     cls_correct_filt = np.convolve(cls_correct, np.ones(7) / 7, mode='same')
     plt.plot(cls_correct)
@@ -152,7 +152,7 @@ def showLogs(log):
     plt.title('Class Accuracy')
     plt.ylim(0, 100)
 
-    plt.subplot(1, 4, 3)
+    plt.subplot(2, 2, 3)
     x = np.array(log['x']).T
     plt.plot(x[1], label='Maximum')
     plt.plot(x[0], label='Median')
@@ -161,7 +161,7 @@ def showLogs(log):
     plt.legend(loc='best')
     plt.title('Error Position X')
 
-    plt.subplot(1, 4, 4)
+    plt.subplot(2, 2, 4)
     w = np.array(log['w']).T
     plt.plot(w[1], label='Maximum')
     plt.plot(w[0], label='Median')
