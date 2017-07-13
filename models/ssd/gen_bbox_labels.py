@@ -112,7 +112,7 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh):
     return out, bbox_score
 
 
-def bboxFromTrainingData(im_dim, bboxes, bbox_labels):
+def bboxFromNetOutput(im_dim, bboxes, bbox_labels):
     assert bboxes.ndim == 3
     assert bboxes.shape[0] == 4
 
@@ -170,7 +170,7 @@ def showBBoxData(img, y_bbox, y_score):
 
     # Convert the training output to BBox positions.
     labels, bboxes = y_bbox[0], y_bbox[1:]
-    bboxes = bboxFromTrainingData(img.shape[:2], bboxes, labels)
+    bboxes = bboxFromNetOutput(img.shape[:2], bboxes, labels)
 
     # Insert the BBox rectangle into the image.
     img_bbox = np.array(img)
