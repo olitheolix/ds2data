@@ -213,6 +213,7 @@ def main():
     # Load the BBox training data.
     ds = data_loader.BBox(conf)
     ds.printSummary()
+    num_cls = len(ds.classNames())
     im_dim = ds.imageDimensions().tolist()
     ft_dim = (128, 128)
 
@@ -221,8 +222,8 @@ def main():
     x_in = tf.placeholder(dtype, [None, *im_dim], name='x_in')
 
     # Build the shared layers and connect it to the RPN layers.
-    shared_out = shared_net.setup(fnames['shared_net'], True, x_in)
-    rpn_out = rpn_net.setup(fnames['rpn_net'], True, shared_out)
+    shared_out = shared_net.setup(fnames['shared_net'], True, x_in, np.float32)
+    rpn_out = rpn_net.setup(fnames['rpn_net'], True, shared_out, num_cls, np.float32)
     sess.run(tf.global_variables_initializer())
 
     # Plot learning information as well as the last used mask for reference.
