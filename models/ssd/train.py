@@ -94,11 +94,9 @@ def logProgress(log, gt, pred, mask_cls, mask_bbox):
 
     # Count the correct label predictions, but only at valid mask positions.
     idx = np.nonzero(mask_cls)[0]
-    matches = (gt_label == pred_label)
-    matches = matches[idx]
-    matches = 100 * np.count_nonzero(matches) / len(matches)
-    log['cls'].append(matches)
-    s1 = f'Cls={matches:.2f}%  '
+    wrong_cls = (gt_label != pred_label)
+    wrong_cls = wrong_cls[idx]
+    cls_err = np.count_nonzero(wrong_cls) / len(wrong_cls)
 
     # Compute the BBox prediction error (L1 norm). Only consider locations
     # where the mask is valid (ie the locations where there actually was a BBox
@@ -106,18 +104,7 @@ def logProgress(log, gt, pred, mask_cls, mask_bbox):
     idx = np.nonzero(mask_bbox)[0]
     bbox_err = np.abs(gt_bbox - pred_bbox)
     bbox_err = bbox_err[:, idx]
-
-    # Compute Median/Max stats for x, y, width and height of BBox.
-    bb_med = np.median(bbox_err, axis=1)
-    bb_max = np.max(bbox_err, axis=1)
-    s2 = f'X={bb_med[0]:.1f}, {bb_max[0]:.1f}  '
-    s3 = f'W={bb_med[2]:.1f}, {bb_max[2]:.1f}  '
-    log['x'].append([bb_med[0], bb_max[0]])
-    log['y'].append([bb_med[1], bb_max[1]])
-    log['w'].append([bb_med[2], bb_max[2]])
-    log['h'].append([bb_med[3], bb_max[3]])
-
-    return s1 + s2 + s3
+    return bbox_err, cls_err
 
 
 def showMask(img_chw, mask_cls, mask_bbox):
@@ -157,9 +144,10 @@ def showLogs(log):
     plt.ylim(0, max(log['cost']))
 
     plt.subplot(1, 4, 2)
-    cost_filt = np.convolve(log['cls'], np.ones(7) / 7, mode='same')
-    plt.plot(log['cls'])
-    plt.plot(cost_filt, '--r')
+    cls_correct = 100 * (1 - np.array(log['cls']))
+    cls_correct_filt = np.convolve(cls_correct, np.ones(7) / 7, mode='same')
+    plt.plot(cls_correct)
+    plt.plot(cls_correct_filt, '--r')
     plt.grid()
     plt.title('Class Accuracy')
     plt.ylim(0, 100)
@@ -183,6 +171,33 @@ def showLogs(log):
     plt.title('Error Width')
 
 
+def validate(log, sess, ds, ft_dim, x_in, rpn_out):
+    print('Test Set')
+    ds.reset()
+    mask_cls = mask_bbox = np.ones(ft_dim, np.float32)
+    bb_max, bb_med, cls_cor = [], [], []
+    while True:
+        x, y, meta = ds.nextBatch(1, 'train')
+        if len(x) == 0:
+            break
+
+        # Predict. Ensure there are no NaN in the output.
+        pred = sess.run(rpn_out, feed_dict={x_in: x})
+        bb_err, cls_err = logProgress(log, y[0], pred[0], mask_cls, mask_bbox)
+        cls_cor.append(1 - cls_err)
+        bb_max.append(np.max(bb_err, axis=1))
+        bb_med.append(np.median(bb_err, axis=1))
+
+    cls_cor = 100 * np.mean(cls_cor)
+    bb_max = np.max(bb_max, axis=0)
+    bb_med = np.mean(bb_med, axis=0)
+    print(f'  Correct Class: {cls_cor:.1f}%')
+    print(f'  X: {bb_med[0]:.1f} {bb_med[0]:.1f}')
+    print(f'  Y: {bb_med[1]:.1f} {bb_med[1]:.1f}')
+    print(f'  W: {bb_med[2]:.1f} {bb_med[2]:.1f}')
+    print(f'  H: {bb_med[3]:.1f} {bb_med[3]:.1f}')
+
+
 def main():
     sess = tf.Session()
     data_path = os.path.dirname(os.path.abspath(__file__))
@@ -192,7 +207,7 @@ def main():
     conf = config.NetConf(
         width=512, height=512, colour='rgb', seed=0, num_dense=32, keep_model=0.8,
         path=data_path, names=None,
-        batch_size=16, num_epochs=10, train_rat=0.8, num_samples=10
+        batch_size=16, num_epochs=100, train_rat=0.8, num_samples=10
     )
 
     # Load the BBox training data.
@@ -222,7 +237,7 @@ def main():
     log = collections.defaultdict(list)
     epoch, batch, first = 0, -1, True
     try:
-        while epoch < conf.num_epochs:
+        while epoch <= conf.num_epochs:
             # Get the next image or reset the data store if we have reached the
             # end of an epoch.
             x, y, meta = ds.nextBatch(1, 'train')
@@ -255,15 +270,31 @@ def main():
             cost, _ = sess.run([rpn_cost, opt], feed_dict=fd)
             log['cost'].append(cost)
 
-            # Print progress report.
-            s = logProgress(log, y[0], pred[0], mask_cls[0], mask_bbox[0])
-            print(f'  {batch:,}: Cost: {int(cost):,}  ' + s)
+            # Compute training statistics.
+            bb_err, cls_err = logProgress(log, y[0], pred[0], mask_cls[0], mask_bbox[0])
+            bb_max = np.max(bb_err, axis=1)
+            bb_med = np.median(bb_err, axis=1)
+
+            # Log training stats for plotting later.
+            log['cls'].append(cls_err)
+            log['x'].append([bb_med[0], bb_max[0]])
+            log['y'].append([bb_med[1], bb_max[1]])
+            log['w'].append([bb_med[2], bb_max[2]])
+            log['h'].append([bb_med[3], bb_max[3]])
+
+            # Print progress report to terminal.
+            s1 = f'ClsErr={100 * cls_err:.1f}%  '
+            s2 = f'X={bb_med[0]:.1f}, {bb_max[0]:.1f}  '
+            s3 = f'W={bb_med[2]:.1f}, {bb_max[2]:.1f}  '
+            print(f'  {batch:,}: Cost: {int(cost):,}  ' + s1 + s2 + s3)
     except KeyboardInterrupt:
         pass
 
     # Plot learning information as well as the last used mask for reference.
     showLogs(log)
-    showMask(x[0], mask_cls[0], mask_bbox[0])
+#    showMask(x[0], mask_cls[0], mask_bbox[0])
+    validate(log, sess, ds, ft_dim, x_in, rpn_out)
+
     plt.show()
 
 
