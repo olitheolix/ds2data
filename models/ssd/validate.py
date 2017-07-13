@@ -201,11 +201,13 @@ def main():
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     net_path = os.path.join(cur_dir, 'netstate')
 
-    fname_logs = os.path.join(net_path, 'log.pickle')
-    fname_rpn_net = os.path.join(net_path, 'rpn-net.pickle')
-    fname_shared_net = os.path.join(net_path, 'shared-net.pickle')
+    fnames = {
+        'meta': os.path.join(net_path, 'rpn-meta.pickle'),
+        'rpn_net': os.path.join(net_path, 'rpn-net.pickle'),
+        'shared_net': os.path.join(net_path, 'shared-net.pickle'),
+    }
 
-    meta = pickle.load(open(fname_logs, 'rb'))
+    meta = pickle.load(open(fnames['meta'], 'rb'))
     conf, log = meta['conf'], meta['log']
 
     # Load the BBox training data.
@@ -219,8 +221,8 @@ def main():
     x_in = tf.placeholder(dtype, [None, *im_dim], name='x_in')
 
     # Build the shared layers and connect it to the RPN layers.
-    shared_out = shared_net.setup(fname_shared_net, True, x_in)
-    rpn_out = rpn_net.setup(fname_rpn_net, True, shared_out)
+    shared_out = shared_net.setup(fnames['shared_net'], True, x_in)
+    rpn_out = rpn_net.setup(fnames['rpn_net'], True, shared_out)
     sess.run(tf.global_variables_initializer())
 
     # Plot learning information as well as the last used mask for reference.
