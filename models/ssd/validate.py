@@ -11,32 +11,6 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 
 
-def plotMasks(img_chw, mask_cls, mask_bbox):
-    # Mask must be Gray scale images, and img_chw must be RGB.
-    assert mask_cls.ndim == mask_cls.ndim == 2
-    assert img_chw.ndim == 3 and img_chw.shape[0] == 3
-
-    # Convert to HWC format for Matplotlib.
-    img = np.transpose(img_chw, [1, 2, 0]).astype(np.float32)
-
-    # Matplotlib only likes float32.
-    mask_cls = mask_cls.astype(np.float32)
-    mask_bbox = mask_bbox.astype(np.float32)
-
-    plt.figure()
-    plt.subplot(2, 2, 1)
-    plt.imshow(img, cmap='gray')
-    plt.title('Input Image')
-
-    plt.subplot(2, 2, 2)
-    plt.imshow(mask_cls, cmap='gray', clim=[0, 1])
-    plt.title('Active Regions')
-
-    plt.subplot(2, 2, 3)
-    plt.imshow(mask_bbox, cmap='gray', clim=[0, 1])
-    plt.title('Valid BBox in Active Regions')
-
-
 def plotTrainingProgress(log):
     plt.figure()
     plt.subplot(2, 2, 1)
@@ -115,16 +89,31 @@ def validateTestEpoch(log, sess, ds, ft_dim, x_in, rpn_out):
     print(f'  W: {bb_med[2]:.1f} {bb_med[2]:.1f}')
     print(f'  H: {bb_med[3]:.1f} {bb_med[3]:.1f}')
 
-    # Plot a class/bbox mask.
-    ds.reset()
-    x, y, meta = ds.nextBatch(1, 'test')
-    assert len(x) > 0
-    pred = sess.run(rpn_out, feed_dict={x_in: x})
-    mask_cls, mask_bbox = train.computeMasks(y)
-    plotMasks(x[0], mask_cls[0], mask_bbox[0])
 
-    # Create a plot with the predicted BBoxes.
-    drawBBoxes(x[0], pred[0])
+def plotMasks(img_chw, mask_cls, mask_bbox):
+    # Mask must be Gray scale images, and img_chw must be RGB.
+    assert mask_cls.ndim == mask_cls.ndim == 2
+    assert img_chw.ndim == 3 and img_chw.shape[0] == 3
+
+    # Convert to HWC format for Matplotlib.
+    img = np.transpose(img_chw, [1, 2, 0]).astype(np.float32)
+
+    # Matplotlib only likes float32.
+    mask_cls = mask_cls.astype(np.float32)
+    mask_bbox = mask_bbox.astype(np.float32)
+
+    plt.figure()
+    plt.subplot(2, 2, 1)
+    plt.imshow(img, cmap='gray')
+    plt.title('Input Image')
+
+    plt.subplot(2, 2, 2)
+    plt.imshow(mask_cls, cmap='gray', clim=[0, 1])
+    plt.title('Active Regions')
+
+    plt.subplot(2, 2, 3)
+    plt.imshow(mask_bbox, cmap='gray', clim=[0, 1])
+    plt.title('Valid BBox in Active Regions')
 
 
 def drawBBoxes(img_chw, pred):
@@ -172,6 +161,19 @@ def drawBBoxes(img_chw, pred):
     plt.title('GT Label')
 
 
+def createDebugPlots(ds, sess, rpn_out, x_in):
+    # Plot a class/bbox mask.
+    ds.reset()
+    x, y, meta = ds.nextBatch(1, 'test')
+    assert len(x) > 0
+    pred = sess.run(rpn_out, feed_dict={x_in: x})
+    mask_cls, mask_bbox = train.computeMasks(y)
+    plotMasks(x[0], mask_cls[0], mask_bbox[0])
+
+    # Create a plot with the predicted BBoxes.
+    drawBBoxes(x[0], pred[0])
+
+
 def main():
     sess = tf.Session()
     cur_dir = os.path.dirname(os.path.abspath(__file__))
@@ -208,10 +210,13 @@ def main():
     rpn_out = rpn_net.setup(fnames['rpn_net'], True, shared_out, num_cls, np_dtype)
     sess.run(tf.global_variables_initializer())
 
-    # Plot learning information as well as the last used mask for reference.
-    plotTrainingProgress(log)
+    # Compute and print statistics from test data set.
     validateTestEpoch(log, sess, ds, ft_dim, x_in, rpn_out)
 
+    # Plot the learning progress and other debug plots like masks and an image
+    # with predicted BBoxes.
+    plotTrainingProgress(log)
+    createDebugPlots(ds, sess, rpn_out, x_in)
     plt.show()
 
 
