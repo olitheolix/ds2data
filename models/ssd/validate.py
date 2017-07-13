@@ -10,7 +10,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 
 
-def showMask(img_chw, mask_cls, mask_bbox):
+def plotMasks(img_chw, mask_cls, mask_bbox):
     # Mask must be Gray scale images, and img_chw must be RGB.
     assert mask_cls.ndim == mask_cls.ndim == 2
     assert img_chw.ndim == 3 and img_chw.shape[0] == 3
@@ -36,7 +36,7 @@ def showMask(img_chw, mask_cls, mask_bbox):
     plt.title('Valid BBox in Active Regions')
 
 
-def showLogs(log):
+def plotTrainingProgress(log):
     plt.figure()
     plt.subplot(2, 2, 1)
     cost_filt = np.convolve(log['cost'], np.ones(7) / 7, mode='same')
@@ -74,8 +74,7 @@ def showLogs(log):
     plt.title('Error Width')
 
 
-def validate(log, sess, ds, ft_dim, x_in, rpn_out):
-    print('Test Set')
+def validateTestEpoch(log, sess, ds, ft_dim, x_in, rpn_out):
     ds.reset()
     mask_cls = mask_bbox = np.ones(ft_dim, np.float32)
     bb_max, bb_med, cls_cor = [], [], []
@@ -106,7 +105,7 @@ def validate(log, sess, ds, ft_dim, x_in, rpn_out):
     assert len(x) > 0
     pred = sess.run(rpn_out, feed_dict={x_in: x})
     mask_cls, mask_bbox = train.computeMasks(y)
-    showMask(x[0], mask_cls[0], mask_bbox[0])
+    plotMasks(x[0], mask_cls[0], mask_bbox[0])
 
     # Create a plot with the predicted BBoxes.
     drawBBoxes(x[0], pred[0])
@@ -233,8 +232,8 @@ def main():
     sess.run(tf.global_variables_initializer())
 
     # Plot learning information as well as the last used mask for reference.
-    showLogs(log)
-    validate(log, sess, ds, ft_dim, x_in, rpn_out)
+    plotTrainingProgress(log)
+    validateTestEpoch(log, sess, ds, ft_dim, x_in, rpn_out)
 
     plt.show()
 
