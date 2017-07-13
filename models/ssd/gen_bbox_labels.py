@@ -112,23 +112,22 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh):
     return out, bbox_score
 
 
-def bboxFromTrainingData(im_dim, y_bbox):
-    assert y_bbox.ndim == 3
-    assert y_bbox.shape[0] == 5
+def bboxFromTrainingData(im_dim, bboxes, bbox_labels):
+    assert bboxes.ndim == 3
+    assert bboxes.shape[0] == 4
 
     im_height, im_width = im_dim
-    ft_height, ft_width = y_bbox[0].shape
+    ft_height, ft_width = bboxes.shape[1:]
 
     mul = im_height / ft_height
     ofs = mul / 2
-    labels, bboxes = y_bbox[0], y_bbox[1:]
 
     # Iterate over every position of the feature map and determine if the
     # network found an object. Add the estimated BBox if it did.
     out = []
     for fy in range(ft_height):
         for fx in range(ft_width):
-            label = labels[fy, fx]
+            label = bbox_labels[fy, fx]
             if label == 0:
                 continue
 
@@ -170,7 +169,8 @@ def showBBoxData(img, y_bbox, y_score):
     assert img.shape[2] == 3
 
     # Convert the training output to BBox positions.
-    bboxes = bboxFromTrainingData(img.shape[:2], y_bbox)
+    labels, bboxes = y_bbox[0], y_bbox[1:]
+    bboxes = bboxFromTrainingData(img.shape[:2], bboxes, labels)
 
     # Insert the BBox rectangle into the image.
     img_bbox = np.array(img)
