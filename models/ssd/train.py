@@ -38,8 +38,8 @@ def computeMasks(y):
     # activate them in the mask.
     idx = np.nonzero(hot_labels[0])[0].tolist()
     assert len(idx) == n_bg
-    if n_bg > n_fg // num_classes:
-        idx = random.sample(idx, n_fg // num_classes)
+    if n_bg > n_fg:
+        idx = random.sample(idx, n_fg)
     mask_cls[idx] = 1
 
     # Set the mask for all locations where there is an object.
