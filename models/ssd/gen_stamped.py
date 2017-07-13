@@ -48,6 +48,48 @@ def createForegroundShapes(N, width, height):
     return out
 
 
+def loadForegroundShapes(N, width, height):
+    base = os.path.dirname(os.path.abspath(__file__))
+    base = os.path.join(base, 'data', 'shapes')
+    out = {}
+
+    thresh = 50 * width * height
+
+    # Load cubes for all 10 labels.
+    for i in range(10):
+        # Path to cubes with current label (ie number of side).
+        name = f'{i:02d}'
+        path = os.path.join(base, name)
+        fnames = glob.glob(os.path.join(path, '*.jpg'))
+
+        # Load all cubes and assign an alpha map. Skip cubes that are too dark
+        # as they have no chance of being identified.
+        out[name] = []
+        for j, fname in enumerate(fnames[:N]):
+            # Load the image and convert to NumPy array.
+            img = Image.open(fname).convert('RGBA')
+            if img.size != (width, height):
+                img = img.resize((width, height))
+            img = np.array(img, np.uint8)
+
+            # Crappy threshold to remove images that are too dark.
+            if np.sum(img[:, :, :3]) < thresh:
+                continue
+
+            # Compute alpha mask. Basically, we _hope_ that dark areas are
+            # outside the cube.
+            intensity = np.sum(np.array(img[:, :, :3], np.float32), axis=2)
+            img[:, :, 3] = np.interp(intensity, [0, 20, 30, 255], [0, 25, 255, 255])
+
+            # Store the image.
+            out[name].append(img)
+
+        # Convert the list of NumPy arrays to a single NumPy array.
+        out[name] = np.array(out[name], np.uint8)
+        assert out[name].shape[1:] == (height, width, 4)
+    return out
+
+
 def findBackgroundImages(path):
     """Return list of background image file names"""
     # Abort if the data set does not exist.
@@ -159,7 +201,8 @@ def main():
     assert len(bg_fnames) > 0
 
     # Load the foreground objects.
-    shapes = createForegroundShapes(width=32, height=32)
+    shapes = createForegroundShapes(N=10, width=32, height=32)
+    shapes = loadForegroundShapes(N=10, width=32, height=32)
 
     # Compile a map to convert a label ID to its human readable name. Note that
     # this is 1-based because label 0 will always be reserved for the
