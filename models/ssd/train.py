@@ -15,11 +15,13 @@ def computeMasks(y):
     batch, _, height, width = y.shape
     assert batch == 1
 
+    # Grab the portion of the network output that encodes the BBox data.
     hot_labels = y[0, 4:, :, :]
     num_classes = len(hot_labels)
     hot_labels = np.reshape(hot_labels, [num_classes, -1])
     del y
 
+    # Allocate the mask arrays.
     mask_cls = np.zeros(height * width, np.float16)
     mask_bbox = np.zeros_like(mask_cls)
 
@@ -31,11 +33,9 @@ def computeMasks(y):
     n_bg = int(np.sum(hot_labels[0]))
     n_fg = int(np.sum(hot_labels[1:]))
 
-    # We want an even split of how many locations there with an arbitrary
-    # object, and without any object at all. To do that we identify all
-    # locations without object and then randomly pick a subset of these. Then
-    # we will set the mask to '1' for all of them, as well as for all locations
-    # with an object.
+    # Evenly split the number of locations with- and without an object. To do
+    # that we identify all locations without object, select a random subset and
+    # activate them in the mask.
     idx = np.nonzero(hot_labels[0])[0].tolist()
     assert len(idx) == n_bg
     if n_bg > n_fg // num_classes:
