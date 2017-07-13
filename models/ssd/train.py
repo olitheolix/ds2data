@@ -199,7 +199,7 @@ def validate(log, sess, ds, ft_dim, x_in, rpn_out):
 
     # Show one mask set specimen.
     ds.reset()
-    x, y, meta = ds.nextBatch(1, 'train')
+    x, y, meta = ds.nextBatch(1, 'test')
     assert len(x) > 0
     pred = sess.run(rpn_out, feed_dict={x_in: x})
     mask_cls, mask_bbox = computeMasks(y)
