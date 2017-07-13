@@ -15,26 +15,37 @@ import numpy as np
 from PIL import Image
 
 
-def createForegroundShapes(width, height):
+def createForegroundShapes(N, width, height):
     """Return hard coded 'square' and 'disc' shape."""
     margin = 2
 
     # Box shape.
-    box = np.zeros((height, width, 3), np.uint8)
+    box = np.zeros((height, width, 4), np.uint8)
     box[margin:-margin, margin:-margin, :] = 255
 
     # Disc shape.
     centre_x = width / 2
     centre_y = height / 2
     circle_radius = min(height, width) // 2 - margin
-    disc = np.zeros((height, width, 3), np.uint8)
+    disc = np.zeros((height, width, 4), np.uint8)
     for y in range(height):
         for x in range(width):
             dist = np.sqrt(((x - centre_x) ** 2 + (y - centre_y) ** 2))
             disc[y, x, :] = 255 if dist < circle_radius else 0
 
+    # Put shapes in a dict for easier processing.
+    shapes = dict(box=box, disc=disc)
+
+    # Replicate each shape N times. Give each shape a random colour.
+    out = {}
+    for name, shape in shapes.items():
+        img = np.array([shape] * N)
+        for i in range(len(img)):
+            img[i, :, :, :3] = img[i, :, :, :3] * np.random.uniform(0.3, 1, 3)
+        out[name] = img
+
     # Save shapes into NumPy array and return it with a human readable mapping.
-    return dict(box=box, disc=disc)
+    return out
 
 
 def findBackgroundImages(path):
@@ -58,8 +69,8 @@ def stampImage(background, fg_shapes, N, xmin, xmax, ymin, ymax):
     assert background.ndim == 3
     assert background.shape[2] == 3
     for fg in fg_shapes.values():
-        assert fg.ndim == 3
-        assert fg.shape[2] == 3
+        assert fg.ndim == 4
+        assert fg.shape[3] == 4
 
     # Convenience
     bg_height, bg_width = background.shape[:2]
@@ -67,7 +78,7 @@ def stampImage(background, fg_shapes, N, xmin, xmax, ymin, ymax):
     bboxes, labels = [], []
     stencil = np.zeros_like(out)
 
-    # Stamp N non-overlapping images into the background. If this proves
+    # Stamp N non-overlapping shapes onto the background. If this proves
     # difficult, abort after `max_attempts` and return what we have so far.
     attempts, max_attempts = 0, 10 * N
     while len(labels) < N and attempts < max_attempts:
@@ -84,37 +95,33 @@ def stampImage(background, fg_shapes, N, xmin, xmax, ymin, ymax):
         if np.sum(stencil[y0:y1, x0:x1]) > 0:
             continue
         stencil[y0:y1, x0:x1] = 1
+        bboxes.append([x0, y0, x1, y1])
 
-        # Pick a random foreground image.
+        # Pick a random foreground label and specimen.
         label = random.choice(list(fg_shapes.keys()))
         labels.append(label)
-        bboxes.append([x0, y0, x1, y1])
-        fg = np.array(fg_shapes[label])
-
-        # Make foreground shape a random colour.
-        for chan in range(fg.shape[2]):
-            fg[:, :, chan] = fg[:, :, chan] * np.random.uniform(0.3, 1)
+        idx = np.random.randint(0, len(fg_shapes[label]) - 1)
+        fg = np.array(fg_shapes[label][idx])
 
         # Scale the foreground image.
         fg = Image.fromarray(fg.astype(np.uint8)).resize((w, h), Image.BILINEAR)
         fg = np.array(fg, np.uint8)
 
-        # Compute a mask to only copy the image portion that contains the
-        # object but not those that contain only the black background.
-        idx = np.nonzero(fg > 30)
-        mask = np.zeros_like(fg)
-        mask[idx] = 1
+        # Separate RGB from alpha and normalise alpha channel for blending.
+        fg, alpha = fg[:, :, :3], fg[:, :, 3]
+        alpha = np.array(alpha, np.float32) / 255
+        alpha = np.stack([alpha, alpha, alpha], axis=2)
 
         # Stamp the foreground object into the background image.
-        out[y0:y1, x0:x1, :] = (1 - mask) * out[y0:y1, x0:x1, :] + mask * fg
+        out[y0:y1, x0:x1] = (1 - alpha) * out[y0:y1, x0:x1] + alpha * fg
     return out, bboxes, labels
 
 
 def generateImages(dst_path, bg_fnames, fg_shapes, int2name, num_img, num_stamps):
     """Create N stamped background images and save them."""
-    xmax = max([_.shape[1] for _ in fg_shapes.values()])
-    ymax = max([_.shape[0] for _ in fg_shapes.values()])
-    xmin, ymin = int(0.5 * xmax), int(0.5 * ymax)
+    xmax = max([_.shape[2] for _ in fg_shapes.values()])
+    ymax = max([_.shape[1] for _ in fg_shapes.values()])
+    xmin, ymin = int(0.95 * xmax), int(0.95 * ymax)
     dims = (xmin, xmax, ymin, ymax)
 
     # Create N images.
