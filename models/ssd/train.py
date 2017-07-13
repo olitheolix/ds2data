@@ -64,7 +64,7 @@ def computeMasks(y):
     return mask_cls, mask_bbox
 
 
-def logProgress(log, gt, pred, mask_cls, mask_bbox):
+def accuracy(log, gt, pred, mask_cls, mask_bbox):
     assert mask_cls.shape == mask_bbox.shape
     assert mask_cls.ndim == mask_bbox.ndim == 2
     assert pred.ndim == gt.ndim == 3
@@ -190,7 +190,7 @@ def main():
             log['cost'].append(cost)
 
             # Compute training statistics.
-            bb_err, cls_err = logProgress(log, y[0], pred[0], mask_cls[0], mask_bbox[0])
+            bb_err, cls_err = accuracy(log, y[0], pred[0], mask_cls[0], mask_bbox[0])
             bb_max = np.max(bb_err, axis=1)
             bb_med = np.median(bb_err, axis=1)
 

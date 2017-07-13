@@ -86,7 +86,7 @@ def validate(log, sess, ds, ft_dim, x_in, rpn_out):
 
         # Predict. Ensure there are no NaN in the output.
         pred = sess.run(rpn_out, feed_dict={x_in: x})
-        bb_err, cls_err = train.logProgress(log, y[0], pred[0], mask_cls, mask_bbox)
+        bb_err, cls_err = train.accuracy(log, y[0], pred[0], mask_cls, mask_bbox)
         cls_cor.append(1 - cls_err)
         bb_max.append(np.max(bb_err, axis=1))
         bb_med.append(np.median(bb_err, axis=1))
