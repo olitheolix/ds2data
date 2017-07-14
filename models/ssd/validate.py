@@ -1,4 +1,5 @@
 import os
+import tqdm
 import train
 import pickle
 import rpn_net
@@ -75,10 +76,10 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     ds.reset()
     fg_tot, bg_tot = [], []
     bb_max, bb_med, fg_fp, bg_fp, fg_correct = [], [], [], [], []
-    while True:
+    N = ds.lenOfEpoch(dset)
+    for i in tqdm.tqdm(range(N)):
         x, y, meta = ds.nextBatch(1, dset)
-        if len(x) == 0:
-            break
+        assert len(x) > 0
 
         # Predict the BBoxes and ensure there are no NaNs in the output.
         _, mask_bbox = train.computeMasks(y)
@@ -107,7 +108,7 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     bb_med = np.mean(bb_med, axis=0)
 
     # Dump the stats to the terminal.
-    print()
+    print(f'\nResults for <{dset}> data set ({N} samples)')
     print(f'  Correct Foreground Class: {fg_correct:.1f}%')
     print(f'  BG False Pos: {bg_fp:,}  Total: {bg_tot:,}')
     print(f'  FG False Pos: {fg_fp:,}  Total: {fg_tot:,}')
