@@ -21,7 +21,7 @@ import numpy as np
 import PIL.Image as Image
 
 
-def computeScore(img_dim_hw, bboxes):
+def computeOverlapScore(img_dim_hw, bboxes):
     assert bboxes.shape[1] == 4
 
     # Find out where the anchor box will overlap with each BBox. To do
@@ -237,7 +237,7 @@ def main():
         bbox_labels = [name2int[_] for _ in meta['labels']]
 
         # Compute the score map for each individual bounding box.
-        bbox_score = computeScore(im_dim, bboxes)
+        bbox_score = computeOverlapScore(im_dim, bboxes)
         y_bbox, y_score = genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh)
         assert y_bbox.shape == (5, *ft_dim)
         assert y_score.shape == (bboxes.shape[0], *im_dim), y_score.shape
