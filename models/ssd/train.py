@@ -11,6 +11,12 @@ import numpy as np
 import tensorflow as tf
 
 
+AccuracyMetrics = collections.namedtuple(
+    'AccuracyMetrics',
+    'bbox_err pred_bg_falsepos pred_fg_falsepos fg_err gt_bg_tot gt_fg_tot'
+)
+
+
 def computeMasks(y):
     batch, _, height, width = y.shape
     assert batch == 1
@@ -96,7 +102,21 @@ def accuracy(log, gt, pred, mask_cls, mask_bbox):
     idx = np.nonzero(mask_cls)[0]
     wrong_cls = (gt_label != pred_label)
     wrong_cls = wrong_cls[idx]
-    cls_err = np.count_nonzero(wrong_cls) / len(wrong_cls)
+
+    # False positive for background: predicted background but is foreground.
+    # Similarly, compute false positive for foreground.
+    gt_bg_idx = set(np.nonzero(gt_label[idx] == 0)[0].tolist())
+    gt_fg_idx = set(np.nonzero(gt_label[idx] != 0)[0].tolist())
+    pred_bg_idx = set(np.nonzero(pred_label[idx] == 0)[0].tolist())
+    pred_fg_idx = set(np.nonzero(pred_label[idx] != 0)[0].tolist())
+    bg_fp = len(pred_bg_idx - gt_bg_idx)
+    fg_fp = len(pred_fg_idx - gt_fg_idx)
+    gt_bg_tot, gt_fg_tot = len(gt_bg_idx), len(gt_fg_idx)
+
+    # Compute label error only for those locations with a foreground object.
+    gt_fg_idx = np.nonzero(gt_label != 0)[0]
+    fg_err = (gt_label[gt_fg_idx] != pred_label[gt_fg_idx])
+    fg_err = np.count_nonzero(fg_err)
 
     # Compute the BBox prediction error (L1 norm). Only consider locations
     # where the mask is valid (ie the locations where there actually was a BBox
@@ -104,7 +124,7 @@ def accuracy(log, gt, pred, mask_cls, mask_bbox):
     idx = np.nonzero(mask_bbox)[0]
     bbox_err = np.abs(gt_bbox - pred_bbox)
     bbox_err = bbox_err[:, idx]
-    return bbox_err, cls_err
+    return AccuracyMetrics(bbox_err, bg_fp, fg_fp, fg_err, gt_bg_tot, gt_fg_tot)
 
 
 def trainEpoch(conf, ds, sess, log, opt, lrate):
