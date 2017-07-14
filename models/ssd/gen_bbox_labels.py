@@ -211,8 +211,9 @@ def main():
     thresh = 0.8
     anchor_dim = (16, 16)
 
-    # Sampling ratio between original image and feature map.
-    sample_rat = 4
+    # Number of downsampling layers in shared network. We will need this to
+    # determine the feature map size based on the input image size.
+    num_layers = 2
 
     # Find all background image files and strip off the file extension (we will
     # need to load meta file with the same prefix).
@@ -228,9 +229,9 @@ def main():
         img = np.array(Image.open(fname + '.jpg', 'r').convert('RGB'), np.uint8)
         img = np.transpose(img, [2, 0, 1])
 
-        # Define the image- and feature dimensions.
+        # Determine the image- and feature dimensions.
         im_dim = img.shape[1:]
-        ft_dim = (np.array(im_dim) / sample_rat).astype(np.int32).tolist()
+        ft_dim = (np.array(im_dim) / 2 ** num_layers).astype(np.int32).tolist()
 
         # Unpack the BBox data and map the human readable labels to numeric ones.
         bboxes = np.array(meta['bboxes'], np.int32)
