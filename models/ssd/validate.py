@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 def plotTrainingProgress(log):
     plt.figure()
-    plt.subplot(2, 2, 1)
+    plt.subplot(2, 3, 1)
     cost_filt = np.convolve(log['cost'], np.ones(7) / 7, mode='same')
     plt.plot(log['cost'])
     plt.plot(cost_filt, '--r')
@@ -21,17 +21,17 @@ def plotTrainingProgress(log):
     plt.title('Cost')
     plt.ylim(0, max(log['cost']))
 
-    plt.subplot(2, 2, 2)
-    cls_correct = 100 * (1 - np.array(log['cls']))
+    plt.subplot(2, 3, 2)
+    cls_correct = 100 * (1 - np.array(log['err_fg']))
     cls_correct_filt = np.convolve(cls_correct, np.ones(7) / 7, mode='same')
     plt.plot(cls_correct)
     plt.plot(cls_correct_filt, '--r')
     plt.grid()
-    plt.title('Class Accuracy')
+    plt.title('Pred FG Label Accuracy')
     plt.ylim(0, 100)
 
-    plt.subplot(2, 2, 3)
-    x = np.array(log['x']).T
+    plt.subplot(2, 3, 3)
+    x = np.array(log['err_x']).T
     plt.plot(x[1], label='Maximum')
     plt.plot(x[0], label='Median')
     plt.ylim(0, max(x[1]))
@@ -39,14 +39,29 @@ def plotTrainingProgress(log):
     plt.legend(loc='best')
     plt.title('Error Position X')
 
-    plt.subplot(2, 2, 4)
-    w = np.array(log['w']).T
+    plt.subplot(2, 3, 4)
+    w = np.array(log['err_w']).T
     plt.plot(w[1], label='Maximum')
     plt.plot(w[0], label='Median')
     plt.ylim(0, max(w[1]))
     plt.grid()
     plt.legend(loc='best')
     plt.title('Error Width')
+
+    plt.subplot(2, 3, 5)
+    bg_fp = np.array(log['bg_falsepos'])
+    plt.plot(bg_fp, label='Background')
+    plt.ylim(0, max(bg_fp))
+    plt.grid()
+    plt.legend(loc='best')
+    plt.title('False Positive Background')
+
+    plt.subplot(2, 3, 6)
+    fg_fp = np.array(log['fg_falsepos'])
+    plt.plot(fg_fp, label='Foreground')
+    plt.ylim(0, max(fg_fp))
+    plt.grid()
+    plt.title('False Positive Foreground')
 
 
 def validateTestEpoch(log, sess, ds, ft_dim, x_in, rpn_out):
@@ -58,7 +73,8 @@ def validateTestEpoch(log, sess, ds, ft_dim, x_in, rpn_out):
     # Predict the BBoxes for every image in the test data set and accumulate
     # error statistics.
     ds.reset()
-    bb_max, bb_med, cls_cor = [], [], []
+    fg_tot, bg_tot = [], []
+    bb_max, bb_med, fg_fp, bg_fp, fg_correct = [], [], [], [], []
     while True:
         x, y, meta = ds.nextBatch(1, 'test')
         if len(x) == 0:
@@ -67,23 +83,34 @@ def validateTestEpoch(log, sess, ds, ft_dim, x_in, rpn_out):
         # Predict the BBoxes and ensure there are no NaNs in the output.
         _, mask_bbox = train.computeMasks(y)
         pred = sess.run(rpn_out, feed_dict={x_in: x})
-        bb_err, cls_err = train.accuracy(log, y[0], pred[0], mask_cls, mask_bbox[0])
+        acc = train.accuracy(log, y[0], pred[0], mask_cls, mask_bbox[0])
 
         # Store the ratio of correct/total labels, as well as median and max
         # stats for the BBox position/size error.
-        cls_cor.append(1 - cls_err)
-        bb_max.append(np.max(bb_err, axis=1))
-        bb_med.append(np.median(bb_err, axis=1))
+        fg_correct.append(1 - acc.fg_err / acc.gt_fg_tot)
+        fg_fp.append(acc.pred_fg_falsepos)
+        bg_fp.append(acc.pred_bg_falsepos)
+        fg_tot.append(acc.gt_fg_tot)
+        bg_tot.append(acc.gt_bg_tot)
+        bb_max.append(np.max(acc.bbox_err, axis=1))
+        bb_med.append(np.median(acc.bbox_err, axis=1))
 
     # Compute the average class prediction error.
-    cls_cor = 100 * np.mean(cls_cor)
+    fg_correct = 100 * np.mean(fg_correct)
+    bg_fp = int(np.mean(bg_fp))
+    fg_fp = int(np.mean(fg_fp))
+    fg_tot = int(np.mean(fg_tot))
+    bg_tot = int(np.mean(bg_tot))
 
     # Compute the worst case BBox pos/size error, and the average median value.
     bb_max = np.max(bb_max, axis=0)
     bb_med = np.mean(bb_med, axis=0)
 
     # Dump the stats to the terminal.
-    print(f'  Correct Class: {cls_cor:.1f}%')
+    print()
+    print(f'  Correct Foreground Class: {fg_correct:.1f}%')
+    print(f'  BG False Pos: {bg_fp:,}  Total: {bg_tot:,}')
+    print(f'  FG False Pos: {fg_fp:,}  Total: {fg_tot:,}')
     print(f'  X: {bb_med[0]:.1f} {bb_med[0]:.1f}')
     print(f'  Y: {bb_med[1]:.1f} {bb_med[1]:.1f}')
     print(f'  W: {bb_med[2]:.1f} {bb_med[2]:.1f}')
