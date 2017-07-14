@@ -187,12 +187,13 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
         s1 = f'FGClsErr={fg_err_rat:.1f}%  '
         s2 = f'X={bb_med[0]:4.1f}, {bb_max[0]:4.1f}  '
         s3 = f'W={bb_med[2]:4.1f}, {bb_max[2]:4.1f}  '
-        s4 = f'FalsePos=(FG={fp_fg:,} BG={fp_bg:,})'
+        s4 = f'FalsePos: FG={fp_fg:,} BG={fp_bg:,}'
         print(f'  {batch:,}: Cost: {int(cost):,}  ' + s1 + s2 + s3 + s4)
 
 
 def main():
-    new_epochs = 2
+    # Number of epochs to simulate.
+    new_epochs = 1000
 
     sess = tf.Session()
 
@@ -218,7 +219,7 @@ def main():
         conf = config.NetConf(
             seed=0, width=512, height=512, colour='rgb',
             keep_prob=0.8, path=data_path, train_rat=0.8,
-            dtype='float32', num_epochs=0, num_samples=10
+            dtype='float32', num_epochs=0, num_samples=None
         )
         print('\n----- New Configuration -----')
     print(conf)
@@ -269,11 +270,13 @@ def main():
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(rpn_cost)
     sess.run(tf.global_variables_initializer())
 
-    print(f'\n----- Training for {conf.num_epochs} Epochs -----')
+    print(f'\n----- Training for another {new_epochs} Epochs -----')
     try:
+        epoch_ofs = conf.num_epochs + 1
         for epoch in range(new_epochs):
-            epoch += conf.num_epochs + 1
+            epoch += epoch_ofs
             print(f'\nEpoch {epoch}')
+
             ds.reset()
             lrate = 1E-4
             trainEpoch(conf, ds, sess, log, opt, lrate)
