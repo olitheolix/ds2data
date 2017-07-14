@@ -273,13 +273,13 @@ def main():
     print(f'\n----- Training for another {new_epochs} Epochs -----')
     try:
         epoch_ofs = conf.num_epochs + 1
+        lrates = np.logspace(-3, -5, new_epochs)
         for epoch in range(new_epochs):
             epoch += epoch_ofs
             print(f'\nEpoch {epoch}')
 
             ds.reset()
-            lrate = 1E-4
-            trainEpoch(conf, ds, sess, log, opt, lrate)
+            trainEpoch(conf, ds, sess, log, opt, lrates[epoch])
 
             # Save the network states and log data.
             rpn_net.save(fnames['rpn_net'], sess)
