@@ -192,6 +192,8 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
 
 
 def main():
+    new_epochs = 2
+
     sess = tf.Session()
 
     # File names.
@@ -216,7 +218,7 @@ def main():
         conf = config.NetConf(
             seed=0, width=512, height=512, colour='rgb',
             keep_prob=0.8, path=data_path, train_rat=0.8,
-            dtype='float32', num_epochs=1000, num_samples=10
+            dtype='float32', num_epochs=0, num_samples=10
         )
         print('\n----- New Configuration -----')
     print(conf)
@@ -269,7 +271,8 @@ def main():
 
     print(f'\n----- Training for {conf.num_epochs} Epochs -----')
     try:
-        for epoch in range(conf.num_epochs):
+        for epoch in range(new_epochs):
+            epoch += conf.num_epochs + 1
             print(f'\nEpoch {epoch}')
             ds.reset()
             lrate = 1E-4
@@ -278,6 +281,7 @@ def main():
             # Save the network states and log data.
             rpn_net.save(fnames['rpn_net'], sess)
             shared_net.save(fnames['shared_net'], sess)
+            conf = conf._replace(num_epochs=epoch)
             meta = {'conf': conf, 'log': log}
             pickle.dump(meta, open(fnames['meta'], 'wb'))
     except KeyboardInterrupt:
