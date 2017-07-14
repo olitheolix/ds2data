@@ -184,11 +184,11 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
         fp_bg = acc.pred_bg_falsepos
         fp_fg = acc.pred_fg_falsepos
         fg_err_rat = 100 * acc.fg_err / acc.gt_fg_tot
-        s1 = f'FGClsErr={fg_err_rat:.1f}%  '
-        s2 = f'X={bb_med[0]:4.1f}, {bb_max[0]:4.1f}  '
-        s3 = f'W={bb_med[2]:4.1f}, {bb_max[2]:4.1f}  '
-        s4 = f'FalsePos: FG={fp_fg:,} BG={fp_bg:,}'
-        print(f'  {batch:,}: Cost: {int(cost):,}  ' + s1 + s2 + s3 + s4)
+        s1 = f'ClsErr={fg_err_rat:4.1f}%  '
+        s2 = f'X=({bb_med[0]:2.0f}, {bb_max[0]:2.0f})  '
+        s3 = f'W=({bb_med[2]:2.0f}, {bb_max[2]:2.0f})  '
+        s4 = f'FalsePos: FG={fp_fg:2.0f} BG={fp_bg:2.0f}'
+        print(f'  {batch:,}: Cost: {int(cost):6,}  ' + s1 + s2 + s3 + s4)
 
 
 def main():
