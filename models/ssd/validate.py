@@ -64,7 +64,7 @@ def plotTrainingProgress(log):
     plt.title('False Positive Foreground')
 
 
-def validateTestEpoch(log, sess, ds, ft_dim, x_in, rpn_out):
+def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     # We want to predict the label at every location. However, we only want to
     # predict the BBox where there are actually objects, which is why we will
     # compute that mask for each image (see inside loop).
@@ -76,7 +76,7 @@ def validateTestEpoch(log, sess, ds, ft_dim, x_in, rpn_out):
     fg_tot, bg_tot = [], []
     bb_max, bb_med, fg_fp, bg_fp, fg_correct = [], [], [], [], []
     while True:
-        x, y, meta = ds.nextBatch(1, 'test')
+        x, y, meta = ds.nextBatch(1, dset)
         if len(x) == 0:
             break
 
@@ -238,7 +238,7 @@ def main():
     sess.run(tf.global_variables_initializer())
 
     # Compute and print statistics from test data set.
-    validateTestEpoch(log, sess, ds, ft_dim, x_in, rpn_out)
+    validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, 'test')
 
     # Plot the learning progress and other debug plots like masks and an image
     # with predicted BBoxes.
