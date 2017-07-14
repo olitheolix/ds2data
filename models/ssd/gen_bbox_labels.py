@@ -58,7 +58,7 @@ def computeScore(img_dim_hw, bboxes):
     return bbox_score
 
 
-def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh):
+def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
     # Compute the BBox parameters that the network will ultimately learn.
     # These are two values to encode the BBox centre (relative to the
     # anchor in the full image), and another two value to encode the
@@ -74,15 +74,6 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh):
             anchor_centre_x = int(fx * mul + ofs)
             anchor_centre_y = int(fy * mul + ofs)
 
-            # Ignore this position unless the anchor is fully inside the image.
-            x0 = anchor_centre_x - anchor_dim[1] // 2
-            y0 = anchor_centre_y - anchor_dim[0] // 2
-            x1 = anchor_centre_x + anchor_dim[1] // 2
-            y1 = anchor_centre_y + anchor_dim[0] // 2
-            if x0 < 0 or x1 >= img_width or y0 < 0 or y1 >= img_height:
-                continue
-            del x0, y0, x1, y1
-
             # Find out if the score in the neighbourhood of the anchor position
             # exceeds the threshold. We need search the neighbourhood, not just
             # a single point, because of the inaccuracy when mapping feature
@@ -96,7 +87,15 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh):
             del x0, x1, y0, y1, tmp
 
             # Unpack the parameters and label for the BBox with the best score.
+            # The corners are in image coordinates.
             bbox_x0, bbox_y0, bbox_x1, bbox_y1 = bboxes[best]
+
+            # Ignore this BBox if it is (partially) outside the image.
+            if bbox_x0 < 0 or bbox_x1 >= img_width:
+                continue
+            if bbox_y0 < 0 or bbox_y1 >= img_height:
+                continue
+
             label_int = bbox_labels[best]
 
             # Compute the BBox location, width and height relative to the
@@ -209,7 +208,6 @@ def main():
     # If BBox overlaps more than `thresh` with anchor then the location will be
     # marked as containing the respective object.
     thresh = 0.8
-    anchor_dim = (16, 16)
 
     # Number of downsampling layers in shared network. We will need this to
     # determine the feature map size based on the input image size.
@@ -240,8 +238,7 @@ def main():
 
         # Compute the score map for each individual bounding box.
         bbox_score = computeScore(im_dim, bboxes)
-        y_bbox, y_score = genBBoxData(
-            bboxes, bbox_labels, bbox_score, ft_dim, anchor_dim, thresh)
+        y_bbox, y_score = genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh)
         assert y_bbox.shape == (5, *ft_dim)
         assert y_score.shape == (bboxes.shape[0], *im_dim), y_score.shape
 
