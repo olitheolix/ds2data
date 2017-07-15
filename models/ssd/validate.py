@@ -119,7 +119,16 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     print(f'  H: {bb_med[3]:.1f} {bb_med[3]:.1f}')
 
 
-def plotMasks(img_chw, mask_cls, mask_bbox):
+def plotMasks(ds, sess):
+    # Plot a class/bbox mask.
+    ds.reset()
+    x, y, meta = ds.nextBatch(1, 'test')
+    assert len(x) > 0
+    mask_cls, mask_bbox = train.computeMasks(y)
+
+    # Unpack tensors and show the masks alongside the image.
+    img_chw, mask_cls, mask_bbox = x[0], mask_cls[0], mask_bbox[0]
+
     # Mask must be Gray scale images, and img_chw must be RGB.
     assert mask_cls.ndim == mask_cls.ndim == 2
     assert img_chw.ndim == 3 and img_chw.shape[0] == 3
@@ -175,7 +184,7 @@ def drawBBoxes(img_chw, bboxes, labels):
         ax.text(x0, y0, f'P: {label}', fontdict=font)
 
 
-def createDebugPlots(ds, sess, rpn_out, x_in):
+def plotBBoxPredictions(ds, sess, rpn_out, x_in):
     # Plot a class/bbox mask.
     ds.reset()
     x, y, meta = ds.nextBatch(1, 'test')
@@ -187,9 +196,6 @@ def createDebugPlots(ds, sess, rpn_out, x_in):
     bboxes, labels = pred[0][:4], pred[0][4:]
     img, mask_cls, mask_bbox = x[0], mask_cls[0], mask_bbox[0]
     del pred, x, y, meta
-
-    # Show the masks alongside the image.
-    plotMasks(img, mask_cls, mask_bbox)
 
     # Convert one-hot label to best guess.
     hard_labels = np.argmax(labels, axis=0)
@@ -271,7 +277,8 @@ def main():
     # Plot the learning progress and other debug plots like masks and an image
     # with predicted BBoxes.
     plotTrainingProgress(log)
-    createDebugPlots(ds, sess, rpn_out, x_in)
+    plotMasks(ds, sess)
+    plotBBoxPredictions(ds, sess, rpn_out, x_in)
     plt.show()
 
 
