@@ -13,7 +13,10 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 
-def predictBBoxes(sess, img, labels, bboxes):
+def predictImage(sess, rpn_out, x_in, x):
+    pred = sess.run(rpn_out, feed_dict={x_in: x})
+    img, bboxes, labels = x[0], pred[0][:4], pred[0][4:]
+
     # Convert one-hot label to best guess.
     hard_labels = np.argmax(labels, axis=0)
 
@@ -46,7 +49,7 @@ def predictBBoxes(sess, img, labels, bboxes):
         # human readable name.
         sm = np.exp(w_labels) / np.sum(np.exp(w_labels))
         out_labels.append(np.argmax(sm) + 1)
-    return bb_dims, out_labels
+    return pred, bb_dims, out_labels
 
 
 def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
@@ -68,9 +71,8 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
         assert len(x) > 0
 
         # Predict the BBoxes and ensure there are no NaNs in the output.
-        pred = sess.run(rpn_out, feed_dict={x_in: x})
-        img, bboxes, labels = x[0], pred[0][:4], pred[0][4:]
-        bb_dims, bb_labels = predictBBoxes(sess, img, labels, bboxes)
+        pred, bb_dims, bb_labels = predictImage(sess, rpn_out, x_in, x)
+        assert not np.any(np.isnan(pred))
 
         _, mask_bbox = train.computeMasks(y)
         acc = train.accuracy(log, y[0], pred[0], mask_cls, mask_bbox[0])
@@ -106,7 +108,7 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     print(f'  W: {bb_med[2]:.1f} {bb_med[2]:.1f}')
     print(f'  H: {bb_med[3]:.1f} {bb_med[3]:.1f}')
 
-    drawBBoxes(img, bb_dims, bb_labels, int2name)
+    drawBBoxes(x[0], bb_dims, bb_labels, int2name)
 
 
 def plotTrainingProgress(log):
