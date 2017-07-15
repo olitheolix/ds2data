@@ -135,12 +135,23 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
 
 
 def smoothSignal(sig, num_drop=5):
-    wl_name = 'coif5'
-    coeff = pywt.wavedec(sig, wl_name)
+    wl_opts = dict(wavelet='coif5', mode='symmetric')
+
+    # The first few elements of our signals of interest tend to be excessively
+    # large (eg the cost during the first few batches). This will badly throw
+    # off the smoothing. To avoid this, we limit the signal amplitude to cover
+    # only the largest 99% of all amplitudes.
+    tmp = np.sort(sig)
+    sig = np.clip(sig, 0, tmp[int(0.99 * len(sig))])
+
+    # Decompose the signal and throw away `num_drop` detail coefficients.
+    coeff = pywt.wavedec(sig, **wl_opts)
     if len(coeff) < num_drop:
         return sig
     coeff = coeff[:-num_drop] + [None] * num_drop
-    return pywt.waverec(coeff, wl_name)
+
+    # Reconstruct the signal from the pruned coefficient set.
+    return pywt.waverec(coeff, **wl_opts)
 
 
 def plotTrainingProgress(log):
