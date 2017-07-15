@@ -120,7 +120,7 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     print(f'  H: {bb_med[3]:.1f} {bb_med[3]:.1f}')
     print(f'  Prediction time per image: {1000 * etime:.0f}ms')
 
-    drawBBoxes(x[0], bb_dims, bb_labels, int2name)
+    showPredictedBBoxes(x[0], bb_dims, bb_labels, int2name)
 
 
 def plotTrainingProgress(log):
@@ -211,7 +211,7 @@ def plotMasks(ds, sess):
     plt.title('Valid BBox in Active Regions')
 
 
-def drawBBoxes(img_chw, bboxes, labels, int2name):
+def showPredictedBBoxes(img_chw, bboxes, labels, int2name):
     assert img_chw.ndim == 3 and img_chw.shape[0] == 3
 
     # Convert image to HWC format for Matplotlib.
