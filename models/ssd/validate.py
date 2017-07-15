@@ -211,7 +211,7 @@ def plotMasks(ds, sess):
     plt.title('Valid BBox in Active Regions')
 
 
-def showPredictedBBoxes(img_chw, bboxes, labels, int2name):
+def showPredictedBBoxes(img_chw, bboxes, labels, gt_labels, int2name):
     assert img_chw.ndim == 3 and img_chw.shape[0] == 3
 
     # Convert image to HWC format for Matplotlib.
@@ -220,7 +220,7 @@ def showPredictedBBoxes(img_chw, bboxes, labels, int2name):
 
     # Parameters for the overlays that will state true/predicted label.
     font = dict(color='white', alpha=0.5, size=16, weight='normal')
-    rect_opts = dict(linewidth=1, facecolor='none', edgecolor='r')
+    rect_opts = dict(linewidth=1, facecolor='none', edgecolor=None)
 
     # Show the input image.
     plt.figure()
@@ -228,9 +228,10 @@ def showPredictedBBoxes(img_chw, bboxes, labels, int2name):
     ax = plt.gca()
 
     # Add the predicted BBoxes and their labels.
-    for label, (x0, y0, x1, y1) in zip(labels, bboxes):
+    for label, (x0, y0, x1, y1), gt_label in zip(labels, bboxes, gt_labels):
         w = x1 - x0 + 1
         h = y1 - y0 + 1
+        rect_opts['edgecolor'] = 'g' if label == gt_label else 'r'
         ax.add_patch(patches.Rectangle((x0, y0), w, h, **rect_opts))
         ax.text(x0, y0, f'P: {int2name[label]}', fontdict=font)
     plt.title('Pred BBoxes')
