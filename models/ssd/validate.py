@@ -133,12 +133,17 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     showPredictedBBoxes(x[0], bb_dims, bb_labels, gt_labels, int2name)
 
 
+def smoothSignal(sig, num_coeff=7):
+    coeff = np.ones(num_coeff) / num_coeff
+    return np.convolve(sig, coeff, mode='same')
+
+
 def plotTrainingProgress(log):
     plt.figure()
     plt.subplot(2, 3, 1)
-    cost_filt = np.convolve(log['cost'], np.ones(7) / 7, mode='same')
+    cost_smooth = smoothSignal(log['cost'], 7)
     plt.plot(log['cost'])
-    plt.plot(cost_filt, '--r')
+    plt.plot(cost_smooth, '--r')
     plt.grid()
     plt.title('Cost')
     plt.ylim(0, max(log['cost']))
