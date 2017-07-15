@@ -28,7 +28,7 @@ def parseCmdline():
 
         The foreground shapes will be loaded from "./data/shapes". This folder
         must contain specimen images for each shape in a separate sub-folder,
-        eg "./data/shapes/dog". Use `--cls-specimen` to limit the number of
+        eg "./data/shapes/dog". Use `-cls-specimen` to limit the number of
         images loaded for each label.
 
         Use the `--dummy-shapes` option to ignore the folder and stamp only
@@ -36,8 +36,8 @@ def parseCmdline():
         because nets are easy to train for those two shapes.
 
         Usage examples:
-          gen_stamped.py --width 32 --height 32 --num-stamps 100
-          gen_stamped.py --dummy-shapes
+          gen_stamped.py -width 32 -height 32 -num-stamps 100
+          gen_stamped.py -dummy-shapes
     ''')
 
     # Create a parser and program description.
@@ -48,15 +48,15 @@ def parseCmdline():
     padd = parser.add_argument
 
     # Add the command line options.
-    padd('--N', metavar='', type=int, default=100,
+    padd('-N', metavar='', type=int, default=100,
          help='Number of output images')
-    padd('--width', metavar='', type=int, default=64, help='Width (default 64)')
-    padd('--height', metavar='', type=int, default=64, help='Height (default 64)')
-    padd('--seed', metavar='', type=int, default=None,
+    padd('-width', metavar='', type=int, default=64, help='Width (default 64)')
+    padd('-height', metavar='', type=int, default=64, help='Height (default 64)')
+    padd('-seed', metavar='', type=int, default=None,
          help='Seed value for reproducible results (default None)')
-    padd('--num-stamps', metavar='', type=int, default=20,
+    padd('-num-stamps', metavar='', type=int, default=20,
          help='Number of objects to embed in each background image (default 20)')
-    padd('--cls-specimen', metavar='', type=int, default=64,
+    padd('-cls-specimen', metavar='', type=int, default=64,
          help='Limit number of specimen images to load for each label')
     padd('--dummy-shapes', action='store_true', default=False,
          help='Use dummy shapes instead of loading them from disk')
