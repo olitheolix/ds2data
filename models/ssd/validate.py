@@ -13,57 +13,40 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 
-def plotTrainingProgress(log):
-    plt.figure()
-    plt.subplot(2, 3, 1)
-    cost_filt = np.convolve(log['cost'], np.ones(7) / 7, mode='same')
-    plt.plot(log['cost'])
-    plt.plot(cost_filt, '--r')
-    plt.grid()
-    plt.title('Cost')
-    plt.ylim(0, max(log['cost']))
+def predictBBoxes(sess, img, labels, bboxes):
+    # Convert one-hot label to best guess.
+    hard_labels = np.argmax(labels, axis=0)
 
-    plt.subplot(2, 3, 2)
-    cls_correct = 100 * (1 - np.array(log['err_fg']))
-    cls_correct_filt = np.convolve(cls_correct, np.ones(7) / 7, mode='same')
-    plt.plot(cls_correct)
-    plt.plot(cls_correct_filt, '--r')
-    plt.grid()
-    plt.title('Pred FG Label Accuracy')
-    plt.ylim(0, 100)
+    # Compile BBox data from network output.
+    assert img.ndim == 3 and img.shape[0] == 3
+    bb_dims, _ = gen_bbox_labels.bboxFromNetOutput(img.shape[1:], bboxes, hard_labels)
 
-    plt.subplot(2, 3, 3)
-    x = np.array(log['err_x']).T
-    plt.plot(x[1], label='Maximum')
-    plt.plot(x[0], label='Median')
-    plt.ylim(0, max(x[1]))
-    plt.grid()
-    plt.legend(loc='best')
-    plt.title('Error Position X')
+    # Suppress overlapping BBoxes.
+    scores = np.ones(len(bb_dims))
+    idx = sess.run(tf.image.non_max_suppression(bb_dims, scores, 30, 0.5))
+    bb_dims = bb_dims[idx]
 
-    plt.subplot(2, 3, 4)
-    w = np.array(log['err_w']).T
-    plt.plot(w[1], label='Maximum')
-    plt.plot(w[0], label='Median')
-    plt.ylim(0, max(w[1]))
-    plt.grid()
-    plt.legend(loc='best')
-    plt.title('Error Width')
+    # Compute the most likely label.
+    # fixme: remove hard coded 4; maybe pass an im2ft_rat to bboxFromNetOutput
+    # and reuse that one?
+    out_labels = []
+    for (x0, y0, x1, y1) in (bb_dims / 4).astype(np.int16):
+        # Compute Gaussian mask to weigh predictions inside BBox.
+        mx = 5 * (np.linspace(-1, 1, x1 - x0) ** 2)
+        my = 5 * (np.linspace(-1, 1, y1 - y0) ** 2)
+        mask = np.outer(np.exp(-my), np.exp(-mx))
 
-    plt.subplot(2, 3, 5)
-    bg_fp = np.array(log['bg_falsepos'])
-    plt.plot(bg_fp, label='Background')
-    plt.ylim(0, max(bg_fp))
-    plt.grid()
-    plt.legend(loc='best')
-    plt.title('False Positive Background')
+        # Extract the predictions inside BBox, except background and compute
+        # the weighted confidence for each label.
+        w_labels = labels[1:, y0:y1, x0:x1] * mask
+        w_labels = np.sum(w_labels, axis=(1, 2))
 
-    plt.subplot(2, 3, 6)
-    fg_fp = np.array(log['fg_falsepos'])
-    plt.plot(fg_fp, label='Foreground')
-    plt.ylim(0, max(fg_fp))
-    plt.grid()
-    plt.title('False Positive Foreground')
+        # Softmax the predictions and determine the ID of the best one. Add '1'
+        # to that ID to account for the removed background and map the ID to a
+        # human readable name.
+        sm = np.exp(w_labels) / np.sum(np.exp(w_labels))
+        out_labels.append(np.argmax(sm) + 1)
+    return bb_dims, out_labels
 
 
 def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
@@ -124,6 +107,59 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     print(f'  H: {bb_med[3]:.1f} {bb_med[3]:.1f}')
 
     drawBBoxes(img, bb_dims, bb_labels, int2name)
+
+
+def plotTrainingProgress(log):
+    plt.figure()
+    plt.subplot(2, 3, 1)
+    cost_filt = np.convolve(log['cost'], np.ones(7) / 7, mode='same')
+    plt.plot(log['cost'])
+    plt.plot(cost_filt, '--r')
+    plt.grid()
+    plt.title('Cost')
+    plt.ylim(0, max(log['cost']))
+
+    plt.subplot(2, 3, 2)
+    cls_correct = 100 * (1 - np.array(log['err_fg']))
+    cls_correct_filt = np.convolve(cls_correct, np.ones(7) / 7, mode='same')
+    plt.plot(cls_correct)
+    plt.plot(cls_correct_filt, '--r')
+    plt.grid()
+    plt.title('Pred FG Label Accuracy')
+    plt.ylim(0, 100)
+
+    plt.subplot(2, 3, 3)
+    x = np.array(log['err_x']).T
+    plt.plot(x[1], label='Maximum')
+    plt.plot(x[0], label='Median')
+    plt.ylim(0, max(x[1]))
+    plt.grid()
+    plt.legend(loc='best')
+    plt.title('Error Position X')
+
+    plt.subplot(2, 3, 4)
+    w = np.array(log['err_w']).T
+    plt.plot(w[1], label='Maximum')
+    plt.plot(w[0], label='Median')
+    plt.ylim(0, max(w[1]))
+    plt.grid()
+    plt.legend(loc='best')
+    plt.title('Error Width')
+
+    plt.subplot(2, 3, 5)
+    bg_fp = np.array(log['bg_falsepos'])
+    plt.plot(bg_fp, label='Background')
+    plt.ylim(0, max(bg_fp))
+    plt.grid()
+    plt.legend(loc='best')
+    plt.title('False Positive Background')
+
+    plt.subplot(2, 3, 6)
+    fg_fp = np.array(log['fg_falsepos'])
+    plt.plot(fg_fp, label='Foreground')
+    plt.ylim(0, max(fg_fp))
+    plt.grid()
+    plt.title('False Positive Foreground')
 
 
 def plotMasks(ds, sess):
@@ -190,42 +226,6 @@ def drawBBoxes(img_chw, bboxes, labels, int2name):
         ax.add_patch(rect)
         name = int2name[label]
         ax.text(x0, y0, f'P: {name}', fontdict=font)
-
-
-def predictBBoxes(sess, img, labels, bboxes):
-    # Convert one-hot label to best guess.
-    hard_labels = np.argmax(labels, axis=0)
-
-    # Compile BBox data from network output.
-    assert img.ndim == 3 and img.shape[0] == 3
-    bb_dims, _ = gen_bbox_labels.bboxFromNetOutput(img.shape[1:], bboxes, hard_labels)
-
-    # Suppress overlapping BBoxes.
-    scores = np.ones(len(bb_dims))
-    idx = sess.run(tf.image.non_max_suppression(bb_dims, scores, 30, 0.5))
-    bb_dims = bb_dims[idx]
-
-    # Compute the most likely label.
-    # fixme: remove hard coded 4; maybe pass an im2ft_rat to bboxFromNetOutput
-    # and reuse that one?
-    out_labels = []
-    for (x0, y0, x1, y1) in (bb_dims / 4).astype(np.int16):
-        # Compute Gaussian mask to weigh predictions inside BBox.
-        mx = 5 * (np.linspace(-1, 1, x1 - x0) ** 2)
-        my = 5 * (np.linspace(-1, 1, y1 - y0) ** 2)
-        mask = np.outer(np.exp(-my), np.exp(-mx))
-
-        # Extract the predictions inside BBox, except background and compute
-        # the weighted confidence for each label.
-        w_labels = labels[1:, y0:y1, x0:x1] * mask
-        w_labels = np.sum(w_labels, axis=(1, 2))
-
-        # Softmax the predictions and determine the ID of the best one. Add '1'
-        # to that ID to account for the removed background and map the ID to a
-        # human readable name.
-        sm = np.exp(w_labels) / np.sum(np.exp(w_labels))
-        out_labels.append(np.argmax(sm) + 1)
-    return bb_dims, out_labels
 
 
 def main():
