@@ -10,6 +10,7 @@ import gen_bbox_labels
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 
 def plotTrainingProgress(log):
@@ -144,49 +145,34 @@ def plotMasks(img_chw, mask_cls, mask_bbox):
     plt.title('Valid BBox in Active Regions')
 
 
-def drawBBoxes(img_chw, pred):
-    assert pred.ndim == 3
+def drawBBoxes(img_chw, bboxes, labels):
     assert img_chw.ndim == 3 and img_chw.shape[0] == 3
 
-    # Unpack the image and convert it to HWC format for Matplotlib later.
+    # Convert image to HWC format for Matplotlib.
     img = np.transpose(img_chw, [1, 2, 0])
     img = (255 * img).astype(np.uint8)
-
-    # The class label is a one-hot-label encoding for is-object and
-    # is-not-object. Determine which option the network deemed more likely.
-    bboxes, labels = pred[:4], pred[4:]
-    labels = np.argmax(labels, axis=0)
-
-    # Compile BBox data from network output.
-    im_dim = img_chw.shape[1:]
-    bboxes = gen_bbox_labels.bboxFromNetOutput(im_dim, bboxes, labels)
-
-    img_bbox = np.array(img)
-    img_label = np.zeros(im_dim, np.float32)
-    for label, x0, y0, x1, y1 in bboxes:
-        cx = int(np.mean([x0, x1]))
-        cy = int(np.mean([y0, y1]))
-        img_label[cy, cx] = label
-
-        img_bbox[y0:y1, x0, :] = 255
-        img_bbox[y0:y1, x1, :] = 255
-        img_bbox[y0, x0:x1, :] = 255
-        img_bbox[y1, x0:x1, :] = 255
 
     # Show the image with BBoxes, without BBoxes, and the predicted object
     # class (with-object, without-object).
     plt.figure()
-    plt.subplot(1, 3, 1)
+    plt.subplot(1, 2, 1)
     plt.imshow(img)
     plt.title('Original Image')
 
-    plt.subplot(1, 3, 2)
-    plt.imshow(img_bbox)
+    ax = plt.subplot(1, 2, 2)
+    plt.imshow(img)
     plt.title('Pred BBoxes')
 
-    plt.subplot(1, 3, 3)
-    plt.imshow(img_label)
-    plt.title('GT Label')
+    # Parameters for the overlays that will state true/predicted label.
+    font = dict(color='white', alpha=0.5, size=16, weight='normal')
+
+    for label, (x0, y0, x1, y1) in zip(labels, bboxes):
+        ll = (x0, y0)
+        w = x1 - x0 + 1
+        h = y1 - y0 + 1
+        rect = patches.Rectangle(ll, w, h, linewidth=1, edgecolor='r', facecolor='none')
+        ax.add_patch(rect)
+        ax.text(x0, y0, f'P: {label}', fontdict=font)
 
 
 def createDebugPlots(ds, sess, rpn_out, x_in):
@@ -196,10 +182,33 @@ def createDebugPlots(ds, sess, rpn_out, x_in):
     assert len(x) > 0
     pred = sess.run(rpn_out, feed_dict={x_in: x})
     mask_cls, mask_bbox = train.computeMasks(y)
-    plotMasks(x[0], mask_cls[0], mask_bbox[0])
 
-    # Create a plot with the predicted BBoxes.
-    drawBBoxes(x[0], pred[0])
+    # Unpack tensors.
+    bboxes, labels = pred[0][:4], pred[0][4:]
+    img, mask_cls, mask_bbox = x[0], mask_cls[0], mask_bbox[0]
+    del pred, x, y, meta
+
+    # Show the masks alongside the image.
+    plotMasks(img, mask_cls, mask_bbox)
+
+    # Convert one-hot label to best guess.
+    labels = np.argmax(labels, axis=0)
+
+    # Compile BBox data from network output.
+    assert img.ndim == 3 and img.shape[0] == 3
+    bboxes = gen_bbox_labels.bboxFromNetOutput(img.shape[1:], bboxes, labels)
+
+    # Suppress overlapping BBoxes.
+    tmp_bb = bboxes[:, 1:]
+    scores = np.ones(len(tmp_bb))
+    idx = sess.run(tf.image.non_max_suppression(tmp_bb, scores, 30, 0.5))
+    bboxes = bboxes[idx]
+    print(f'picked {len(idx)}')
+
+    # Draw the BBoxes.
+    labels, bboxes = bboxes[:, 0], bboxes[:, 1:]
+    labels = labels - 1
+    drawBBoxes(img, bboxes, labels)
 
 
 def main():
