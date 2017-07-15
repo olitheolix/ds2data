@@ -73,13 +73,13 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     # Predict the BBoxes for every image in the test data set and accumulate
     # error statistics.
     ds.reset()
-    fg_tot, bg_tot = [], []
-    bb_max, bb_med, fg_fp, bg_fp, fg_correct = [], [], [], [], []
-    fig_opts = dict(dpi=300, transparent=True, bbox_inches='tight', pad_inches=0)
     N = ds.lenOfEpoch(dset)
     int2name = ds.classNames()
+    fig_opts = dict(dpi=300, transparent=True, bbox_inches='tight', pad_inches=0)
 
     etime = []
+    fg_tot, bg_tot = [], []
+    bb_max, bb_med, fg_fp, bg_fp, fg_correct = [], [], [], [], []
     for i in tqdm.tqdm(range(N)):
         x, y, meta = ds.nextBatch(1, dset)
         assert len(x) > 0
@@ -90,8 +90,10 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
         etime.append(time.perf_counter() - t0)
         assert not np.any(np.isnan(pred))
 
+        # Compute accuracy metrics.
         _, mask_bbox = train.computeMasks(y)
         acc = train.accuracy(log, y[0], pred[0], mask_cls, mask_bbox[0])
+        del mask_bbox
 
         # Store the ratio of correct/total labels, as well as median and max
         # stats for the BBox position/size error.
