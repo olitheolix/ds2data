@@ -190,11 +190,9 @@ def plotBBoxPredictions(ds, sess, rpn_out, x_in):
     x, y, meta = ds.nextBatch(1, 'test')
     assert len(x) > 0
     pred = sess.run(rpn_out, feed_dict={x_in: x})
-    mask_cls, mask_bbox = train.computeMasks(y)
 
     # Unpack tensors.
-    bboxes, labels = pred[0][:4], pred[0][4:]
-    img, mask_cls, mask_bbox = x[0], mask_cls[0], mask_bbox[0]
+    img, bboxes, labels = x[0], pred[0][:4], pred[0][4:]
     del pred, x, y, meta
 
     # Convert one-hot label to best guess.
