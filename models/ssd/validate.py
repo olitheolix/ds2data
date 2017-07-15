@@ -14,16 +14,19 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 
-def predictImage(sess, rpn_out, x_in, x):
+def predictImage(sess, rpn_out, x_in, x, y):
+    # Predict BBoxes and labels.
     pred = sess.run(rpn_out, feed_dict={x_in: x})
-    img, bboxes, labels = x[0], pred[0][:4], pred[0][4:]
 
-    # Convert one-hot label to best guess.
-    hard_labels = np.argmax(labels, axis=0)
+    # Unpack tensors.
+    true_labels = y[0][4:]
+    img, bboxes, pred_labels = x[0], pred[0][:4], pred[0][4:]
+    assert img.ndim == 3 and img.shape[0] == 3
 
     # Compile BBox data from network output.
-    assert img.ndim == 3 and img.shape[0] == 3
+    hard_labels = np.argmax(pred_labels, axis=0)
     bb_dims, _ = gen_bbox_labels.bboxFromNetOutput(img.shape[1:], bboxes, hard_labels)
+    del hard_labels, bboxes
 
     # Suppress overlapping BBoxes.
     scores = np.ones(len(bb_dims))
@@ -33,24 +36,31 @@ def predictImage(sess, rpn_out, x_in, x):
     # Compute the most likely label.
     # fixme: remove hard coded 4; maybe pass an im2ft_rat to bboxFromNetOutput
     # and reuse that one?
-    out_labels = []
+    true_out_labels, pred_out_labels = [], []
     for (x0, y0, x1, y1) in (bb_dims / 4).astype(np.int16):
-        # Compute Gaussian mask to weigh predictions inside BBox.
+        # Compute Gaussian mask to weigh label predictions across BBox.
         mx = 5 * (np.linspace(-1, 1, x1 - x0) ** 2)
         my = 5 * (np.linspace(-1, 1, y1 - y0) ** 2)
         mask = np.outer(np.exp(-my), np.exp(-mx))
 
-        # Extract the predictions inside BBox, except background and compute
-        # the weighted confidence for each label.
-        w_labels = labels[1:, y0:y1, x0:x1] * mask
-        w_labels = np.sum(w_labels, axis=(1, 2))
+        # Weigh up the predictions inside the BBox to decide which label
+        # corresponds best to the BBox. NOTE: remove the background label
+        # because a) the presence of the BBox precludes it and b) it will most
+        # likely dominate everywhere except near the centre of the BBox, since
+        # this is how we trained the network.
+        pred_w_labels = pred_labels[1:, y0:y1, x0:x1] * mask
+        true_w_labels = true_labels[1:, y0:y1, x0:x1] * mask
+        pred_w_labels = np.sum(pred_w_labels, axis=(1, 2))
+        true_w_labels = np.sum(true_w_labels, axis=(1, 2))
 
         # Softmax the predictions and determine the ID of the best one. Add '1'
         # to that ID to account for the removed background and map the ID to a
         # human readable name.
-        sm = np.exp(w_labels) / np.sum(np.exp(w_labels))
-        out_labels.append(np.argmax(sm) + 1)
-    return pred, bb_dims, out_labels
+        pred_sm = np.exp(pred_w_labels) / np.sum(np.exp(pred_w_labels))
+        true_sm = np.exp(true_w_labels) / np.sum(np.exp(true_w_labels))
+        pred_out_labels.append(np.argmax(pred_sm) + 1)
+        true_out_labels.append(np.argmax(true_sm) + 1)
+    return pred, bb_dims, pred_out_labels, true_out_labels
 
 
 def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
@@ -74,7 +84,7 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
 
         # Predict the BBoxes and ensure there are no NaNs in the output.
         t0 = time.perf_counter()
-        pred, bb_dims, bb_labels = predictImage(sess, rpn_out, x_in, x)
+        pred, bb_dims, bb_labels, gt_labels = predictImage(sess, rpn_out, x_in, x, y)
         etime.append(time.perf_counter() - t0)
         assert not np.any(np.isnan(pred))
 
@@ -120,7 +130,7 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     print(f'  H: {bb_med[3]:.1f} {bb_med[3]:.1f}')
     print(f'  Prediction time per image: {1000 * etime:.0f}ms')
 
-    showPredictedBBoxes(x[0], bb_dims, bb_labels, int2name)
+    showPredictedBBoxes(x[0], bb_dims, bb_labels, gt_labels, int2name)
 
 
 def plotTrainingProgress(log):
