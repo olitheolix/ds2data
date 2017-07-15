@@ -111,7 +111,7 @@ def loadForegroundShapes(path, param):
 
     # Makeshift threshold to remove images that are too dark. All images with
     # less cumulative intensity will be considered too dark.
-    thresh = 50 * width * height
+    thresh = 100 * width * height
 
     # Load cubes for all 10 labels.
     out = {}
