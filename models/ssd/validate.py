@@ -78,13 +78,18 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     fg_tot, bg_tot = [], []
     bb_max, bb_med, fg_fp, bg_fp, fg_correct = [], [], [], [], []
     N = ds.lenOfEpoch(dset)
+    int2name = ds.classNames()
+
     for i in tqdm.tqdm(range(N)):
         x, y, meta = ds.nextBatch(1, dset)
         assert len(x) > 0
 
         # Predict the BBoxes and ensure there are no NaNs in the output.
-        _, mask_bbox = train.computeMasks(y)
         pred = sess.run(rpn_out, feed_dict={x_in: x})
+        img, bboxes, labels = x[0], pred[0][:4], pred[0][4:]
+        bb_dims, bb_labels = predictBBoxes(sess, img, labels, bboxes, int2name)
+
+        _, mask_bbox = train.computeMasks(y)
         acc = train.accuracy(log, y[0], pred[0], mask_cls, mask_bbox[0])
 
         # Store the ratio of correct/total labels, as well as median and max
@@ -117,6 +122,8 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     print(f'  Y: {bb_med[1]:.1f} {bb_med[1]:.1f}')
     print(f'  W: {bb_med[2]:.1f} {bb_med[2]:.1f}')
     print(f'  H: {bb_med[3]:.1f} {bb_med[3]:.1f}')
+
+    drawBBoxes(img, bb_dims, bb_labels)
 
 
 def plotMasks(ds, sess):
@@ -184,17 +191,7 @@ def drawBBoxes(img_chw, bboxes, labels):
         ax.text(x0, y0, f'P: {label}', fontdict=font)
 
 
-def plotBBoxPredictions(ds, sess, rpn_out, x_in):
-    # Plot a class/bbox mask.
-    ds.reset()
-    x, y, meta = ds.nextBatch(1, 'test')
-    assert len(x) > 0
-    pred = sess.run(rpn_out, feed_dict={x_in: x})
-
-    # Unpack tensors.
-    img, bboxes, labels = x[0], pred[0][:4], pred[0][4:]
-    del pred, x, y, meta
-
+def predictBBoxes(sess, img, labels, bboxes, int2name):
     # Convert one-hot label to best guess.
     hard_labels = np.argmax(labels, axis=0)
 
@@ -211,7 +208,6 @@ def plotBBoxPredictions(ds, sess, rpn_out, x_in):
     # fixme: remove hard coded 4; maybe pass an im2ft_rat to bboxFromNetOutput
     # and reuse that one?
     out_labels = []
-    int2name = ds.classNames()
     for (x0, y0, x1, y1) in (bb_dims / 4).astype(np.int16):
         # Compute Gaussian mask to weigh predictions inside BBox.
         mx = 5 * (np.linspace(-1, 1, x1 - x0) ** 2)
@@ -229,8 +225,7 @@ def plotBBoxPredictions(ds, sess, rpn_out, x_in):
         sm = np.exp(w_labels) / np.sum(np.exp(w_labels))
         label_id = np.argmax(sm) + 1
         out_labels.append(int2name[label_id])
-
-    drawBBoxes(img, bb_dims, out_labels)
+    return bb_dims, out_labels
 
 
 def main():
@@ -276,7 +271,6 @@ def main():
     # with predicted BBoxes.
     plotTrainingProgress(log)
     plotMasks(ds, sess)
-    plotBBoxPredictions(ds, sess, rpn_out, x_in)
     plt.show()
 
 
