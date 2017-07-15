@@ -192,23 +192,41 @@ def createDebugPlots(ds, sess, rpn_out, x_in):
     plotMasks(img, mask_cls, mask_bbox)
 
     # Convert one-hot label to best guess.
-    labels = np.argmax(labels, axis=0)
+    hard_labels = np.argmax(labels, axis=0)
 
     # Compile BBox data from network output.
     assert img.ndim == 3 and img.shape[0] == 3
-    bboxes = gen_bbox_labels.bboxFromNetOutput(img.shape[1:], bboxes, labels)
+    bb_dims, _ = gen_bbox_labels.bboxFromNetOutput(img.shape[1:], bboxes, hard_labels)
 
     # Suppress overlapping BBoxes.
-    tmp_bb = bboxes[:, 1:]
-    scores = np.ones(len(tmp_bb))
-    idx = sess.run(tf.image.non_max_suppression(tmp_bb, scores, 30, 0.5))
-    bboxes = bboxes[idx]
-    print(f'picked {len(idx)}')
+    scores = np.ones(len(bb_dims))
+    idx = sess.run(tf.image.non_max_suppression(bb_dims, scores, 30, 0.5))
+    bb_dims = bb_dims[idx]
 
-    # Draw the BBoxes.
-    labels, bboxes = bboxes[:, 0], bboxes[:, 1:]
-    labels = labels - 1
-    drawBBoxes(img, bboxes, labels)
+    # Compute the most likely label.
+    # fixme: remove hard coded 4; maybe pass an im2ft_rat to bboxFromNetOutput
+    # and reuse that one?
+    out_labels = []
+    int2name = ds.classNames()
+    for (x0, y0, x1, y1) in (bb_dims / 4).astype(np.int16):
+        # Compute Gaussian mask to weigh predictions inside BBox.
+        mx = 5 * (np.linspace(-1, 1, x1 - x0) ** 2)
+        my = 5 * (np.linspace(-1, 1, y1 - y0) ** 2)
+        mask = np.outer(np.exp(-my), np.exp(-mx))
+
+        # Extract the predictions inside BBox, except background and compute
+        # the weighted confidence for each label.
+        w_labels = labels[1:, y0:y1, x0:x1] * mask
+        w_labels = np.sum(w_labels, axis=(1, 2))
+
+        # Softmax the predictions and determine the ID of the best one. Add '1'
+        # to that ID to account for the removed background and map the ID to a
+        # human readable name.
+        sm = np.exp(w_labels) / np.sum(np.exp(w_labels))
+        label_id = np.argmax(sm) + 1
+        out_labels.append(int2name[label_id])
+
+    drawBBoxes(img, bb_dims, out_labels)
 
 
 def main():
