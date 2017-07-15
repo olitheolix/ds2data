@@ -179,7 +179,7 @@ def stampImage(background, fg_shapes, N, xmin, xmax, ymin, ymax):
     bg_height, bg_width = background.shape[:2]
     out = np.array(background, np.uint8)
     bboxes, labels = [], []
-    stencil = np.zeros_like(out)
+    occupied = np.zeros_like(out)
 
     # Stamp N non-overlapping shapes onto the background. If this proves
     # difficult, abort after `max_attempts` and return what we have so far.
@@ -195,9 +195,9 @@ def stampImage(background, fg_shapes, N, xmin, xmax, ymin, ymax):
         x1, y1 = x0 + w, y0 + h
 
         # Verify if the region is already occupied. Do nothing if it is.
-        if np.sum(stencil[y0:y1, x0:x1]) > 0:
+        if np.sum(occupied[y0:y1, x0:x1]) > 0:
             continue
-        stencil[y0:y1, x0:x1] = 1
+        occupied[y0:y1, x0:x1] = 1
         bboxes.append([x0, y0, x1, y1])
 
         # Pick a random foreground label and specimen.
