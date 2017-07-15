@@ -1,5 +1,6 @@
 import os
 import tqdm
+import time
 import train
 import pickle
 import rpn_net
@@ -66,12 +67,15 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     N = ds.lenOfEpoch(dset)
     int2name = ds.classNames()
 
+    etime = []
     for i in tqdm.tqdm(range(N)):
         x, y, meta = ds.nextBatch(1, dset)
         assert len(x) > 0
 
         # Predict the BBoxes and ensure there are no NaNs in the output.
+        t0 = time.perf_counter()
         pred, bb_dims, bb_labels = predictImage(sess, rpn_out, x_in, x)
+        etime.append(time.perf_counter() - t0)
         assert not np.any(np.isnan(pred))
 
         _, mask_bbox = train.computeMasks(y)
@@ -98,6 +102,13 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     bb_max = np.max(bb_max, axis=0)
     bb_med = np.mean(bb_med, axis=0)
 
+    # Compute average prediction time.
+    etime.sort()
+    if len(etime) < 3:
+        etime = np.mean(etime)
+    else:
+        etime = np.mean(etime[1:-1])
+
     # Dump the stats to the terminal.
     print(f'\nResults for <{dset}> data set ({N} samples)')
     print(f'  Correct Foreground Class: {fg_correct:.1f}%')
@@ -107,6 +118,7 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     print(f'  Y: {bb_med[1]:.1f} {bb_med[1]:.1f}')
     print(f'  W: {bb_med[2]:.1f} {bb_med[2]:.1f}')
     print(f'  H: {bb_med[3]:.1f} {bb_med[3]:.1f}')
+    print(f'  Prediction time per image: {1000 * etime:.0f}ms')
 
     drawBBoxes(x[0], bb_dims, bb_labels, int2name)
 
