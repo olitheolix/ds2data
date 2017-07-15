@@ -149,13 +149,14 @@ def plotTrainingProgress(log):
     plt.ylim(0, max(log['cost']))
 
     plt.subplot(2, 3, 2)
-    cls_correct = 100 * (1 - np.array(log['err_fg']))
-    cls_correct_filt = np.convolve(cls_correct, np.ones(7) / 7, mode='same')
-    plt.plot(cls_correct)
-    plt.plot(cls_correct_filt, '--r')
+    fg_wrong = np.array(log['err_fg'])
+    fg_wrong_smooth = smoothSignal(fg_wrong, 7)
+    plt.plot(fg_wrong)
+    plt.plot(fg_wrong_smooth, '--r')
     plt.grid()
-    plt.title('Pred FG Label Accuracy')
-    plt.ylim(0, 100)
+    plt.title('Pred FG')
+    plt.ylabel('#Wrong')
+    plt.ylim(0, max(fg_wrong))
 
     plt.subplot(2, 3, 3)
     x = np.array(log['err_x']).T
