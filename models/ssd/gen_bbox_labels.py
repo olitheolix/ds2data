@@ -131,7 +131,6 @@ def bboxFromNetOutput(im_dim, bboxes, labels):
     anchor_y = np.array(pick_yx[0]) * ft2im_k + ft2im_d
 
     # Pick the labels and BBox parameters from the valid locations.
-    l = labels[pick_yx]
     x = bboxes[0][pick_yx]
     y = bboxes[1][pick_yx]
     w = bboxes[2][pick_yx]
@@ -149,7 +148,9 @@ def bboxFromNetOutput(im_dim, bboxes, labels):
     y1 = y + h / 2
 
     # Stack the BBox parameters and labels and return it.
-    return np.vstack([l, x0, y0, x1, y1]).T.astype(np.int16)
+    bb_dims = np.vstack([x0, y0, x1, y1]).T.astype(np.int16)
+
+    return bb_dims, pick_yx
 
 
 def showBBoxData(img, y_bbox, y_score):
@@ -158,11 +159,12 @@ def showBBoxData(img, y_bbox, y_score):
 
     # Convert the training output to BBox positions.
     labels, bboxes = y_bbox[0], y_bbox[1:]
-    bboxes = bboxFromNetOutput(img.shape[:2], bboxes, labels)
+    bb_dims, pick_yx = bboxFromNetOutput(img.shape[:2], bboxes, labels)
+    bb_labels = labels[pick_yx]
 
     # Insert the BBox rectangle into the image.
     img_bbox = np.array(img)
-    for (label, x0, y0, x1, y1) in bboxes:
+    for label, (x0, y0, x1, y1) in zip(bb_labels, bb_dims):
         img_bbox[y0:y1, x0, :] = 255
         img_bbox[y0:y1, x1, :] = 255
         img_bbox[y0, x0:x1, :] = 255
