@@ -165,10 +165,10 @@ def findBackgroundImages(path):
     return fnames
 
 
-def stampImage(background, fg_shapes, N, xmin, xmax, ymin, ymax):
+def stampImage(background, fg_shapes, N):
     """Return a new image with N shapes in it, and their BBox and labels.
     """
-    # Background and shape images must be RGB.
+    # Background and shape images must be RGBA.
     assert background.ndim == 3
     assert background.shape[2] == 3
     for fg in fg_shapes.values():
@@ -187,9 +187,16 @@ def stampImage(background, fg_shapes, N, xmin, xmax, ymin, ymax):
     while len(labels) < N and attempts < max_attempts:
         attempts += 1
 
+        # Pick a random foreground label and specimen.
+        label = random.choice(list(fg_shapes.keys()))
+        labels.append(label)
+        idx = np.random.randint(0, len(fg_shapes[label]))
+        fg = np.array(fg_shapes[label][idx])
+        im_height, im_width = np.array(fg.shape[:2], np.float32)
+
         # Compute random region in foreground image to put the object.
-        w = np.random.randint(xmin, 1 + xmax)
-        h = np.random.randint(ymin, 1 + ymax)
+        w, h = np.random.uniform(0.5, 1.0) * np.array([im_width, im_height])
+        w, h = int(w), int(h)
         x0 = np.random.randint(0, 1 + bg_width - w)
         y0 = np.random.randint(0, 1 + bg_height - h)
         x1, y1 = x0 + w, y0 + h
@@ -199,12 +206,6 @@ def stampImage(background, fg_shapes, N, xmin, xmax, ymin, ymax):
             continue
         occupied[y0:y1, x0:x1] = 1
         bboxes.append([x0, y0, x1, y1])
-
-        # Pick a random foreground label and specimen.
-        label = random.choice(list(fg_shapes.keys()))
-        labels.append(label)
-        idx = np.random.randint(0, len(fg_shapes[label]))
-        fg = np.array(fg_shapes[label][idx])
 
         # Scale the foreground image.
         fg = Image.fromarray(fg.astype(np.uint8)).resize((w, h), Image.BILINEAR)
@@ -222,11 +223,6 @@ def stampImage(background, fg_shapes, N, xmin, xmax, ymin, ymax):
 
 def generateImages(dst_path, param, bg_fnames, fg_shapes, int2name):
     """Create N stamped background images and save them."""
-    xmax = max([_.shape[2] for _ in fg_shapes.values()])
-    ymax = max([_.shape[1] for _ in fg_shapes.values()])
-    xmin, ymin = int(0.95 * xmax), int(0.95 * ymax)
-    dims = (xmin, xmax, ymin, ymax)
-
     # Create N images.
     for i in tqdm.tqdm(range(param.N)):
         # Load background image as NumPy array.
@@ -234,7 +230,7 @@ def generateImages(dst_path, param, bg_fnames, fg_shapes, int2name):
         img = np.array(img, np.uint8)
 
         # Stamp foreground shapes into background image.
-        img, bboxes, labels = stampImage(img, fg_shapes, param.num_stamps, *dims)
+        img, bboxes, labels = stampImage(img, fg_shapes, param.num_stamps)
 
         # File name prefix for image and meta data.
         fname = os.path.join(dst_path, f'{i:04d}')
