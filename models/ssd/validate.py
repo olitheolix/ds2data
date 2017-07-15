@@ -218,28 +218,22 @@ def drawBBoxes(img_chw, bboxes, labels, int2name):
     img = np.transpose(img_chw, [1, 2, 0])
     img = (255 * img).astype(np.uint8)
 
-    # Show the image with BBoxes, without BBoxes, and the predicted object
-    # class (with-object, without-object).
-    plt.figure()
-    plt.subplot(1, 2, 1)
-    plt.imshow(img)
-    plt.title('Original Image')
-
-    ax = plt.subplot(1, 2, 2)
-    plt.imshow(img)
-    plt.title('Pred BBoxes')
-
     # Parameters for the overlays that will state true/predicted label.
     font = dict(color='white', alpha=0.5, size=16, weight='normal')
+    rect_opts = dict(linewidth=1, facecolor='none', edgecolor='r')
 
+    # Show the input image.
+    plt.figure()
+    plt.imshow(img)
+    ax = plt.gca()
+
+    # Add the predicted BBoxes and their labels.
     for label, (x0, y0, x1, y1) in zip(labels, bboxes):
-        ll = (x0, y0)
         w = x1 - x0 + 1
         h = y1 - y0 + 1
-        rect = patches.Rectangle(ll, w, h, linewidth=1, edgecolor='r', facecolor='none')
-        ax.add_patch(rect)
-        name = int2name[label]
-        ax.text(x0, y0, f'P: {name}', fontdict=font)
+        ax.add_patch(patches.Rectangle((x0, y0), w, h, **rect_opts))
+        ax.text(x0, y0, f'P: {int2name[label]}', fontdict=font)
+    plt.title('Pred BBoxes')
 
 
 def main():
