@@ -117,7 +117,7 @@ def bboxFromNetOutput(im_dim, bboxes, labels):
 
     # Compute the ratio of feature/image dimension. From this, determine the
     # interpolation parameters to map feature locations to image locations.
-    im_height = im_dim[0]
+    im_height, im_width = im_dim
     ft_height = labels.shape[0]
     ft2im_k = im_height / ft_height
     ft2im_d = ft2im_k / 2
@@ -146,6 +146,12 @@ def bboxFromNetOutput(im_dim, bboxes, labels):
     x1 = x + w / 2
     y0 = y - h / 2
     y1 = y + h / 2
+
+    # Ensure the BBoxes are confined to the image.
+    x0 = np.clip(x0, 0, im_width)
+    x1 = np.clip(x1, 0, im_width)
+    y0 = np.clip(y0, 0, im_height)
+    y1 = np.clip(y1, 0, im_height)
 
     # Stack the BBox parameters and labels and return it.
     bb_dims = np.vstack([x0, y0, x1, y1]).T.astype(np.int16)
