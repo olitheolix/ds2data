@@ -60,9 +60,9 @@ def computeOverlapScore(img_dim_hw, bboxes):
 
 def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
     # Compute the BBox parameters that the network will ultimately learn.
-    # These are two values to encode the BBox centre (relative to the
-    # anchor in the full image), and another two value to encode the
-    # width/height difference compared to the anchor.
+    # These are two values to encode the BBox centre relative to the
+    # anchor in the full image, and another two values to specify the
+    # absolute width/height in pixels.
     img_height, img_width = bbox_score.shape[1:]
     mul = img_height / ft_dim[0]
     ofs = mul / 2
