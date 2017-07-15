@@ -121,41 +121,43 @@ def bboxFromNetOutput(im_dim, bboxes, bbox_labels):
     mul = im_height / ft_height
     ofs = mul / 2
 
-    # Iterate over every position of the feature map and determine if the
-    # network found an object. Add the estimated BBox if it did.
+    # Find all locations that are *not* background, ie every location where the
+    # predicted label is anything but zero.
+    idx = np.nonzero(bbox_labels)
+
+    # Iterate over every position with an object and compute the BBox
+    # parameters in image coordinates.
     out = []
-    for fy in range(ft_height):
-        for fx in range(ft_width):
-            label = bbox_labels[fy, fx]
-            if label == 0:
-                continue
+    for fy, fx in zip(*idx):
+        label = bbox_labels[fy, fx]
+        assert label != 0
 
-            # Convert the current feature map position to the corresponding
-            # image coordinates.
-            anchor_x = fx * mul + ofs
-            anchor_y = fy * mul + ofs
+        # Convert the current feature map position to the corresponding
+        # image coordinates.
+        anchor_x = fx * mul + ofs
+        anchor_y = fy * mul + ofs
 
-            # BBox in image coordinates.
-            bbox = bboxes[:, fy, fx]
+        # BBox in image coordinates.
+        bbox = bboxes[:, fy, fx]
 
-            # The BBox parameters are relative to the anchor position and
-            # size. Here we convert those relative values back to absolute
-            # values in the original image.
-            bbox_x = bbox[0] + anchor_x
-            bbox_y = bbox[1] + anchor_y
-            bbox_half_width = bbox[2] / 2
-            bbox_half_height = bbox[3] / 2
+        # The BBox parameters are relative to the anchor position and
+        # size. Here we convert those relative values back to absolute
+        # values in the original image.
+        bbox_x = bbox[0] + anchor_x
+        bbox_y = bbox[1] + anchor_y
+        bbox_half_width = bbox[2] / 2
+        bbox_half_height = bbox[3] / 2
 
-            # Ignore invalid BBoxes.
-            if bbox_half_width < 2 or bbox_half_height < 2:
-                continue
+        # Ignore invalid BBoxes.
+        if bbox_half_width < 2 or bbox_half_height < 2:
+            continue
 
-            # Compute BBox corners and clip them at the image boundaries.
-            x0, y0 = bbox_x - bbox_half_width, bbox_y - bbox_half_height
-            x1, y1 = bbox_x + bbox_half_width, bbox_y + bbox_half_height
-            x0, x1 = np.clip([x0, x1], 0, im_dim[1] - 1)
-            y0, y1 = np.clip([y0, y1], 0, im_dim[0] - 1)
-            out.append([label, x0, y0, x1, y1])
+        # Compute BBox corners and clip them at the image boundaries.
+        x0, y0 = bbox_x - bbox_half_width, bbox_y - bbox_half_height
+        x1, y1 = bbox_x + bbox_half_width, bbox_y + bbox_half_height
+        x0, x1 = np.clip([x0, x1], 0, im_dim[1] - 1)
+        y0, y1 = np.clip([y0, y1], 0, im_dim[0] - 1)
+        out.append([label, x0, y0, x1, y1])
 
     # The BBox label and corner coordinates are integers, even though we used
     # floating point numbers to compute them. Here we convert all data to
