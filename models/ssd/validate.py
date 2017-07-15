@@ -75,6 +75,7 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     ds.reset()
     fg_tot, bg_tot = [], []
     bb_max, bb_med, fg_fp, bg_fp, fg_correct = [], [], [], [], []
+    fig_opts = dict(dpi=300, transparent=True, bbox_inches='tight', pad_inches=0)
     N = ds.lenOfEpoch(dset)
     int2name = ds.classNames()
 
@@ -101,6 +102,13 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
         bg_tot.append(acc.gt_bg_tot)
         bb_max.append(np.max(acc.bbox_err, axis=1))
         bb_med.append(np.median(acc.bbox_err, axis=1))
+
+        # Create and save image with annotated BBoxes. Close all images but the
+        # first because we will show it as a specimen at the end.
+        fig = showPredictedBBoxes(x[0], bb_dims, bb_labels, gt_labels, int2name)
+        fig.savefig(f'/tmp/bbox_{i:04d}.jpg', **fig_opts)
+        if i > 0:
+            fig.close()
 
     # Compute the average class prediction error.
     fg_correct = 100 * np.mean(fg_correct)
@@ -130,8 +138,6 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     print(f'  W: {bb_med[2]:.1f} {bb_med[2]:.1f}')
     print(f'  H: {bb_med[3]:.1f} {bb_med[3]:.1f}')
     print(f'  Prediction time per image: {1000 * etime:.0f}ms')
-
-    showPredictedBBoxes(x[0], bb_dims, bb_labels, gt_labels, int2name)
 
 
 def smoothSignal(sig, num_drop=5):
