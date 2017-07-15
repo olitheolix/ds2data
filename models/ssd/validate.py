@@ -1,4 +1,5 @@
 import os
+import pywt
 import tqdm
 import time
 import train
@@ -133,9 +134,13 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     showPredictedBBoxes(x[0], bb_dims, bb_labels, gt_labels, int2name)
 
 
-def smoothSignal(sig, num_coeff=7):
-    coeff = np.ones(num_coeff) / num_coeff
-    return np.convolve(sig, coeff, mode='same')
+def smoothSignal(sig, num_drop=5):
+    wl_name = 'coif5'
+    coeff = pywt.wavedec(sig, wl_name)
+    if len(coeff) < num_drop:
+        return sig
+    coeff = coeff[:-num_drop] + [None] * num_drop
+    return pywt.waverec(coeff, wl_name)
 
 
 def plotTrainingProgress(log):
