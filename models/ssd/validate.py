@@ -87,7 +87,7 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
         # Predict the BBoxes and ensure there are no NaNs in the output.
         pred = sess.run(rpn_out, feed_dict={x_in: x})
         img, bboxes, labels = x[0], pred[0][:4], pred[0][4:]
-        bb_dims, bb_labels = predictBBoxes(sess, img, labels, bboxes, int2name)
+        bb_dims, bb_labels = predictBBoxes(sess, img, labels, bboxes)
 
         _, mask_bbox = train.computeMasks(y)
         acc = train.accuracy(log, y[0], pred[0], mask_cls, mask_bbox[0])
@@ -123,7 +123,7 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     print(f'  W: {bb_med[2]:.1f} {bb_med[2]:.1f}')
     print(f'  H: {bb_med[3]:.1f} {bb_med[3]:.1f}')
 
-    drawBBoxes(img, bb_dims, bb_labels)
+    drawBBoxes(img, bb_dims, bb_labels, int2name)
 
 
 def plotMasks(ds, sess):
@@ -161,7 +161,7 @@ def plotMasks(ds, sess):
     plt.title('Valid BBox in Active Regions')
 
 
-def drawBBoxes(img_chw, bboxes, labels):
+def drawBBoxes(img_chw, bboxes, labels, int2name):
     assert img_chw.ndim == 3 and img_chw.shape[0] == 3
 
     # Convert image to HWC format for Matplotlib.
@@ -188,10 +188,11 @@ def drawBBoxes(img_chw, bboxes, labels):
         h = y1 - y0 + 1
         rect = patches.Rectangle(ll, w, h, linewidth=1, edgecolor='r', facecolor='none')
         ax.add_patch(rect)
-        ax.text(x0, y0, f'P: {label}', fontdict=font)
+        name = int2name[label]
+        ax.text(x0, y0, f'P: {name}', fontdict=font)
 
 
-def predictBBoxes(sess, img, labels, bboxes, int2name):
+def predictBBoxes(sess, img, labels, bboxes):
     # Convert one-hot label to best guess.
     hard_labels = np.argmax(labels, axis=0)
 
@@ -223,8 +224,7 @@ def predictBBoxes(sess, img, labels, bboxes, int2name):
         # to that ID to account for the removed background and map the ID to a
         # human readable name.
         sm = np.exp(w_labels) / np.sum(np.exp(w_labels))
-        label_id = np.argmax(sm) + 1
-        out_labels.append(int2name[label_id])
+        out_labels.append(np.argmax(sm) + 1)
     return bb_dims, out_labels
 
 
