@@ -111,58 +111,45 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
     return out, bbox_score
 
 
-def bboxFromNetOutput(im_dim, bboxes, bbox_labels):
+def bboxFromNetOutput(im_dim, bboxes, labels):
     assert bboxes.ndim == 3
     assert bboxes.shape[0] == 4
 
-    im_height, im_width = im_dim
-    ft_height, ft_width = bboxes.shape[1:]
-
-    mul = im_height / ft_height
-    ofs = mul / 2
+    # Compute the ratio of feature/image dimension. From this, determine the
+    # interpolation parameters to map feature locations to image locations.
+    im_height = im_dim[0]
+    ft_height = labels.shape[0]
+    ft2im_k = im_height / ft_height
+    ft2im_d = ft2im_k / 2
 
     # Find all locations that are *not* background, ie every location where the
     # predicted label is anything but zero.
-    idx = np.nonzero(bbox_labels)
+    pick_yx = np.nonzero(labels)
 
-    # Iterate over every position with an object and compute the BBox
-    # parameters in image coordinates.
-    out = []
-    for fy, fx in zip(*idx):
-        label = bbox_labels[fy, fx]
-        assert label != 0
+    # Convert the picked locations from feature dim to image dim.
+    anchor_x = np.array(pick_yx[1]) * ft2im_k + ft2im_d
+    anchor_y = np.array(pick_yx[0]) * ft2im_k + ft2im_d
 
-        # Convert the current feature map position to the corresponding
-        # image coordinates.
-        anchor_x = fx * mul + ofs
-        anchor_y = fy * mul + ofs
+    # Pick the labels and BBox parameters from the valid locations.
+    l = labels[pick_yx]
+    x = bboxes[0][pick_yx]
+    y = bboxes[1][pick_yx]
+    w = bboxes[2][pick_yx]
+    h = bboxes[3][pick_yx]
 
-        # BBox in image coordinates.
-        bbox = bboxes[:, fy, fx]
+    # Convert the BBox centre positions, which are still relative to the
+    # anchor, to absolute positions in image coordinates.
+    x = x + anchor_x
+    y = y + anchor_y
 
-        # The BBox parameters are relative to the anchor position and
-        # size. Here we convert those relative values back to absolute
-        # values in the original image.
-        bbox_x = bbox[0] + anchor_x
-        bbox_y = bbox[1] + anchor_y
-        bbox_half_width = bbox[2] / 2
-        bbox_half_height = bbox[3] / 2
+    # Compute BBox corners.
+    x0 = x - w / 2
+    x1 = x + w / 2
+    y0 = y - h / 2
+    y1 = y + h / 2
 
-        # Ignore invalid BBoxes.
-        if bbox_half_width < 2 or bbox_half_height < 2:
-            continue
-
-        # Compute BBox corners and clip them at the image boundaries.
-        x0, y0 = bbox_x - bbox_half_width, bbox_y - bbox_half_height
-        x1, y1 = bbox_x + bbox_half_width, bbox_y + bbox_half_height
-        x0, x1 = np.clip([x0, x1], 0, im_dim[1] - 1)
-        y0, y1 = np.clip([y0, y1], 0, im_dim[0] - 1)
-        out.append([label, x0, y0, x1, y1])
-
-    # The BBox label and corner coordinates are integers, even though we used
-    # floating point numbers to compute them. Here we convert all data to
-    # integer precision.
-    return np.array(np.round(out), np.int16)
+    # Stack the BBox parameters and labels and return it.
+    return np.vstack([l, x0, y0, x1, y1]).T.astype(np.int16)
 
 
 def showBBoxData(img, y_bbox, y_score):
