@@ -3,6 +3,7 @@ import pickle
 import random
 import config
 import rpn_net
+import argparse
 import shared_net
 import data_loader
 import collections
@@ -15,6 +16,16 @@ AccuracyMetrics = collections.namedtuple(
     'AccuracyMetrics',
     'bbox_err pred_bg_falsepos pred_fg_falsepos fg_err gt_bg_tot gt_fg_tot'
 )
+
+
+def parseCmdline():
+    """Parse the command line arguments."""
+    # Create a parser and program description.
+    parser = argparse.ArgumentParser(description='Train the network for N epochs')
+    parser.add_argument(
+        '-N', metavar='', type=int, default=1,
+        help='Train network for an additional N epochs (default 1)')
+    return parser.parse_args()
 
 
 def computeMasks(y):
@@ -193,7 +204,7 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
 
 def main():
     # Number of epochs to simulate.
-    new_epochs = 1000
+    param = parseCmdline()
 
     sess = tf.Session()
 
@@ -270,13 +281,13 @@ def main():
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(rpn_cost)
     sess.run(tf.global_variables_initializer())
 
-    print(f'\n----- Training for another {new_epochs} Epochs -----')
+    print(f'\n----- Training for another {param.N} Epochs -----')
     try:
         epoch_ofs = conf.num_epochs + 1
-        lrates = np.logspace(-3, -5, new_epochs)
-        for epoch in range(new_epochs):
-            epoch += epoch_ofs
-            print(f'\nEpoch {epoch}')
+        lrates = np.logspace(-3, -5, param.N)
+        for epoch in range(param.N):
+            tot_epoch = epoch + epoch_ofs
+            print(f'\nEpoch {tot_epoch} ({epoch+1}/{param.N} in this training cycle)')
 
             ds.reset()
             trainEpoch(conf, ds, sess, log, opt, lrates[epoch])
