@@ -35,10 +35,9 @@ def predictImage(sess, rpn_out, x_in, x, y):
     bb_dims = bb_dims[idx]
 
     # Compute the most likely label.
-    # fixme: remove hard coded 4; maybe pass an im2ft_rat to bboxFromNetOutput
-    # and reuse that one?
+    num_pools = img.shape[1] / pred_labels.shape[1]
     true_out_labels, pred_out_labels = [], []
-    for (x0, y0, x1, y1) in (bb_dims / 4).astype(np.int16):
+    for (x0, y0, x1, y1) in (bb_dims / num_pools).astype(np.int16):
         # Compute Gaussian mask to weigh label predictions across BBox.
         mx = 5 * (np.linspace(-1, 1, x1 - x0) ** 2)
         my = 5 * (np.linspace(-1, 1, y1 - y0) ** 2)
