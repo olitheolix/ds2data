@@ -47,12 +47,18 @@ def parseCmdline():
     padd('-height', metavar='', type=int, default=64, help='Height (default 64)')
     padd('-seed', metavar='', type=int, default=None,
          help='Seed value for reproducible results (default None)')
+    padd('-num-pools', metavar='', type=int, default=2,
+         help='Number of downsampling operations in network (default 2)')
+    padd('-score-thresh', metavar='', type=float, default=0.8,
+         help='Object is inside BBox only if it overlaps this much (default 0.8)')
     padd('-num-stamps', metavar='', type=int, default=20,
          help='Number of objects to embed in each background image (default 20)')
     padd('-cls-specimen', metavar='', type=int, default=64,
          help='Limit number of specimen images to load for each label')
     padd('--dummy-shapes', action='store_true', default=False,
          help='Use dummy shapes instead of loading them from disk')
+    padd('--debug', action='store_true', default=False,
+         help='Create debug plots for instant inspection')
 
     # Parse the actual arguments.
     param = parser.parse_args()
@@ -190,15 +196,8 @@ def main():
     # Stamp the foreground objects into background images.
     stamp_images.generate(dst_path, param, bg_fnames, shapes, int2name)
 
-    # If BBox overlaps more than `thresh` with anchor then the location will be
-    # marked as containing the respective object.
-    thresh = 0.8
-
-    # Number of downsampling layers in shared network. We will need this to
-    # determine the feature map size based on the input image size.
-    num_layers = 2
-
-    compile_bboxes.generate(dst_path, thresh, num_layers)
+    compile_bboxes.generate(
+        dst_path, param.score_thresh, param.num_pools, debug=param.debug)
 
 
 if __name__ == '__main__':
