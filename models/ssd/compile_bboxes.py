@@ -270,6 +270,7 @@ def generate(path, thresh, num_pools, debug):
             next(it)
 
     # Create a debug plot to verify everything went fine.
-    img, y_bbox, y_score = compileBBoxData(args[0])
-    img = np.transpose(img, [1, 2, 0])
-    showBBoxData(img, y_bbox, y_score)
+    if debug:
+        img, y_bbox, y_score = compileBBoxData(args[0])
+        img = np.transpose(img, [1, 2, 0])
+        showBBoxData(img, y_bbox, y_score)
