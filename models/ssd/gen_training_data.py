@@ -50,7 +50,7 @@ def parseCmdline():
     padd('-num-pools', metavar='', type=int, default=2,
          help='Number of downsampling operations in network (default 2)')
     padd('-score-thresh', metavar='', type=float, default=0.8,
-         help='Object is inside BBox only if it overlaps this much (default 0.8)')
+         help='Object inside BBox only if it overlaps by this much (default 0.8)')
     padd('-num-stamps', metavar='', type=int, default=20,
          help='Number of objects to embed in each background image (default 20)')
     padd('-cls-specimen', metavar='', type=int, default=64,
