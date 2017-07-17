@@ -253,6 +253,7 @@ def generateTrainingOutpt(stamped_path):
         it = pool.imap(compileBBoxData, args)
 
         # Consume the iterator to actually start the processes.
+        print('Compiling training output for network')
         for i in tqdm.tqdm(range(len(args))):
             next(it)
 

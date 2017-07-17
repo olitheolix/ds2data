@@ -12,6 +12,7 @@ import pickle
 import random
 import argparse
 import textwrap
+import gen_bbox_labels
 import numpy as np
 
 from PIL import Image
@@ -224,6 +225,7 @@ def stampImage(background, fg_shapes, N):
 def generateImages(dst_path, param, bg_fnames, fg_shapes, int2name):
     """Create N stamped background images and save them."""
     # Create N images.
+    print('Compiling training images with foreground shapes stamped into backgrounds')
     for i in tqdm.tqdm(range(param.N)):
         # Load background image as NumPy array.
         img = Image.open(bg_fnames[i % len(bg_fnames)]).convert('RGB')
@@ -274,6 +276,10 @@ def main():
 
     # Stamp the foreground objects into the background images.
     generateImages(dst_path, param, bg_fnames, shapes, int2name)
+
+    stamped_path = os.path.dirname(os.path.abspath(__file__))
+    stamped_path = os.path.join(stamped_path, 'data', 'stamped')
+    gen_bbox_labels.generateTrainingOutpt(stamped_path)
 
 
 if __name__ == '__main__':
