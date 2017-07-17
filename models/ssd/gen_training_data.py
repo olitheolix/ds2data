@@ -155,11 +155,7 @@ def findBackgroundImages(path):
     # Abort if the data set does not exist.
     fnames = glob.glob(f'{path}/*.jpg')
     if len(fnames) == 0:
-        # fixme: correct data path and download location.
-        print(f'\nError: No files in {path}')
-        print('\nPlease download '
-              'https://github.com/olitheolix/ds2data/blob/master/ds2.tar.gz'
-              '\nand unpack it to data/\n')
+        print(f'\nError: Cannot find background images in {path}')
         raise FileNotFoundError
     return fnames
 

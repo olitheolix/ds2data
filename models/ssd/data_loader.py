@@ -230,11 +230,7 @@ class BBox(DataSet):
         # Find all training images. Abort if there are none.
         fnames = glob.glob(f'{self.conf.path}/*.jpg')
         if len(fnames) == 0:
-            # fixme: correct data path
-            print(f'\nError: No files in {self.conf.path}')
-            print('\nPlease download '
-                  'https://github.com/olitheolix/ds2data/blob/master/ds2.tar.gz'
-                  '\nand unpack it to data/\n')
+            print(f'\nError: No stamped background images in {self.conf.path}')
             raise FileNotFoundError
 
         # Load each image, pre-process it (eg resize, RGB/Gray), and add it
