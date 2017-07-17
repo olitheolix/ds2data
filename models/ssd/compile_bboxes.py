@@ -261,14 +261,3 @@ def generate(stamped_path):
     img, y_bbox, y_score = compileBBoxData(args[0])
     img = np.transpose(img, [1, 2, 0])
     showBBoxData(img, y_bbox, y_score)
-
-
-def main():
-    # Folders with background images, and folder where to put output images.
-    stamped_path = os.path.dirname(os.path.abspath(__file__))
-    stamped_path = os.path.join(stamped_path, 'data', 'stamped')
-    generateTrainingOutpt(stamped_path)
-
-
-if __name__ == '__main__':
-    main()
