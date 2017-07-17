@@ -1,11 +1,7 @@
-""" Load stamped images and produce the training output for the network.
+"""Compile BBox position from meta file into training vector.
 
-The training output `y` is a feature map with 5 features. Its size is one
-quarter of the stamped input images because this script assumes there are two
-pooling layers. The 5 features are: label, BBox centre relative to anchor, and
-BBox width/height (absolute, not relative to anchor).
-
-Example: if the input image is 512x512, then y = (5, 128, 128).
+The training output `y` is a feature map with 5 features: label, BBox centre
+relative to anchor, and BBox absolute width/height.
 
 The label values, ie the entries in y[0, :, :], are non-negative integers. A
 label of zero always means background.
@@ -249,7 +245,7 @@ def generate(path, thresh, num_layers):
         for i in tqdm.tqdm(range(len(args))):
             next(it)
 
-    # Show debug data for first image.
+    # Create a debug plot to verify everything went fine.
     img, y_bbox, y_score = compileBBoxData(args[0])
     img = np.transpose(img, [1, 2, 0])
     showBBoxData(img, y_bbox, y_score)
