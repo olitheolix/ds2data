@@ -228,21 +228,13 @@ def compileBBoxData(args):
     return img, y_bbox, y_score
 
 
-def generate(stamped_path):
-    # If BBox overlaps more than `thresh` with anchor then the location will be
-    # marked as containing the respective object.
-    thresh = 0.8
-
-    # Number of downsampling layers in shared network. We will need this to
-    # determine the feature map size based on the input image size.
-    num_layers = 2
-
+def generate(path, thresh, num_layers):
     # Find all background image files and strip off the file extension (we will
     # need to load meta file with the same prefix).
-    fnames = glob.glob(os.path.join(stamped_path, '*.jpg'))
+    fnames = glob.glob(os.path.join(path, '*.jpg'))
     fnames = [_[:-4] for _ in sorted(fnames)]
     if len(fnames) == 0:
-        print(f'Warning: found no images in {stamped_path}')
+        print(f'Warning: found no images in {path}')
         return
 
     # Compile and save the BBox data for each image. Farm this task out to

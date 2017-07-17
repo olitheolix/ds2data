@@ -190,9 +190,15 @@ def main():
     # Stamp the foreground objects into background images.
     stamp_images.generate(dst_path, param, bg_fnames, shapes, int2name)
 
-    stamped_path = os.path.dirname(os.path.abspath(__file__))
-    stamped_path = os.path.join(stamped_path, 'data', 'stamped')
-    compile_bboxes.generate(stamped_path)
+    # If BBox overlaps more than `thresh` with anchor then the location will be
+    # marked as containing the respective object.
+    thresh = 0.8
+
+    # Number of downsampling layers in shared network. We will need this to
+    # determine the feature map size based on the input image size.
+    num_layers = 2
+
+    compile_bboxes.generate(dst_path, thresh, num_layers)
 
 
 if __name__ == '__main__':
