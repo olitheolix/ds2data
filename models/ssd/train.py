@@ -190,6 +190,8 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
         log['err_fg'].append(acc.fg_err)
         log['fg_falsepos'].append(acc.pred_fg_falsepos)
         log['bg_falsepos'].append(acc.pred_bg_falsepos)
+        log['gt_fg_tot'].append(acc.gt_fg_tot)
+        log['gt_bg_tot'].append(acc.gt_bg_tot)
 
         # Print progress report to terminal.
         fp_bg = acc.pred_bg_falsepos
