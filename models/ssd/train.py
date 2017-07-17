@@ -23,8 +23,8 @@ def parseCmdline():
     # Create a parser and program description.
     parser = argparse.ArgumentParser(description='Train the network for N epochs')
     parser.add_argument(
-        '-N', metavar='', type=int, default=1,
-        help='Train network for an additional N epochs (default 1)')
+        '-N', metavar='', type=int, default=1000,
+        help='Train network for an additional N epochs (default 1000)')
     return parser.parse_args()
 
 
