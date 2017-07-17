@@ -141,7 +141,7 @@ def validateEpoch(log, sess, ds, ft_dim, x_in, rpn_out, dset='test'):
     print(f'  Prediction time per image: {1000 * etime:.0f}ms')
 
 
-def smoothSignal(sig, num_drop=5):
+def smoothSignal(sig, keep_percentage):
     wl_opts = dict(wavelet='coif5', mode='symmetric')
 
     # The first few elements of our signals of interest tend to be excessively
@@ -151,11 +151,11 @@ def smoothSignal(sig, num_drop=5):
     tmp = np.sort(sig)
     sig = np.clip(sig, 0, tmp[int(0.99 * len(sig))])
 
-    # Decompose the signal and throw away `num_drop` detail coefficients.
+    # Decompose the signal and retain only `cutoff` percent of the detail
+    # coefficients.
     coeff = pywt.wavedec(sig, **wl_opts)
-    if len(coeff) < num_drop:
-        return sig
-    coeff = coeff[:-num_drop] + [None] * num_drop
+    cutoff = int(len(coeff) * keep_percentage)
+    coeff = coeff[:cutoff] + [None] * (len(coeff) - cutoff)
 
     # Reconstruct the signal from the pruned coefficient set.
     return pywt.waverec(coeff, **wl_opts)
@@ -165,7 +165,7 @@ def plotTrainingProgress(log):
     plt.figure()
     plt.subplot(2, 3, 1)
     cost = log['cost']
-    cost_s = smoothSignal(cost, 9)
+    cost_s = smoothSignal(cost, 0.5)
     plt.semilogy(cost)
     plt.semilogy(cost_s, '--r')
     plt.grid()
@@ -174,7 +174,7 @@ def plotTrainingProgress(log):
 
     plt.subplot(2, 3, 4)
     fg_wrong = np.array(log['err_fg'])
-    fg_wrong_s = smoothSignal(fg_wrong, 9)
+    fg_wrong_s = smoothSignal(fg_wrong, 0.5)
     plt.plot(fg_wrong)
     plt.plot(fg_wrong_s, '--r')
     plt.grid()
@@ -185,8 +185,8 @@ def plotTrainingProgress(log):
     plt.subplot(2, 3, 2)
     x = np.array(log['err_x']).T
     x_med, x_max = x
-    x_med_s = smoothSignal(x_med, 9)
-    x_max_s = smoothSignal(x_max, 9)
+    x_med_s = smoothSignal(x_med, 0.5)
+    x_max_s = smoothSignal(x_max, 0.5)
     plt.plot(x_max, '-b', label='Maximum')
     plt.plot(x_med, '-g', label='Median')
     plt.plot(x_max_s, '--r')
@@ -199,8 +199,8 @@ def plotTrainingProgress(log):
     plt.subplot(2, 3, 5)
     w = np.array(log['err_w']).T
     w_med, w_max = w
-    w_med_s = smoothSignal(w_med, 9)
-    w_max_s = smoothSignal(w_max, 9)
+    w_med_s = smoothSignal(w_med, 0.5)
+    w_max_s = smoothSignal(w_max, 0.5)
     plt.plot(w_max, '-b', label='Maximum')
     plt.plot(w_med, '-g', label='Median')
     plt.plot(w_max_s, '--r')
@@ -212,7 +212,7 @@ def plotTrainingProgress(log):
 
     plt.subplot(2, 3, 3)
     bg_fp = 100 * np.array(log['bg_falsepos']) / np.array(log['gt_bg_tot'])
-    bg_fp_s = smoothSignal(bg_fp, 9)
+    bg_fp_s = smoothSignal(bg_fp, 0.5)
     plt.plot(bg_fp, label='Background')
     plt.plot(bg_fp_s, '--r')
     plt.ylim(0, 100)
@@ -222,7 +222,7 @@ def plotTrainingProgress(log):
 
     plt.subplot(2, 3, 6)
     fg_fp = 100 * np.array(log['fg_falsepos']) / np.array(log['gt_fg_tot'])
-    fg_fp_s = smoothSignal(fg_fp, 9)
+    fg_fp_s = smoothSignal(fg_fp, 0.5)
     plt.plot(fg_fp, label='Foreground')
     plt.plot(fg_fp_s, '--r')
     plt.ylim(0, 100)
