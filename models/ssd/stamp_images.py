@@ -70,7 +70,7 @@ def stampImage(background, fg_shapes, N):
     return out, bboxes, labels
 
 
-def generateImages(dst_path, param, bg_fnames, fg_shapes, int2name):
+def generate(dst_path, param, bg_fnames, fg_shapes, int2name):
     """Create N stamped background images and save them."""
     # Create N images.
     print('Compiling training images with foreground shapes stamped into backgrounds')

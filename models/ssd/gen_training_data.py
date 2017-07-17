@@ -3,8 +3,8 @@ import glob
 import random
 import argparse
 import textwrap
-import gen_stamped
-import gen_bbox_labels
+import stamp_images
+import compile_bboxes
 
 import numpy as np
 from PIL import Image
@@ -188,11 +188,11 @@ def main():
     int2name[0] = 'background'
 
     # Stamp the foreground objects into background images.
-    gen_stamped.generateImages(dst_path, param, bg_fnames, shapes, int2name)
+    stamp_images.generate(dst_path, param, bg_fnames, shapes, int2name)
 
     stamped_path = os.path.dirname(os.path.abspath(__file__))
     stamped_path = os.path.join(stamped_path, 'data', 'stamped')
-    gen_bbox_labels.generateTrainingOutpt(stamped_path)
+    compile_bboxes.generate(stamped_path)
 
 
 if __name__ == '__main__':

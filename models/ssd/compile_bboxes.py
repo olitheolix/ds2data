@@ -228,7 +228,7 @@ def compileBBoxData(args):
     return img, y_bbox, y_score
 
 
-def generateTrainingOutpt(stamped_path):
+def generate(stamped_path):
     # If BBox overlaps more than `thresh` with anchor then the location will be
     # marked as containing the respective object.
     thresh = 0.8
