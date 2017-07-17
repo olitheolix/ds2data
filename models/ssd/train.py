@@ -32,7 +32,7 @@ def computeMasks(y):
     batch, _, height, width = y.shape
     assert batch == 1
 
-    # Grab the portion of the network output that encodes the BBox data.
+    # Unpack the tensor portion for the BBox data.
     hot_labels = y[0, 4:, :, :]
     num_classes = len(hot_labels)
     hot_labels = np.reshape(hot_labels, [num_classes, -1])
