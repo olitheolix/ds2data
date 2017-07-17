@@ -7,7 +7,7 @@ import pickle
 import rpn_net
 import shared_net
 import data_loader
-import gen_bbox_labels
+import compile_bboxes
 
 import numpy as np
 import tensorflow as tf
@@ -26,7 +26,7 @@ def predictImage(sess, rpn_out, x_in, x, y):
 
     # Compile BBox data from network output.
     hard_labels = np.argmax(pred_labels, axis=0)
-    bb_dims, _ = gen_bbox_labels.bboxFromNetOutput(img.shape[1:], bboxes, hard_labels)
+    bb_dims, _ = compile_bboxes.bboxFromNetOutput(img.shape[1:], bboxes, hard_labels)
     del hard_labels, bboxes
 
     # Suppress overlapping BBoxes.
