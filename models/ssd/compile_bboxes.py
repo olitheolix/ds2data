@@ -197,7 +197,7 @@ def showBBoxData(img, y_bbox, y_score):
 def compileBBoxData(args):
     # Unpack arguments. This is necessary because this function can only have a
     # single argument since it will be called via a process pool.
-    fname, num_layers, thresh = args
+    fname, num_pools, thresh = args
 
     # Load meta data and the image, then convert the image to CHW.
     meta = pickle.load(open(fname + '-meta.pickle', 'rb'))
@@ -206,7 +206,7 @@ def compileBBoxData(args):
 
     # Determine the image- and feature dimensions.
     im_dim = img.shape[1:]
-    ft_dim = (np.array(im_dim) / 2 ** num_layers).astype(np.int32).tolist()
+    ft_dim = (np.array(im_dim) / 2 ** num_pools).astype(np.int32).tolist()
 
     # Unpack the BBox data and map the human readable labels to numeric ones.
     bboxes = np.array(meta['bboxes'], np.int32)
@@ -224,7 +224,31 @@ def compileBBoxData(args):
     return img, y_bbox, y_score
 
 
-def generate(path, thresh, num_layers):
+def generate(path, thresh, num_pools, debug):
+    """
+    Produce the expected network output for each image based on BBoxes.
+
+    Produce one training output for every image in `path`. Write the pickled
+    results to the corresponding '*-bbox.pickle' file.
+
+    Args:
+        path: str
+           Path to image/meta files
+        thresh: float
+           Must be in interval [0, 1]. If BBox overlaps more than `thresh` with
+           anchor then the location will be marked as containing the respective
+           object.
+
+        num_pools: int
+           Number of pooling (or similar) operation. This value will be used to
+           compute the downsampling ratio from original image size to features.
+           For instance, if num_pool=3 then the functions will assume that the
+           feature map will be on eight (1 / 2 ** 3) in size.
+
+        debug: bool
+           Show a debug plot with BBox positions compiled from network training
+           data.
+    """
     # Find all background image files and strip off the file extension (we will
     # need to load meta file with the same prefix).
     fnames = glob.glob(os.path.join(path, '*.jpg'))
@@ -237,7 +261,7 @@ def generate(path, thresh, num_layers):
     # multiple processes.
     with multiprocessing.Pool() as pool:
         # Setup parallel execution.
-        args = [(fname, num_layers, thresh) for fname in fnames]
+        args = [(fname, num_pools, thresh) for fname in fnames]
         it = pool.imap(compileBBoxData, args)
 
         # Consume the iterator to actually start the processes.
