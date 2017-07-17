@@ -14,6 +14,7 @@ import os
 import glob
 import tqdm
 import pickle
+import multiprocessing
 import scipy.signal
 import matplotlib.pyplot as plt
 
@@ -197,6 +198,36 @@ def showBBoxData(img, y_bbox, y_score):
     plt.show()
 
 
+def compileBBoxData(args):
+    # Unpack arguments. This is necessary because this function can only have a
+    # single argument since it will be called via a process pool.
+    fname, num_layers, thresh = args
+
+    # Load meta data and the image, then convert the image to CHW.
+    meta = pickle.load(open(fname + '-meta.pickle', 'rb'))
+    img = np.array(Image.open(fname + '.jpg', 'r').convert('RGB'), np.uint8)
+    img = np.transpose(img, [2, 0, 1])
+
+    # Determine the image- and feature dimensions.
+    im_dim = img.shape[1:]
+    ft_dim = (np.array(im_dim) / 2 ** num_layers).astype(np.int32).tolist()
+
+    # Unpack the BBox data and map the human readable labels to numeric ones.
+    bboxes = np.array(meta['bboxes'], np.int32)
+    name2int = {v: k for k, v in meta['int2name'].items()}
+    bbox_labels = [name2int[_] for _ in meta['labels']]
+
+    # Compute the score map for each individual bounding box.
+    bbox_score = computeOverlapScore(im_dim, bboxes)
+    y_bbox, y_score = genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh)
+    assert y_bbox.shape == (5, *ft_dim)
+    assert y_score.shape == (bboxes.shape[0], *im_dim), y_score.shape
+
+    # Save the expected training output in a meta data file.
+    pickle.dump({'y_bbox': y_bbox}, open(fname + '-bbox.pickle', 'wb'))
+    return img, y_bbox, y_score
+
+
 def main():
     # Folders with background images, and folder where to put output images.
     stamped_path = os.path.dirname(os.path.abspath(__file__))
@@ -218,32 +249,19 @@ def main():
         print(f'Warning: found no images in {stamped_path}')
         return
 
-    for i, fname in enumerate(tqdm.tqdm(fnames)):
-        # Load meta data and the image, then convert the image to CHW.
-        meta = pickle.load(open(fname + '-meta.pickle', 'rb'))
-        img = np.array(Image.open(fname + '.jpg', 'r').convert('RGB'), np.uint8)
-        img = np.transpose(img, [2, 0, 1])
+    # Compile and save the BBox data for each image. Farm this task out to
+    # multiple processes.
+    with multiprocessing.Pool() as pool:
+        # Setup parallel execution.
+        args = [(fname, num_layers, thresh) for fname in fnames]
+        it = pool.imap(compileBBoxData, args)
 
-        # Determine the image- and feature dimensions.
-        im_dim = img.shape[1:]
-        ft_dim = (np.array(im_dim) / 2 ** num_layers).astype(np.int32).tolist()
+        # Consume the iterator to actually start the processes.
+        for i in tqdm.tqdm(range(len(args))):
+            next(it)
 
-        # Unpack the BBox data and map the human readable labels to numeric ones.
-        bboxes = np.array(meta['bboxes'], np.int32)
-        name2int = {v: k for k, v in meta['int2name'].items()}
-        bbox_labels = [name2int[_] for _ in meta['labels']]
-
-        # Compute the score map for each individual bounding box.
-        bbox_score = computeOverlapScore(im_dim, bboxes)
-        y_bbox, y_score = genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh)
-        assert y_bbox.shape == (5, *ft_dim)
-        assert y_score.shape == (bboxes.shape[0], *im_dim), y_score.shape
-
-        # Save the expected training output in a meta data file.
-        fname = os.path.join(stamped_path, f'{i:04d}-bbox.pickle')
-        pickle.dump({'y_bbox': y_bbox}, open(fname, 'wb'))
-
-    # Show debug data for last image.
+    # Show debug data for first image.
+    img, y_bbox, y_score = compileBBoxData(args[0])
     img = np.transpose(img, [1, 2, 0])
     showBBoxData(img, y_bbox, y_score)
 
