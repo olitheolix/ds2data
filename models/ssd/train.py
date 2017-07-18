@@ -266,14 +266,8 @@ def main():
 
     # Input/output/parameter tensors for network.
     print('\n----- Network Setup -----')
-    # Precision.
-    if conf.dtype == 'float32':
-        tf_dtype, np_dtype = tf.float32, np.float32
-    elif conf.dtype == 'float16':
-        tf_dtype, np_dtype = tf.float16, np.float16
-    else:
-        print(f'Error: unknown data type <{conf.dtype}>')
-        return 1
+    assert conf.dtype in ['float32', 'float16']
+    tf_dtype = tf.float32 if conf.dtype == 'float32' else tf.float16
 
     # Determine which network state to restore, if any.
     if restore:
