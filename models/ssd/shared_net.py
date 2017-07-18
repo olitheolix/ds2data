@@ -86,7 +86,12 @@ def load(fname):
     return pickle.load(open(fname, 'rb'))
 
 
-def setup(fname, trainable, x_in, dtype):
+def setup(fname, x_in, num_pools, trainable):
+    # fixme: only 2 layers are currently supported.
+    assert num_pools == 2
+    assert x_in.dtype in [tf.float16, tf.float32]
+    dtype = np.float16 if x_in.dtype == tf.float16 else np.float32
+
     num_filters = 64
     _, chan, _, _ = x_in.shape.as_list()
 
