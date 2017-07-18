@@ -271,10 +271,10 @@ def main():
 
     # Determine which network state to restore, if any.
     if restore:
-        fn_sh = fnames['shared_net']
+        fn_shd = fnames['shared_net']
         fn_rpn = fnames['rpn_net']
     else:
-        fn_sh = fn_rpn = None
+        fn_shd = fn_rpn = None
 
     # Create the input variable, the shared network and the RPN.
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
