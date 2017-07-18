@@ -68,8 +68,10 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
         for fx in range(ft_dim[1]):
             # Convert the current feature coordinates to image coordinates. This
             # is the centre of the anchor box in image coordinates.
-            anchor_centre_x = int(fx * mul + ofs)
-            anchor_centre_y = int(fy * mul + ofs)
+            anchor_x = np.interp(fx, [0, ft_dim[1] - 1], [ofs, img_width - ofs - 1])
+            anchor_y = np.interp(fy, [0, ft_dim[0] - 1], [ofs, img_height - ofs - 1])
+            anchor_x = int(np.round(anchor_x))
+            anchor_y = int(np.round(anchor_y))
 
             # Find out if the score in the neighbourhood of the anchor position
             # exceeds the threshold. We need search the neighbourhood, not just
