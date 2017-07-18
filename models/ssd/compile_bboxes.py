@@ -149,10 +149,10 @@ def bboxFromNetOutput(im_dim, bboxes, labels):
     y1 = y + h / 2
 
     # Ensure the BBoxes are confined to the image.
-    x0 = np.clip(x0, 0, im_width)
-    x1 = np.clip(x1, 0, im_width)
-    y0 = np.clip(y0, 0, im_height)
-    y1 = np.clip(y1, 0, im_height)
+    x0 = np.clip(x0, 0, im_width - 1)
+    x1 = np.clip(x1, 0, im_width - 1)
+    y0 = np.clip(y0, 0, im_height - 1)
+    y1 = np.clip(y1, 0, im_height - 1)
 
     # Stack the BBox parameters and labels and return it.
     bb_dims = np.vstack([x0, y0, x1, y1]).T.astype(np.int16)
