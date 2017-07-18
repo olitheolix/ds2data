@@ -257,7 +257,8 @@ class BBox(DataSet):
             img = np.transpose(img, [2, 0, 1])
             assert img.shape == dims == (chan, height, width)
 
-            # Load the label map and verify that all files use the same one.
+            # Load the GT output and verify that all files use the same
+            # int->label mapping.
             bbox_meta = pickle.load(open(fname[:-4] + '-meta.pickle', 'rb'))
             if int2name is None:
                 int2name = bbox_meta['int2name']
