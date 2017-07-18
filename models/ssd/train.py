@@ -29,18 +29,18 @@ def parseCmdline():
 
 
 def computeMasks(x, y):
-    batch, _, ft_height, ft_width = y.shape
-    im_height, im_width = x.shape[2:]
-    assert batch == 1
+    assert x.ndim == 3 and y.ndim == 3
+    ft_height, ft_width = y.shape[1:]
+    im_height, im_width = x.shape[1:]
 
     # Unpack the tensor portion for the BBox data.
-    hot_labels = y[0, 4:, :, :]
+    hot_labels = y[4:, :, :]
     num_classes = len(hot_labels)
     hot_labels = np.reshape(hot_labels, [num_classes, -1])
 
     # Compute the BBox area at every locations. The value is meaningless for
     # locations that have none.
-    bb_area = np.prod(y[0, 2:4, :, :], axis=0)
+    bb_area = np.prod(y[2:4, :, :], axis=0)
     bb_area = np.reshape(bb_area, [-1])
     assert bb_area.shape == hot_labels.shape[1:]
     del y
@@ -94,8 +94,6 @@ def computeMasks(x, y):
     # dimension. This will result in (batch, height, width) tensors.
     mask_cls = np.reshape(mask_cls, (ft_height, ft_width))
     mask_bbox = np.reshape(mask_bbox, (ft_height, ft_width))
-    mask_cls = np.expand_dims(mask_cls, axis=0)
-    mask_bbox = np.expand_dims(mask_bbox, axis=0)
     return mask_cls, mask_bbox
 
 
@@ -168,47 +166,41 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
 
         # Get the next image or reset the data store if we have reached the
         # end of an epoch.
-        x, yall, meta = ds.nextBatch(1, 'train')
-        if len(x) == 0:
-            break
+        img, ys, _ = ds.nextSingle('train')
+        if img is None:
             return
-        assert len(yall) == 1
-        yall = yall[0]
-        assert isinstance(yall, dict) and list(yall.keys()) == list(range(len(yall)))
+        assert img.ndim == 3 and isinstance(ys, dict)
 
-        # Determine the mask for the cost function because we only want to
-        # learn BBoxes where there are objects. Similarly, we also do not
-        # want to learn the class label at every location since most
-        # correspond to the 'background' class and bias the training.
+        # Compile the feed dictionary so that we can train all RPCNs.
+        x = np.expand_dims(img, 0)
         fd = {x_in: x, lrate_in: lrate}
-        for net_id, y in yall.items():
-            mask_cls, mask_bbox = computeMasks(x, y)
-            assert mask_cls.shape == mask_bbox.shape
-            assert mask_cls.shape[0] == 1
+        for net_id, y in ys.items():
+            # Determine the mask for the cost function because we only want to
+            # learn BBoxes where there are objects. Similarly, we also do not
+            # want to learn the class label at every location since most
+            # correspond to the 'background' class and bias the training.
+            mask_cls, mask_bbox = computeMasks(img, y)
 
             # Run optimiser and log the cost.
-            fd[g(f'rpn{net_id}-cost/y:0')] = y
-            fd[g(f'rpn{net_id}-cost/mask_cls:0')] = mask_cls
-            fd[g(f'rpn{net_id}-cost/mask_bbox:0')] = mask_bbox
+            fd[g(f'rpn{net_id}-cost/y:0')] = np.expand_dims(y, 0)
+            fd[g(f'rpn{net_id}-cost/mask_cls:0')] = np.expand_dims(mask_cls, 0)
+            fd[g(f'rpn{net_id}-cost/mask_bbox:0')] = np.expand_dims(mask_bbox, 0)
             del net_id, y, mask_cls, mask_bbox
 
+        # Run one optimisation step.
         cost, _ = sess.run([g('cost:0'), opt], feed_dict=fd)
         log['cost'].append(cost)
         del fd
 
-        for net_id, y in yall.items():
+        for net_id, y in ys.items():
             # Predict. Ensure there are no NaN in the output.
             pred = sess.run(g(f'rpn{net_id}/rpn_out:0'), feed_dict={x_in: x})
+            pred = pred[0]
             assert not np.any(np.isnan(pred))
 
             # Compute training statistics.
-            mask_cls, mask_bbox = computeMasks(x, y)
-
-            # fixme
-            # import validate
-            # validate.plotMasks(x, y)
-
-            acc = accuracy(log, y[0], pred[0], mask_cls[0], mask_bbox[0])
+            mask_cls, mask_bbox = computeMasks(img, y)
+            acc = accuracy(log, y, pred, mask_cls, mask_bbox)
             num_bb = acc.bbox_err.shape[1]
             if num_bb == 0:
                 bb_max = bb_med = [0] * 4
