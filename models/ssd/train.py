@@ -285,11 +285,7 @@ def main():
     # The size of the shared-net output determines the size of the RPN input.
     # We only need this for training purposes in order to create the masks and
     # desired output 'y'.
-    ft_dim = tuple(shared_out.shape.as_list()[2:])
-    y_in = tf.placeholder(tf_dtype, [None, 4 + num_cls, *ft_dim], name='y_in')
-    mask_cls_in = tf.placeholder(tf_dtype, [None, *ft_dim], name='mask_cls')
-    mask_bbox_in = tf.placeholder(tf_dtype, [None, *ft_dim], name='mask_bbox')
-    lrate_in = tf.placeholder(tf_dtype, name='lrate')
+    lrate_in = tf.placeholder(tf.float32, name='lrate')
 
     # Select cost function, optimiser and initialise the TF graph.
     rpn_cost = rpn_net.cost(rpn_out, y_in, num_cls, mask_cls_in, mask_bbox_in)
