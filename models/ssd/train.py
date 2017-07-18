@@ -159,11 +159,8 @@ def accuracy(log, gt, pred, mask_cls, mask_bbox):
 def trainEpoch(conf, ds, sess, log, opt, lrate):
     g = tf.get_default_graph().get_tensor_by_name
 
+    x_in = g('x_in:0')
     lrate_in = g('lrate:0')
-    rpn_out = g('rpn/net_out:0')
-    rpn_cost = g('rpn-cost/cost:0')
-    x_in, y_in = g('x_in:0'), g('y_in:0')
-    mask_cls_in, mask_bbox_in = g('mask_cls:0'), g('mask_bbox:0')
 
     batch = -1
     while True:
@@ -171,55 +168,77 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
 
         # Get the next image or reset the data store if we have reached the
         # end of an epoch.
-        x, y, meta = ds.nextBatch(1, 'train')
+        x, yall, meta = ds.nextBatch(1, 'train')
         if len(x) == 0:
+            break
             return
+        assert len(yall) == 1
+        yall = yall[0]
+        assert isinstance(yall, dict) and list(yall.keys()) == list(range(len(yall)))
 
         # Determine the mask for the cost function because we only want to
         # learn BBoxes where there are objects. Similarly, we also do not
         # want to learn the class label at every location since most
         # correspond to the 'background' class and bias the training.
-        mask_cls, mask_bbox = computeMasks(y)
-        assert mask_cls.shape == mask_bbox.shape
-        assert mask_cls.shape[0] == 1
+        fd = {x_in: x, lrate_in: lrate}
+        for net_id, y in yall.items():
+            mask_cls, mask_bbox = computeMasks(x, y)
+            assert mask_cls.shape == mask_bbox.shape
+            assert mask_cls.shape[0] == 1
 
-        # Predict. Ensure there are no NaN in the output.
-        pred = sess.run(rpn_out, feed_dict={x_in: x})
-        assert not np.any(np.isnan(pred))
+            # Run optimiser and log the cost.
+            fd[g(f'rpn{net_id}-cost/y:0')] = y
+            fd[g(f'rpn{net_id}-cost/mask_cls:0')] = mask_cls
+            fd[g(f'rpn{net_id}-cost/mask_bbox:0')] = mask_bbox
+            del net_id, y, mask_cls, mask_bbox
 
-        # Run optimiser and log the cost.
-        fd = {
-            x_in: x, y_in: y, lrate_in: lrate,
-            mask_cls_in: mask_cls, mask_bbox_in: mask_bbox,
-        }
-        cost, _ = sess.run([rpn_cost, opt], feed_dict=fd)
+        cost, _ = sess.run([g('cost:0'), opt], feed_dict=fd)
         log['cost'].append(cost)
+        del fd
 
-        # Compute training statistics.
-        acc = accuracy(log, y[0], pred[0], mask_cls[0], mask_bbox[0])
-        bb_max = np.max(acc.bbox_err, axis=1)
-        bb_med = np.median(acc.bbox_err, axis=1)
+        for net_id, y in yall.items():
+            # Predict. Ensure there are no NaN in the output.
+            pred = sess.run(g(f'rpn{net_id}/rpn_out:0'), feed_dict={x_in: x})
+            assert not np.any(np.isnan(pred))
 
-        # Log training stats for plotting later.
-        log['err_x'].append([bb_med[0], bb_max[0]])
-        log['err_y'].append([bb_med[1], bb_max[1]])
-        log['err_w'].append([bb_med[2], bb_max[2]])
-        log['err_h'].append([bb_med[3], bb_max[3]])
-        log['err_fg'].append(acc.fg_err)
-        log['fg_falsepos'].append(acc.pred_fg_falsepos)
-        log['bg_falsepos'].append(acc.pred_bg_falsepos)
-        log['gt_fg_tot'].append(acc.gt_fg_tot)
-        log['gt_bg_tot'].append(acc.gt_bg_tot)
+            # Compute training statistics.
+            mask_cls, mask_bbox = computeMasks(x, y)
 
-        # Print progress report to terminal.
-        fp_bg = acc.pred_bg_falsepos
-        fp_fg = acc.pred_fg_falsepos
-        fg_err_rat = 100 * acc.fg_err / acc.gt_fg_tot
-        s1 = f'ClsErr={fg_err_rat:4.1f}%  '
-        s2 = f'X=({bb_med[0]:2.0f}, {bb_max[0]:2.0f})  '
-        s3 = f'W=({bb_med[2]:2.0f}, {bb_max[2]:2.0f})  '
-        s4 = f'FalsePos: FG={fp_fg:2.0f} BG={fp_bg:2.0f}'
-        print(f'  {batch:,}: Cost: {int(cost):6,}  ' + s1 + s2 + s3 + s4)
+            # fixme
+            # import validate
+            # validate.plotMasks(x, y)
+
+            acc = accuracy(log, y[0], pred[0], mask_cls[0], mask_bbox[0])
+            num_bb = acc.bbox_err.shape[1]
+            if num_bb == 0:
+                bb_max = bb_med = [0] * 4
+            else:
+                bb_max = np.max(acc.bbox_err, axis=1)
+                bb_med = np.median(acc.bbox_err, axis=1)
+
+            # Log training stats for plotting later.
+            if net_id not in log:
+                log[net_id] = collections.defaultdict(list)
+            log[net_id]['num_bb'].append(num_bb)
+            log[net_id]['err_x'].append([bb_med[0], bb_max[0]])
+            log[net_id]['err_y'].append([bb_med[1], bb_max[1]])
+            log[net_id]['err_w'].append([bb_med[2], bb_max[2]])
+            log[net_id]['err_h'].append([bb_med[3], bb_max[3]])
+            log[net_id]['err_fg'].append(acc.fg_err)
+            log[net_id]['fg_falsepos'].append(acc.pred_fg_falsepos)
+            log[net_id]['bg_falsepos'].append(acc.pred_bg_falsepos)
+            log[net_id]['gt_fg_tot'].append(acc.gt_fg_tot)
+            log[net_id]['gt_bg_tot'].append(acc.gt_bg_tot)
+
+            # Print progress report to terminal.
+            fp_bg = acc.pred_bg_falsepos
+            fp_fg = acc.pred_fg_falsepos
+            fg_err_rat = 100 * acc.fg_err / acc.gt_fg_tot
+            s1 = f'ClsErr={fg_err_rat:4.1f}%  '
+            s2 = f'X=({bb_med[0]:2.0f}, {bb_max[0]:2.0f})  '
+            s3 = f'W=({bb_med[2]:2.0f}, {bb_max[2]:2.0f})  '
+            s4 = f'FalsePos: FG={fp_fg:2.0f} BG={fp_bg:2.0f}'
+            print(f'  {batch:,}: Cost: {int(cost):6,}  ' + s1 + s2 + s3 + s4)
 
 
 def main():
