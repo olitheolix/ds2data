@@ -107,7 +107,7 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
             # Insert the BBox parameters into the training vector at the
             # respective image position.
             out[:, fy, fx] = [label_int, rel_x, rel_y, rel_w, rel_h]
-    return out, bbox_score
+    return out
 
 
 def bboxFromNetOutput(im_dim, bboxes, labels):
