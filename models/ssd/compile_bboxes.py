@@ -60,6 +60,7 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
     # These are two values to encode the BBox centre relative to the
     # anchor in the full image, and another two values to specify the
     # absolute width/height in pixels.
+    # fixme: remove loops in this function
     img_height, img_width = bbox_score.shape[1:]
     mul = img_height / ft_dim[0]
     ofs = mul / 2
