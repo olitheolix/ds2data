@@ -211,6 +211,27 @@ class BBox(DataSet):
     """
     MetaData = namedtuple('MetaData', 'filename')
 
+    def nextSingle(self, dset):
+        """Return next image and corresponding training vectors from `dset`.
+
+        Returns:
+            img: NumPy
+                The input image in CHW format.
+            labels: dict
+                Each key denotes a feature size and each value holds the
+                corresponding training data.
+            idx: int
+                Index into data set.
+        """
+        assert dset in self.handles, f'Unknown data set <{dset}>'
+
+        try:
+            idx = self.handles[dset][self.ofs[dset]]
+            self.ofs[dset] += 1
+            return self.features[idx], self.labels[idx], idx
+        except IndexError:
+            return None, None, None
+
     def loadRawData(self):
         # Original attributes of the images in the DS2 dataset.
         N = self.conf.num_samples
