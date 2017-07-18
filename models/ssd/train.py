@@ -278,9 +278,9 @@ def main():
 
     # Create the input variable, the shared network and the RPN.
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
-    shared_out = shared_net.setup(fn_sh, True, x_in, np_dtype)
-    rpn_out = rpn_net.setup(fn_rpn, True, shared_out, num_cls, np_dtype)
-    del fn_sh, fn_rpn
+    shared_out = shared_net.setup(fn_shd, x_in, conf.num_pools_shared, True)
+    rpn_outs = rpn_net.setup(fn_rpn, shared_out, num_cls, conf.num_pools_rpn, True)
+    del fn_shd, fn_rpn
 
     # The size of the shared-net output determines the size of the RPN input.
     # We only need this for training purposes in order to create the masks and
