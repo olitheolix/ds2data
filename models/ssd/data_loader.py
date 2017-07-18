@@ -292,11 +292,8 @@ class BBox(DataSet):
                 labels = np.vstack([bboxes, labels])
                 assert labels.shape == (4 + num_classes, ft_height, ft_width)
 
-                all_labels[-1][net_id].append(np.array(labels, np.float32))
+                all_labels[-1][net_id] = np.array(labels, np.float32)
 
-            # Store the flattened image alongside its label and meta data.
-            for net_id, labels in all_labels[-1].items():
-                all_labels[-1][net_id] = np.array(all_labels[-1][net_id], np.float32)
             all_features.append(img)
             meta.append(self.MetaData(fname))
 
