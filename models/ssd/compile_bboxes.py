@@ -74,11 +74,13 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
             anchor_y = int(np.round(anchor_y))
 
             # Find out if the score in the neighbourhood of the anchor position
-            # exceeds the threshold. We need search the neighbourhood, not just
-            # a single point, because of the inaccuracy when mapping feature
-            # coordinates to image coordinates.
-            x0, x1 = int(anchor_centre_x - ofs), int(anchor_centre_x + ofs)
-            y0, y1 = int(anchor_centre_y - ofs), int(anchor_centre_y + ofs)
+            # exceeds the threshold. We need to search the neighbourhood, not
+            # just a single point, because of the inaccuracy when mapping
+            # feature coordinates to image coordinates.
+            x0, x1 = int(anchor_x - ofs - 1), int(anchor_x + ofs + 1)
+            y0, y1 = int(anchor_y - ofs - 1), int(anchor_y + ofs + 1)
+            x0, x1 = np.clip([x0, x1], 0, img_width - 1)
+            y0, y1 = np.clip([y0, y1], 0, img_height - 1)
             tmp = bbox_score[:, y0:y1, x0:x1]
             best = np.argmax(np.amax(tmp, axis=(1, 2)))
             if bbox_score[best, anchor_y, anchor_x] <= thresh:
