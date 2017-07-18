@@ -195,8 +195,6 @@ def showBBoxData(img, y_bbox, y_score):
     plt.imshow(score, cmap='hot')
     plt.title('GT Score')
 
-    plt.show()
-
 
 def compileBBoxData(args):
     # Unpack arguments. This is necessary because this function can only have a
@@ -282,6 +280,8 @@ def generate(path, thresh, num_pools, debug):
 
     # Create a debug plot to verify everything went fine.
     if debug:
-        img, y_bbox, y_score = compileBBoxData(args[0])
+        img, y_bbox, y_score = compileBBoxData(args[1])
         img = np.transpose(img, [1, 2, 0])
-        showBBoxData(img, y_bbox, y_score)
+        for _, bbox in sorted(y_bbox.items()):
+            showBBoxData(img, bbox, y_score)
+        plt.show()
