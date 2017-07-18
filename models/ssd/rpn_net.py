@@ -101,7 +101,7 @@ def cost(net_id, pred_net):
     return cost_tot
 
 
-def save(fname, sess):
+def save(fname, sess, num_layers):
     """ Save the pickled network state to `fname`.
 
     Args:
@@ -125,22 +125,40 @@ def load(fname):
     return pickle.load(open(fname, 'rb'))
 
 
-def setup(fname, trainable, x_in, num_classes, dtype):
-    chan = 4 + num_classes
-    num_filters = x_in.shape.as_list()[1]
+def setup(fname, x_in, num_classes, num_layers, trainable):
+    assert x_in.dtype in [tf.float16, tf.float32]
+    dtype = np.float16 if x_in.dtype == tf.float16 else np.float32
 
-    b1_dim = (chan, 1, 1)
-    W1_dim = (15, 15, num_filters, chan)
+    out = []
+    for layer_id in range(num_layers):
+        num_filters = x_in.shape.as_list()[1]
 
-    if fname is None:
-        print('RPN: random init')
-        b1 = 0.5 + np.zeros(b1_dim).astype(dtype)
-        W1 = np.random.normal(0.0, 0.1, W1_dim).astype(dtype)
-    else:
-        print(f'RPN: restored from <{fname}>')
-        net = load(fname)
-        b1, W1 = net['b1'], net['W1']
+        W1_dim = (3, 3, num_filters, 64)
+        b1_dim = (64, 1, 1)
+        W2_dim = (7, 7, 64, 4 + num_classes)
+        b2_dim = (4 + num_classes, 1, 1)
 
-    assert b1.dtype == W1.dtype == dtype
-    assert b1.shape == b1_dim and W1.shape == W1_dim
-    return model(x_in, (b1, W1, trainable))
+        if fname is None:
+            print('RPN: random init')
+            b1 = 0.5 + np.zeros(b1_dim).astype(dtype)
+            W1 = np.random.normal(0.0, 0.1, W1_dim).astype(dtype)
+            b2 = 0.5 + np.zeros(b2_dim).astype(dtype)
+            W2 = np.random.normal(0.0, 0.1, W2_dim).astype(dtype)
+        else:
+            print(f'RPN: restored from <{fname}>')
+            net = load(fname)
+            b1, W1 = net[layer_id]['b1'], net[layer_id]['W1']
+            b2, W2 = net[layer_id]['b2'], net[layer_id]['W2']
+
+        assert b1.dtype == W1.dtype == dtype
+        assert b1.shape == b1_dim and W1.shape == W1_dim
+        assert b2.dtype == W2.dtype == dtype
+        assert b2.shape == b2_dim and W2.shape == W2_dim
+
+        bwt1 = (b1, W1, trainable)
+        bwt2 = (b2, W2, trainable)
+        net_out, rpn_out = model(x_in, layer_id, bwt1, bwt2)
+        out.append(rpn_out)
+
+        x_in = net_out
+    return out
