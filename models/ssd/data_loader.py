@@ -2,6 +2,7 @@
 import os
 import glob
 import pickle
+import collections
 import numpy as np
 
 from PIL import Image
@@ -234,7 +235,7 @@ class BBox(DataSet):
         # Load each image, pre-process it (eg resize, RGB/Gray), and add it
         # to the data set.
         int2name = None
-        all_labels, all_features, meta = [], [], []
+        all_features, all_labels, meta = [], [], []
         for i, fname in enumerate(fnames[:N]):
             # Convert to correct colour format and resize.
             img = Image.open(fname)
@@ -264,29 +265,43 @@ class BBox(DataSet):
             num_classes = len(int2name)
 
             # Load the meta data with the label and BBox information.
-            tmp = pickle.load(open(fname[:-4] + '-bbox.pickle', 'rb'))
-            tmp = tmp['y_bbox']
-            assert tmp.shape[0] == 5
-            labels, bboxes = tmp[0], tmp[1:]
-            ft_height, ft_width = labels.shape
+            y_bbox = pickle.load(open(fname[:-4] + '-bbox.pickle', 'rb'))
+            y_bbox = y_bbox['y_bbox']
+            assert isinstance(y_bbox, dict)
 
-            # Convert the integer label to one-hot-encoding.
-            labels = self.toHotLabels(labels, num_classes)
-            assert labels.shape == (num_classes, ft_height, ft_width)
+            ft_max = self.conf.height // (2 ** self.conf.num_pools_shared)
+            ft_max = ft_max // 2
+            ft_min = ft_max // (2 ** (self.conf.num_pools_rpn - 1))
+            net_id = -1
+            all_labels.append(collections.defaultdict(list))
+            for (ft_height, ft_width), bbox in reversed(sorted(y_bbox.items())):
+                if not (ft_min <= ft_height <= ft_max):
+                    continue
+                net_id += 1
 
-            # Stack the feature vector. Its first 4 dimensions are the BBox
-            # data, the remaining are the class labels.
-            labels = np.vstack([bboxes, labels])
-            assert labels.shape == (4 + num_classes, ft_height, ft_width)
+                assert bbox.shape[0] == 5
+                labels, bboxes = bbox[0], bbox[1:]
+                assert labels.shape == (ft_height, ft_width)
+
+                # Convert the integer label to one-hot-encoding.
+                labels = self.toHotLabels(labels, num_classes)
+                assert labels.shape == (num_classes, ft_height, ft_width)
+
+                # Stack the feature vector. Its first 4 dimensions are the BBox
+                # data, the remaining are the class labels.
+                labels = np.vstack([bboxes, labels])
+                assert labels.shape == (4 + num_classes, ft_height, ft_width)
+
+                all_labels[-1][net_id].append(np.array(labels, np.float32))
 
             # Store the flattened image alongside its label and meta data.
-            all_labels.append(labels)
+            for net_id, labels in all_labels[-1].items():
+                all_labels[-1][net_id] = np.array(all_labels[-1][net_id], np.float32)
             all_features.append(img)
             meta.append(self.MetaData(fname))
 
         # Ensure that everything is a proper NumPy array.
         all_features = np.array(all_features, np.uint8)
-        all_labels = np.array(all_labels, np.float32)
 
         return all_features, all_labels, dims, int2name, meta
 
