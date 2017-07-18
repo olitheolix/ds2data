@@ -288,9 +288,13 @@ def main():
     lrate_in = tf.placeholder(tf.float32, name='lrate')
 
     # Select cost function, optimiser and initialise the TF graph.
-    rpn_cost = rpn_net.cost(rpn_out, y_in, num_cls, mask_cls_in, mask_bbox_in)
-    opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(rpn_cost)
+    partial_costs = []
+    for net_id, rpn_out in enumerate(rpn_outs):
+        partial_costs.append(rpn_net.cost(net_id, rpn_out))
+    cost = tf.add_n(partial_costs, name='cost')
+    opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
     sess.run(tf.global_variables_initializer())
+    del cost, partial_costs, rpn_outs
 
     print(f'\n----- Training for another {param.N} Epochs -----')
     try:
