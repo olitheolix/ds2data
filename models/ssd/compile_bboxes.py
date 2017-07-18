@@ -207,10 +207,7 @@ def compileBBoxData(args):
     meta = pickle.load(open(fname + '-meta.pickle', 'rb'))
     img = np.array(Image.open(fname + '.jpg', 'r').convert('RGB'), np.uint8)
     img = np.transpose(img, [2, 0, 1])
-
-    # Determine the image- and feature dimensions.
     im_dim = img.shape[1:]
-    ft_dim = (np.array(im_dim) / 2 ** num_pools).astype(np.int32).tolist()
 
     # Unpack the BBox data and map the human readable labels to numeric ones.
     bboxes = np.array(meta['bboxes'], np.int32)
@@ -218,14 +215,24 @@ def compileBBoxData(args):
     bbox_labels = [name2int[_] for _ in meta['labels']]
 
     # Compute the score map for each individual bounding box.
-    bbox_score = computeOverlapScore(im_dim, bboxes)
-    y_bbox, y_score = genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh)
-    assert y_bbox.shape == (5, *ft_dim)
+    y_score = computeOverlapScore(im_dim, bboxes)
     assert y_score.shape == (bboxes.shape[0], *im_dim), y_score.shape
 
-    # Save the expected training output in a meta data file.
-    pickle.dump({'y_bbox': y_bbox}, open(fname + '-bbox.pickle', 'wb'))
-    return img, y_bbox, y_score
+    # Determine the image- and feature dimensions.
+    out_bbox = {}
+    while True:
+        ft_dim = (np.array(im_dim) / 2 ** num_pools).astype(np.int32).tolist()
+        num_pools += 1
+        if min(ft_dim) < 2:
+            break
+
+        y_bbox = genBBoxData(bboxes, bbox_labels, y_score, ft_dim, thresh)
+        assert y_bbox.shape == (5, *ft_dim)
+        out_bbox[tuple(ft_dim)] = y_bbox
+
+    # Save the pickled ground truth training data.
+    pickle.dump({'y_bbox': out_bbox}, open(fname + '-bbox.pickle', 'wb'))
+    return img, out_bbox, y_score
 
 
 def generate(path, thresh, num_pools, debug):
