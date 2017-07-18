@@ -97,7 +97,7 @@ def computeMasks(x, y):
     return mask_cls, mask_bbox
 
 
-def accuracy(log, gt, pred, mask_cls, mask_bbox):
+def accuracy(gt, pred, mask_cls, mask_bbox):
     assert mask_cls.shape == mask_bbox.shape
     assert mask_cls.ndim == mask_bbox.ndim == 2
     assert pred.ndim == gt.ndim == 3
@@ -200,7 +200,7 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
 
             # Compute training statistics.
             mask_cls, mask_bbox = computeMasks(img, y)
-            acc = accuracy(log, y, pred, mask_cls, mask_bbox)
+            acc = accuracy(y, pred, mask_cls, mask_bbox)
             num_bb = acc.bbox_err.shape[1]
 
             # Compute maximum/median BBox errors. If this features map did not
