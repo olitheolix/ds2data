@@ -99,8 +99,8 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
 
             # Compute the BBox location, width and height relative to the
             # anchor (image coordinates).
-            rel_x = np.mean([bbox_x0, bbox_x1]) - anchor_centre_x
-            rel_y = np.mean([bbox_y0, bbox_y1]) - anchor_centre_y
+            rel_x = np.mean([bbox_x0, bbox_x1]) - anchor_x
+            rel_y = np.mean([bbox_y0, bbox_y1]) - anchor_y
             rel_w = (bbox_x1 - bbox_x0)
             rel_h = (bbox_y1 - bbox_y0)
 
