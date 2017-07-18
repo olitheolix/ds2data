@@ -28,22 +28,40 @@ def parseCmdline():
     return parser.parse_args()
 
 
-def computeMasks(y):
-    batch, _, height, width = y.shape
+def computeMasks(x, y):
+    batch, _, ft_height, ft_width = y.shape
+    im_height, im_width = x.shape[2:]
     assert batch == 1
 
     # Unpack the tensor portion for the BBox data.
     hot_labels = y[0, 4:, :, :]
     num_classes = len(hot_labels)
     hot_labels = np.reshape(hot_labels, [num_classes, -1])
+
+    # Compute the BBox area at every locations. The value is meaningless for
+    # locations that have none.
+    bb_area = np.prod(y[0, 2:4, :, :], axis=0)
+    bb_area = np.reshape(bb_area, [-1])
+    assert bb_area.shape == hot_labels.shape[1:]
     del y
 
+    # Determine the minimum and maximum BBox area that we can identify from the
+    # current feature map. We assume the RPN filters are square, eg 5x5 or 7x7.
+    # fixme: remove hard coded assumption that RPN filters are 7x7
+    imft_rat = im_height / ft_height
+    assert imft_rat >= 1
+    a_max = 7 * imft_rat
+    a_max = a_max * a_max
+    a_min = a_max // 4
+
     # Allocate the mask arrays.
-    mask_cls = np.zeros(height * width, np.float16)
+    mask_cls = np.zeros(ft_height * ft_width, np.float16)
     mask_bbox = np.zeros_like(mask_cls)
 
-    # Find all locations with an object and set the mask for it to '1'.
-    idx = np.nonzero(hot_labels[0] == 0)[0]
+    # Activate the mask for all locations that have 1) an object and 2) its
+    # BBox is within the limits for the current feature map size.
+    idx = np.nonzero((hot_labels[0] == 0) & (a_min <= bb_area) & (bb_area <= a_max))[0]
+    idx = np.nonzero((hot_labels[0] == 0))[0]
     mask_bbox[idx] = 1
 
     # Determine how many (non) background locations we have.
@@ -74,8 +92,8 @@ def computeMasks(y):
 
     # Convert the mask to the desired 2D format, then expand the batch
     # dimension. This will result in (batch, height, width) tensors.
-    mask_cls = np.reshape(mask_cls, (height, width))
-    mask_bbox = np.reshape(mask_bbox, (height, width))
+    mask_cls = np.reshape(mask_cls, (ft_height, ft_width))
+    mask_bbox = np.reshape(mask_bbox, (ft_height, ft_width))
     mask_cls = np.expand_dims(mask_cls, axis=0)
     mask_bbox = np.expand_dims(mask_bbox, axis=0)
     return mask_cls, mask_bbox
