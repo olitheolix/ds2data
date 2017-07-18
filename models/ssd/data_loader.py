@@ -68,13 +68,11 @@ class DataSet:
 
         # Sanity checks: all images must be NumPy arrays.
         assert isinstance(x, np.ndarray)
-        assert isinstance(y, np.ndarray)
         assert x.dtype == np.uint8, x.dtype
 
         # Sanity check: images must be a 4-D tensor, and there must be as many
         # labels as there are features (images).
         assert x.ndim == 4
-        assert x.shape[0] == y.shape[0]
 
         # Sanity check: to comply with the NCHW format, the second to fourth
         # dimension must match the `dims` returned by `loadRawData`.
@@ -165,7 +163,7 @@ class DataSet:
         a, b = self.ofs[dset], self.ofs[dset] + N
         idx = self.handles[dset][a:b]
         self.ofs[dset] = min(b, self.lenOfEpoch(dset))
-        return self.features[idx], self.labels[idx], idx
+        return self.features[idx], [self.labels[_] for _ in idx], idx
 
     def loadRawData(self):
         """Return feature and label vector for data set of choice.
