@@ -80,8 +80,8 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
             x0, x1 = int(anchor_centre_x - ofs), int(anchor_centre_x + ofs)
             y0, y1 = int(anchor_centre_y - ofs), int(anchor_centre_y + ofs)
             tmp = bbox_score[:, y0:y1, x0:x1]
-            best = np.argmax(np.amax(np.amax(tmp, axis=2), axis=1))
-            if bbox_score[best, anchor_centre_y, anchor_centre_x] <= thresh:
+            best = np.argmax(np.amax(tmp, axis=(1, 2)))
+            if bbox_score[best, anchor_y, anchor_x] <= thresh:
                 continue
             del x0, x1, y0, y1, tmp
 
