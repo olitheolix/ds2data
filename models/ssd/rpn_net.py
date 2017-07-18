@@ -111,11 +111,14 @@ def save(fname, sess):
     """
     # Query the state of the shared network (weights and biases).
     g = tf.get_default_graph().get_tensor_by_name
-    W1, b1 = sess.run([g('rpn/W1:0'), g('rpn/b1:0')])
-    shared = {'W1': W1, 'b1': b1}
+    state = {}
+    for layer_id in range(num_layers):
+        W1, b1 = sess.run([g(f'rpn{layer_id}/W1:0'), g(f'rpn{layer_id}/b1:0')])
+        W2, b2 = sess.run([g(f'rpn{layer_id}/W2:0'), g(f'rpn{layer_id}/b2:0')])
+        state[layer_id] = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
 
     # Save the state.
-    pickle.dump(shared, open(fname, 'wb'))
+    pickle.dump(state, open(fname, 'wb'))
 
 
 def load(fname):
