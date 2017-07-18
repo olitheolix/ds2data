@@ -250,6 +250,7 @@ def main():
         conf = config.NetConf(
             seed=0, width=512, height=512, colour='rgb',
             keep_prob=0.8, path=data_path, train_rat=0.8,
+            num_pools_shared=2, num_pools_rpn=1,
             dtype='float32', num_epochs=0, num_samples=None
         )
         print('\n----- New Configuration -----')
