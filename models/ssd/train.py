@@ -202,8 +202,11 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
             mask_cls, mask_bbox = computeMasks(img, y)
             acc = accuracy(log, y, pred, mask_cls, mask_bbox)
             num_bb = acc.bbox_err.shape[1]
+
+            # Compute maximum/median BBox errors. If this features map did not
+            # have any BBoxes then report -1.
             if num_bb == 0:
-                bb_max = bb_med = [0] * 4
+                bb_max = bb_med = [-1] * 4
             else:
                 bb_max = np.max(acc.bbox_err, axis=1)
                 bb_med = np.median(acc.bbox_err, axis=1)
