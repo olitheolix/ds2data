@@ -308,7 +308,7 @@ def main():
             trainEpoch(conf, ds, sess, log, opt, lrates[epoch])
 
             # Save the network states and log data.
-            rpn_net.save(fnames['rpn_net'], sess)
+            rpn_net.save(fnames['rpn_net'], sess, conf.num_pools_rpn)
             shared_net.save(fnames['shared_net'], sess)
             conf = conf._replace(num_epochs=epoch)
             meta = {'conf': conf, 'log': log}
