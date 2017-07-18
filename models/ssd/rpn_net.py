@@ -3,19 +3,23 @@ import numpy as np
 import tensorflow as tf
 
 
-def model(x_in, bwt1):
-    # Convenience: shared arguments for bias variable, conv2d, and max-pool.
-    convpool_opts = dict(padding='SAME', data_format='NCHW')
-    with tf.variable_scope('rpn'):
-        # Convolution layer to learn the anchor boxes.
-        # Shape: [-1, 64, 64, 64] ---> [-1, 5, 64, 64]
-        # Kernel: 5x5  Features: 6
+def model(x_in, layer_id, bwt1, bwt2):
+    # Convenience
+    conv_opts = dict(padding='SAME', data_format='NCHW')
+    with tf.variable_scope(f'rpn{layer_id}'):
+        # Convolution layer to downsample the feature map.
+        # Shape: [-1, 64, 64, 64] ---> [-1, 64, 32, 32]
+        # Kernel: 3x3
         b1 = tf.Variable(bwt1[0], trainable=bwt1[2], name='b1')
         W1 = tf.Variable(bwt1[1], trainable=bwt1[2], name='W1')
-        net_out = tf.nn.conv2d(x_in, W1, [1, 1, 1, 1], **convpool_opts)
-        net_out = tf.add(net_out, b1, name='net_out')
-    return net_out
+        net_out = tf.nn.conv2d(x_in, W1, [1, 1, 2, 2], **conv_opts)
+        net_out = tf.nn.relu(net_out + b1)
 
+        # Convolution layer to learn the BBoxes and class labels.
+        # Shape: [-1, 64, 32, 32] ---> [-1, 4 + num_classes, 64, 64]
+        # Kernel: 5x5
+        b2 = tf.Variable(bwt2[0], trainable=bwt2[2], name='b2')
+        W2 = tf.Variable(bwt2[1], trainable=bwt2[2], name='W2')
 
 def cost(pred_net, gt_net, num_classes, mask_cls, mask_bbox):
     """ Return the scalar cost node.
