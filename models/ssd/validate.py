@@ -53,10 +53,10 @@ def predictImage(sess, rpn_out_dims, x_in, img, ys):
         del scores, idx
 
         # Compute the most likely label for every individual BBox.
-        num_pools = img.shape[1] / pred_labels.shape[1]
+        im2ft_rat = img.shape[1] / pred_labels.shape[1]
         pred_labels_out[layer_dim] = []
         true_labels_out[layer_dim] = []
-        for (x0, y0, x1, y1) in (bb_dims / num_pools).astype(np.int16):
+        for (x0, y0, x1, y1) in (bb_dims / im2ft_rat).astype(np.int16):
             # Compute Gaussian mask to weigh label predictions across BBox.
             mx = 5 * (np.linspace(-1, 1, x1 - x0) ** 2)
             my = 5 * (np.linspace(-1, 1, y1 - y0) ** 2)
