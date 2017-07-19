@@ -213,12 +213,21 @@ def plotTrainingProgress(log):
     plt.title('Cost')
     plt.ylim(0, max(log['cost']))
 
-    # fixme: needs more sub-plots
-    for layer_dim in log['conf'].rpn_out_dims:
-        plt.figure()
+    plt.figure()
+    num_col = len(log['conf'].rpn_out_dims)
+    for idx, layer_dim in enumerate(log['conf'].rpn_out_dims):
         layer_log = log['rpnc'][layer_dim]
 
-        plt.subplot(2, 3, 4)
+        plt.subplot(num_col, 6, 6 * idx + 1)
+        cost = layer_log['cost']
+        cost_s = smoothSignal(cost, 0.5)
+        plt.semilogy(cost)
+        plt.semilogy(cost_s, '--r')
+        plt.grid()
+        plt.title('Cost')
+        plt.ylim(0, max(log['cost']))
+
+        plt.subplot(num_col, 6, 6 * idx + 2)
         fg_wrong = np.array(layer_log['err_fg'])
         fg_wrong_s = smoothSignal(fg_wrong, 0.5)
         plt.plot(fg_wrong)
@@ -228,7 +237,7 @@ def plotTrainingProgress(log):
         plt.ylabel('#Wrong')
         plt.ylim(0, max(fg_wrong))
 
-        plt.subplot(2, 3, 2)
+        plt.subplot(num_col, 6, 6 * idx + 3)
         x = np.array(layer_log['err_x']).T
         x_med, x_max = x
         x_med_s = smoothSignal(x_med, 0.5)
@@ -242,7 +251,7 @@ def plotTrainingProgress(log):
         plt.legend(loc='best')
         plt.title('Error Position X')
 
-        plt.subplot(2, 3, 5)
+        plt.subplot(num_col, 6, 6 * idx + 4)
         w = np.array(layer_log['err_w']).T
         w_med, w_max = w
         w_med_s = smoothSignal(w_med, 0.5)
@@ -256,9 +265,12 @@ def plotTrainingProgress(log):
         plt.legend(loc='best')
         plt.title('Error Width')
 
-        plt.subplot(2, 3, 3)
-        bg_fp = 100 * np.array(layer_log['bg_falsepos']) / np.array(layer_log['gt_bg_tot'])
+        plt.subplot(num_col, 6, 6 * idx + 5)
+        bg_falsepos = np.array(layer_log['bg_falsepos'])
+        gt_bg_tot = np.array(layer_log['gt_bg_tot'])
+        bg_fp = 100 * bg_falsepos / gt_bg_tot
         bg_fp_s = smoothSignal(bg_fp, 0.5)
+
         plt.plot(bg_fp, label='Background')
         plt.plot(bg_fp_s, '--r')
         plt.ylim(0, 100)
@@ -266,8 +278,10 @@ def plotTrainingProgress(log):
         plt.legend(loc='best')
         plt.title('False Positive Background')
 
-        plt.subplot(2, 3, 6)
-        fg_fp = 100 * np.array(layer_log['fg_falsepos']) / np.array(layer_log['gt_fg_tot'])
+        plt.subplot(num_col, 6, 6 * idx + 6)
+        fg_falsepos = np.array(layer_log['fg_falsepos'])
+        gt_fg_tot = np.array(layer_log['gt_fg_tot'])
+        fg_fp = 100 * fg_falsepos / gt_fg_tot
         fg_fp_s = smoothSignal(fg_fp, 0.5)
         plt.plot(fg_fp, label='Foreground')
         plt.plot(fg_fp_s, '--r')
