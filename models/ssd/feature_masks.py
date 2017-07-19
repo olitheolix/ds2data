@@ -9,6 +9,13 @@ import matplotlib.pyplot as plt
 def plotMasks(img_chw, ys):
     assert img_chw.ndim == 3
     for ft_dim, y in sorted(ys.items()):
+        assert y.ndim == 3
+        min_len, max_len = computeBBoxLimits(img_chw.shape[1], y.shape[1])
+
+        print(f'Receptive field for feature map size '
+              f'{y.shape[1]}x{y.shape[2]}: '
+              f'from {min_len}x{min_len} to {max_len}x{max_len} pixels')
+
         mask_cls, mask_bbox = computeMasks(img_chw, y)
 
         # Mask must be Gray scale images, and img_chw must be RGB.
@@ -36,6 +43,22 @@ def plotMasks(img_chw, ys):
         plt.title(f'Valid BBox in Active Regions ({ft_dim})')
 
 
+def computeBBoxLimits(im_height, ft_height):
+    # Determine the minimum and maximum BBox area that we can identify from the
+    # current feature map. We assume the RPN filters are square, eg 5x5 or 7x7.
+    # fixme: remove hard coded assumption that RPN filters are 9x9
+    imft_rat = im_height / ft_height
+    assert imft_rat >= 1
+
+    max_len = 9 * imft_rat
+    min_len = max_len / 2
+
+    # Add some slack to allow for BBoxes that are slightly smaller/larger.
+    l = 0.9 * min_len, 1.1 * max_len
+    min_len, max_len = np.round(l).astype(np.int32).tolist()
+    return min_len, max_len
+
+
 def computeMasks(x, y):
     assert x.ndim == 3 and y.ndim == 3
     ft_height, ft_width = y.shape[1:]
@@ -46,34 +69,26 @@ def computeMasks(x, y):
     num_classes = len(hot_labels)
     hot_labels = np.reshape(hot_labels, [num_classes, -1])
 
-    # Compute the BBox area at every locations. The value is meaningless for
-    # locations that have none.
-    bb_area = np.prod(y[2:4, :, :], axis=0)
-    bb_area = np.reshape(bb_area, [-1])
-    assert bb_area.shape == hot_labels.shape[1:]
+    # Unpack BBox width/height. We will need that later to determine if the
+    # object dimensions are compatible with the feature map size.
+    bb_width, bb_height = np.reshape(y[2:4], [2, -1])
+    assert bb_width.shape == bb_height.shape == hot_labels.shape[1:]
     del y
 
-    # Determine the minimum and maximum BBox area that we can identify from the
-    # current feature map. We assume the RPN filters are square, eg 5x5 or 7x7.
-    # fixme: remove hard coded assumption that RPN filters are 9x9
-    imft_rat = im_height / ft_height
-    assert imft_rat >= 1
-    a_max = 9 * imft_rat
-    a_max = a_max * a_max
-    a_min = a_max / 4
-
-    # Add some slack to allow for BBoxes that are slightly smaller/larger.
-    a_min, a_max = 0.9 * a_min, 1.1 * a_max
-    rf1, rf2 = int(np.sqrt(a_max)), int(np.sqrt(a_min))
-    print(f'Receptive field: {rf2}x{rf2} - {rf1}x{rf1}')
+    # Determine the min/maximum BBox side length that can/should be learned
+    # from the current feature map size.
+    min_len, max_len = computeBBoxLimits(im_height, ft_height)
 
     # Allocate the mask arrays.
     mask_cls = np.zeros(ft_height * ft_width, np.float16)
     mask_bbox = np.zeros_like(mask_cls)
 
-    # Activate the mask for all locations that have 1) an object and 2) its
-    # BBox is within the limits for the current feature map size.
-    idx = np.nonzero((hot_labels[0] == 0) & (a_min <= bb_area) & (bb_area <= a_max))[0]
+    # Activate the mask for all locations that have 1) an object and 2) both
+    # BBox side lengths are within the limits for the current feature map size.
+    cond = (hot_labels[0] == 0)
+    cond &= (min_len <= bb_width) & (bb_width <= max_len)
+    cond &= (min_len <= bb_height) & (bb_height <= max_len)
+    idx = np.nonzero(cond)[0]
     mask_bbox[idx] = 1
     del idx
 
