@@ -316,9 +316,13 @@ def showPredictedBBoxes(img_chw, bboxes, pred_labels, true_labels, int2name):
 
     # Add the predicted BBoxes and their labels.
     assert len(bboxes) == len(pred_labels) == len(true_labels)
-    for layer_dim in bboxes:
+    plt.figure()
+
+    rpnc_dims = list(bboxes.keys())
+    num_cols = len(rpnc_dims)
+    for idx, layer_dim in enumerate(rpnc_dims):
         # Show the input image.
-        plt.figure()
+        ax = plt.subplot(1, num_cols, idx + 1)
         ax = plt.gca()
         ax.set_axis_off()
         ax.imshow(img)
