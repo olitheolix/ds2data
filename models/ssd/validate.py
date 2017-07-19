@@ -7,6 +7,7 @@ import pickle
 import rpn_net
 import shared_net
 import data_loader
+import feature_masks
 import compile_bboxes
 
 import numpy as np
@@ -128,7 +129,7 @@ def validateEpoch(log, sess, ds, x_in, dset='train'):
         for layer_dim in rpnc_dims:
             y = ys[layer_dim]
             pred = preds[layer_dim]
-            _, mask_bbox = train.computeMasks(img, y)
+            _, mask_bbox = feature_masks.computeMasks(img, y)
 
             # We want to predict the label at every location. However, we only want to
             # predict the BBox where there are actually objects, which is why we will
@@ -275,36 +276,6 @@ def plotTrainingProgress(log):
         plt.title('False Positive Foreground')
 
 
-def plotMasks(img_chw, ys):
-    assert img_chw.ndim == 3
-    for ft_dim, y in sorted(ys.items()):
-        mask_cls, mask_bbox = train.computeMasks(img_chw, y)
-
-        # Mask must be Gray scale images, and img_chw must be RGB.
-        assert mask_cls.ndim == mask_cls.ndim == 2
-        assert img_chw.ndim == 3 and img_chw.shape[0] == 3
-
-        # Convert to HWC format for Matplotlib.
-        img = np.transpose(img_chw, [1, 2, 0]).astype(np.float32)
-
-        # Matplotlib only likes float32.
-        mask_cls = mask_cls.astype(np.float32)
-        mask_bbox = mask_bbox.astype(np.float32)
-
-        plt.figure()
-        plt.subplot(2, 2, 1)
-        plt.imshow(img, cmap='gray')
-        plt.title('Input Image')
-
-        plt.subplot(2, 2, 2)
-        plt.imshow(mask_cls, cmap='gray', clim=[0, 1])
-        plt.title(f'Active Regions ({ft_dim})')
-
-        plt.subplot(2, 2, 3)
-        plt.imshow(mask_bbox, cmap='gray', clim=[0, 1])
-        plt.title(f'Valid BBox in Active Regions ({ft_dim})')
-
-
 def showPredictedBBoxes(img_chw, bboxes, pred_labels, true_labels, int2name):
     assert img_chw.ndim == 3 and img_chw.shape[0] == 3
     assert isinstance(bboxes, dict)
@@ -379,10 +350,6 @@ def main():
     # Plot the learning progress and other debug plots like masks and an image
     # with predicted BBoxes.
     plotTrainingProgress(log)
-
-    # fixme: how many masks do we want to plot?
-    x, y, _ = ds.nextSingle('train')
-    plotMasks(x, y)
     plt.show()
 
 
