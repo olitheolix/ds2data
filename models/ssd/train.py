@@ -328,6 +328,7 @@ def main():
             rpn_net.save(fnames['rpn_net'], sess, conf.rpn_out_dims)
             shared_net.save(fnames['shared_net'], sess)
             conf = conf._replace(num_epochs=epoch)
+            log['conf'] = conf
             meta = {'conf': conf, 'log': log}
             pickle.dump(meta, open(fnames['meta'], 'wb'))
     except KeyboardInterrupt:
