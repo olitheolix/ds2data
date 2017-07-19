@@ -121,9 +121,13 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
             fd[g(f'rpn-{layer_name}-cost/mask_bbox:0')] = np.expand_dims(mask_bbox, 0)
             del rpn_dim, mask_cls, mask_bbox, layer_name
 
-        # Run one optimisation step.
-        cost, _ = sess.run([g('cost:0'), opt], feed_dict=fd)
-        log['cost'].append(cost)
+        # Run one optimisation step and record all costs.
+        cost_nodes = {'tot': g('cost:0')}
+        for rpn_dim in rpnc_dims:
+            layer_name = f'{rpn_dim[0]}x{rpn_dim[1]}'
+            cost_nodes[rpn_dim] = g(f'rpn-{layer_name}-cost/cost:0')
+        all_costs, _ = sess.run([cost_nodes, opt], feed_dict=fd)
+        log['cost'].append(all_costs['tot'])
         del fd
 
         feed_dict = {x_in: np.expand_dims(img, 0)}
@@ -149,6 +153,8 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
                 bb_med = np.median(acc.bbox_err, axis=1)
 
             # Log training stats for plotting later.
+            rpn_cost = all_costs[rpn_dim]
+            log['rpnc'][rpn_dim]['cost'].append(rpn_cost)
             log['rpnc'][rpn_dim]['num_bb'].append(num_bb)
             log['rpnc'][rpn_dim]['err_x'].append([bb_med[0], bb_max[0]])
             log['rpnc'][rpn_dim]['err_y'].append([bb_med[1], bb_max[1]])
@@ -168,7 +174,7 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
             s2 = f'X=({bb_med[0]:2.0f}, {bb_max[0]:2.0f})  '
             s3 = f'W=({bb_med[2]:2.0f}, {bb_max[2]:2.0f})  '
             s4 = f'FalsePos: FG={fp_fg:2.0f} BG={fp_bg:2.0f}'
-            print(f'  {batch:,}: Cost: {int(cost):6,}  ' + s1 + s2 + s3 + s4)
+            print(f'  {batch:,}: Cost: {int(rpn_cost):,}  ' + s1 + s2 + s3 + s4)
 
 
 def main():
