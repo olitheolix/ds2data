@@ -38,7 +38,6 @@ def stampImage(background, fg_shapes, N):
 
         # Pick a random foreground label and specimen.
         label = random.choice(list(fg_shapes.keys()))
-        labels.append(label)
         idx = np.random.randint(0, len(fg_shapes[label]))
         fg = np.array(fg_shapes[label][idx])
         im_height, im_width = np.array(fg.shape[:2], np.float32)
@@ -53,6 +52,7 @@ def stampImage(background, fg_shapes, N):
         # Verify if the region is already occupied. Do nothing if it is.
         if np.sum(occupied[y0:y1, x0:x1]) > 0:
             continue
+        labels.append(label)
         occupied[y0:y1, x0:x1] = 1
         bboxes.append([x0, y0, x1, y1])
 
@@ -67,6 +67,7 @@ def stampImage(background, fg_shapes, N):
 
         # Stamp the foreground object into the background image.
         out[y0:y1, x0:x1] = (1 - alpha) * out[y0:y1, x0:x1] + alpha * fg
+    assert len(bboxes) == len(labels)
     return out, bboxes, labels
 
 
