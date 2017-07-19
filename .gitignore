@@ -12,3 +12,4 @@ __pycache__/
 /models/ssd/data/
 /models/ssd/saved/
 /models/ssd/.cache/
+/models/ssd/netstate/
