@@ -149,8 +149,11 @@ def setup(fname, x_in, num_classes, layer_out_dims, trainable):
 
         W1_dim = (3, 3, num_features_in, num_features_out)
         b1_dim = (num_features_out, 1, 1)
-        W2_dim = (7, 7, num_features_out, 4 + num_classes)
+        W2_dim = (9, 9, num_features_out, 4 + num_classes)
         b2_dim = (4 + num_classes, 1, 1)
+
+        rf = int(W2_dim[0] * (512 / layer_dim[0]))
+        print(f'Receptive field: {rf}x{rf}')
 
         if fname is None:
             print('RPN: random init')
