@@ -44,12 +44,14 @@ def predictImage(sess, rpn_out_dims, x_in, img, ys):
 
         # Compile BBox data from network output.
         hard = np.argmax(pred_labels, axis=0)
-        bb_dims, _ = compile_bboxes.bboxFromNetOutput(img.shape[1:], bboxes, hard)
+        bb_dims, pick_yx = compile_bboxes.bboxFromNetOutput(img.shape[1:], bboxes, hard)
         del hard, bboxes
 
         # Suppress overlapping BBoxes.
-        scores = np.ones(len(bb_dims))
-        idx = sess.run(tf.image.non_max_suppression(bb_dims, scores, 30, 0.5))
+        scores = sess.run(tf.reduce_max(tf.nn.softmax(pred_labels, dim=0), axis=0))
+        scores = scores[pick_yx]
+        assert len(scores) == len(bb_dims)
+        idx = sess.run(tf.image.non_max_suppression(bb_dims, scores, 30, 0.2))
         bb_dims = bb_dims[idx]
         del scores, idx
 
