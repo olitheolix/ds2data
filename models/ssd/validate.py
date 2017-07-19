@@ -7,6 +7,7 @@ import pickle
 import rpn_net
 import shared_net
 import data_loader
+import collections
 import feature_masks
 import compile_bboxes
 
@@ -96,7 +97,6 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
     rpnc_dims = ds.getRpncDimensions()
 
     etime = []
-    import collections
     bb_max = collections.defaultdict(list)
     bb_med = collections.defaultdict(list)
     fg_fp = collections.defaultdict(list)
@@ -179,7 +179,7 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
         etime = np.mean(etime)
     else:
         etime = np.mean(etime[1:-1])
-    print(f'  Prediction time per image: {1000 * etime:.0f}ms')
+    print(f'Prediction time per image: {1000 * etime:.0f}ms')
 
 
 def plotPredictedLabelMap(rpnc_dims, img, preds, ys):
