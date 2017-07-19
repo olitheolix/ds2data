@@ -120,7 +120,9 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
         # first because we will show it as a specimen at the end.
         fig = showPredictedBBoxes(img, bb_dims, bb_labels, gt_labels, int2name)
         fig.savefig(f'/tmp/bbox_{i:04d}.jpg', **fig_opts)
-        if i > 0:
+        if i == 0:
+            plotPredictedLabelMap(rpnc_dims, img, preds, ys)
+        else:
             fig.close()
         del bb_dims, bb_labels, gt_labels
 
@@ -178,6 +180,27 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
     else:
         etime = np.mean(etime[1:-1])
     print(f'  Prediction time per image: {1000 * etime:.0f}ms')
+
+
+def plotPredictedLabelMap(rpnc_dims, img, preds, ys):
+    plt.figure()
+    num_cols = 3
+    num_rows = len(rpnc_dims)
+    for idx, layer_dim in enumerate(rpnc_dims):
+        true_labels = ys[layer_dim][4:]
+        pred_labels = preds[layer_dim][4:]
+
+        plt.subplot(num_rows, 3, idx * num_cols + 1)
+        plt.imshow(np.argmax(true_labels, axis=0))
+        plt.title(f'True {layer_dim}')
+
+        plt.subplot(num_rows, 3, idx * num_cols + 2)
+        plt.imshow(np.transpose(img, [1, 2, 0]))
+        plt.title('Input Image')
+
+        plt.subplot(num_rows, 3, idx * num_cols + 3)
+        plt.imshow(np.argmax(pred_labels, axis=0))
+        plt.title(f'Pred {layer_dim}')
 
 
 def smoothSignal(sig, keep_percentage):
