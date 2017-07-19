@@ -174,7 +174,7 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
         # Compile the feed dictionary so that we can train all RPCNs.
         x = np.expand_dims(img, 0)
         fd = {x_in: x, lrate_in: lrate}
-        for net_id, y in ys.items():
+        for rpn_dim, y in ys.items():
             # Determine the mask for the cost function because we only want to
             # learn BBoxes where there are objects. Similarly, we also do not
             # want to learn the class label at every location since most
@@ -182,19 +182,21 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
             mask_cls, mask_bbox = computeMasks(img, y)
 
             # Run optimiser and log the cost.
-            fd[g(f'rpn{net_id}-cost/y:0')] = np.expand_dims(y, 0)
-            fd[g(f'rpn{net_id}-cost/mask_cls:0')] = np.expand_dims(mask_cls, 0)
-            fd[g(f'rpn{net_id}-cost/mask_bbox:0')] = np.expand_dims(mask_bbox, 0)
-            del net_id, y, mask_cls, mask_bbox
+            name = f'{rpn_dim[0]}x{rpn_dim[1]}'
+            fd[g(f'rpn-{name}-cost/y:0')] = np.expand_dims(y, 0)
+            fd[g(f'rpn-{name}-cost/mask_cls:0')] = np.expand_dims(mask_cls, 0)
+            fd[g(f'rpn-{name}-cost/mask_bbox:0')] = np.expand_dims(mask_bbox, 0)
+            del rpn_dim, y, mask_cls, mask_bbox, name
 
         # Run one optimisation step.
         cost, _ = sess.run([g('cost:0'), opt], feed_dict=fd)
         log['cost'].append(cost)
         del fd
 
-        for net_id, y in ys.items():
+        for rpn_dim, y in ys.items():
+            name = f'{rpn_dim[0]}x{rpn_dim[1]}'
             # Predict. Ensure there are no NaN in the output.
-            pred = sess.run(g(f'rpn{net_id}/rpn_out:0'), feed_dict={x_in: x})
+            pred = sess.run(g(f'rpn-{name}/rpn_out:0'), feed_dict={x_in: x})
             pred = pred[0]
             assert not np.any(np.isnan(pred))
 
@@ -212,18 +214,18 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
                 bb_med = np.median(acc.bbox_err, axis=1)
 
             # Log training stats for plotting later.
-            if net_id not in log:
-                log[net_id] = collections.defaultdict(list)
-            log[net_id]['num_bb'].append(num_bb)
-            log[net_id]['err_x'].append([bb_med[0], bb_max[0]])
-            log[net_id]['err_y'].append([bb_med[1], bb_max[1]])
-            log[net_id]['err_w'].append([bb_med[2], bb_max[2]])
-            log[net_id]['err_h'].append([bb_med[3], bb_max[3]])
-            log[net_id]['err_fg'].append(acc.fg_err)
-            log[net_id]['fg_falsepos'].append(acc.pred_fg_falsepos)
-            log[net_id]['bg_falsepos'].append(acc.pred_bg_falsepos)
-            log[net_id]['gt_fg_tot'].append(acc.gt_fg_tot)
-            log[net_id]['gt_bg_tot'].append(acc.gt_bg_tot)
+            if rpn_dim not in log:
+                log[rpn_dim] = collections.defaultdict(list)
+            log[rpn_dim]['num_bb'].append(num_bb)
+            log[rpn_dim]['err_x'].append([bb_med[0], bb_max[0]])
+            log[rpn_dim]['err_y'].append([bb_med[1], bb_max[1]])
+            log[rpn_dim]['err_w'].append([bb_med[2], bb_max[2]])
+            log[rpn_dim]['err_h'].append([bb_med[3], bb_max[3]])
+            log[rpn_dim]['err_fg'].append(acc.fg_err)
+            log[rpn_dim]['fg_falsepos'].append(acc.pred_fg_falsepos)
+            log[rpn_dim]['bg_falsepos'].append(acc.pred_bg_falsepos)
+            log[rpn_dim]['gt_fg_tot'].append(acc.gt_fg_tot)
+            log[rpn_dim]['gt_bg_tot'].append(acc.gt_bg_tot)
 
             # Print progress report to terminal.
             fp_bg = acc.pred_bg_falsepos
@@ -264,7 +266,7 @@ def main():
         conf = config.NetConf(
             seed=0, width=512, height=512, colour='rgb',
             keep_prob=0.8, path=data_path, train_rat=0.8,
-            num_pools_shared=2, num_pools_rpn=1,
+            num_pools_shared=2, rpn_out_dims=[(64, 64), (32, 32)],
             dtype='float32', num_epochs=0, num_samples=None
         )
         print('\n----- New Configuration -----')
@@ -293,7 +295,7 @@ def main():
     # Create the input variable, the shared network and the RPN.
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
     shared_out = shared_net.setup(fn_shd, x_in, conf.num_pools_shared, True)
-    rpn_outs = rpn_net.setup(fn_rpn, shared_out, num_cls, conf.num_pools_rpn, True)
+    rpn_net.setup(fn_rpn, shared_out, num_cls, conf.rpn_out_dims, True)
     del fn_shd, fn_rpn
 
     # The size of the shared-net output determines the size of the RPN input.
@@ -302,13 +304,11 @@ def main():
     lrate_in = tf.placeholder(tf.float32, name='lrate')
 
     # Select cost function, optimiser and initialise the TF graph.
-    partial_costs = []
-    for net_id, rpn_out in enumerate(rpn_outs):
-        partial_costs.append(rpn_net.cost(net_id, rpn_out))
-    cost = tf.add_n(partial_costs, name='cost')
+    cost = [rpn_net.cost(rpn_dim) for rpn_dim in conf.rpn_out_dims]
+    cost = tf.add_n(cost, name='cost')
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
     sess.run(tf.global_variables_initializer())
-    del cost, partial_costs, rpn_outs
+    del cost
 
     print(f'\n----- Training for another {param.N} Epochs -----')
     try:
@@ -322,7 +322,7 @@ def main():
             trainEpoch(conf, ds, sess, log, opt, lrates[epoch])
 
             # Save the network states and log data.
-            rpn_net.save(fnames['rpn_net'], sess, conf.num_pools_rpn)
+            rpn_net.save(fnames['rpn_net'], sess, conf.rpn_out_dims)
             shared_net.save(fnames['shared_net'], sess)
             conf = conf._replace(num_epochs=epoch)
             meta = {'conf': conf, 'log': log}

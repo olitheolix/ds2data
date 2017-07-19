@@ -3,10 +3,10 @@ import numpy as np
 import tensorflow as tf
 
 
-def model(x_in, layer_id, bwt1, bwt2):
+def model(x_in, name, bwt1, bwt2):
     # Convenience
     conv_opts = dict(padding='SAME', data_format='NCHW')
-    with tf.variable_scope(f'rpn{layer_id}'):
+    with tf.variable_scope(f'rpn-{name}'):
         # Convolution layer to downsample the feature map.
         # Shape: [-1, 64, 64, 64] ---> [-1, 64, 32, 32]
         # Kernel: 3x3
@@ -26,8 +26,13 @@ def model(x_in, layer_id, bwt1, bwt2):
     return net_out, rpn_out
 
 
-def cost(net_id, pred_net):
+def cost(rpn_dim):
     """ Return the scalar cost node."""
+    assert len(rpn_dim) == 2
+    assert isinstance(rpn_dim[0], int) and isinstance(rpn_dim[1], int)
+    g = tf.get_default_graph().get_tensor_by_name
+    name = f'{rpn_dim[0]}x{rpn_dim[1]}'
+    pred_net = g(f'rpn-{name}/rpn_out:0')
     chan, ft_height, ft_width = pred_net.shape.as_list()[1:]
 
     num_classes = chan - 4
@@ -35,7 +40,7 @@ def cost(net_id, pred_net):
 
     dtype = pred_net.dtype
     cost_ce = tf.nn.softmax_cross_entropy_with_logits
-    with tf.variable_scope(f'rpn{net_id}-cost'):
+    with tf.variable_scope(f'rpn-{name}-cost'):
         y_in = tf.placeholder(dtype, pred_net.shape, name='y')
         mask_cls = tf.placeholder(dtype, [None, ft_height, ft_width], name='mask_cls')
         mask_bbox = tf.placeholder(dtype, [None, ft_height, ft_width], name='mask_bbox')
@@ -101,7 +106,7 @@ def cost(net_id, pred_net):
     return cost_tot
 
 
-def save(fname, sess, num_layers):
+def save(fname, sess, layer_out_dims):
     """ Save the pickled network state to `fname`.
 
     Args:
@@ -112,10 +117,11 @@ def save(fname, sess, num_layers):
     # Query the state of the shared network (weights and biases).
     g = tf.get_default_graph().get_tensor_by_name
     state = {}
-    for layer_id in range(num_layers):
-        W1, b1 = sess.run([g(f'rpn{layer_id}/W1:0'), g(f'rpn{layer_id}/b1:0')])
-        W2, b2 = sess.run([g(f'rpn{layer_id}/W2:0'), g(f'rpn{layer_id}/b2:0')])
-        state[layer_id] = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
+    for layer_dim in layer_out_dims:
+        layer_name = f'{layer_dim[0]}x{layer_dim[1]}'
+        W1, b1 = sess.run([g(f'rpn-{layer_name}/W1:0'), g(f'rpn-{layer_name}/b1:0')])
+        W2, b2 = sess.run([g(f'rpn-{layer_name}/W2:0'), g(f'rpn-{layer_name}/b2:0')])
+        state[layer_dim] = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
 
     # Save the state.
     pickle.dump(state, open(fname, 'wb'))
@@ -125,17 +131,25 @@ def load(fname):
     return pickle.load(open(fname, 'rb'))
 
 
-def setup(fname, x_in, num_classes, num_layers, trainable):
+def setup(fname, x_in, num_classes, layer_out_dims, trainable):
     assert x_in.dtype in [tf.float16, tf.float32]
     dtype = np.float16 if x_in.dtype == tf.float16 else np.float32
+    num_features_out = 64
 
     out = []
-    for layer_id in range(num_layers):
-        num_filters = x_in.shape.as_list()[1]
+    for layer_dim in layer_out_dims:
+        assert isinstance(layer_dim, tuple) and len(layer_dim) == 2
+        assert x_in.shape.as_list()[2:] == list(2 * np.array(layer_dim))
 
-        W1_dim = (3, 3, num_filters, 64)
-        b1_dim = (64, 1, 1)
-        W2_dim = (7, 7, 64, 4 + num_classes)
+        # Create a layer name based on the dimension. This will be the name of
+        # the Tensorflow namespace.
+        layer_name = f'{layer_dim[0]}x{layer_dim[1]}'
+
+        num_features_in = x_in.shape.as_list()[1]
+
+        W1_dim = (3, 3, num_features_in, num_features_out)
+        b1_dim = (num_features_out, 1, 1)
+        W2_dim = (7, 7, num_features_out, 4 + num_classes)
         b2_dim = (4 + num_classes, 1, 1)
 
         if fname is None:
@@ -147,8 +161,8 @@ def setup(fname, x_in, num_classes, num_layers, trainable):
         else:
             print(f'RPN: restored from <{fname}>')
             net = load(fname)
-            b1, W1 = net[layer_id]['b1'], net[layer_id]['W1']
-            b2, W2 = net[layer_id]['b2'], net[layer_id]['W2']
+            b1, W1 = net[layer_dim]['b1'], net[layer_dim]['W1']
+            b2, W2 = net[layer_dim]['b2'], net[layer_dim]['W2']
 
         assert b1.dtype == W1.dtype == dtype
         assert b1.shape == b1_dim and W1.shape == W1_dim
@@ -157,7 +171,7 @@ def setup(fname, x_in, num_classes, num_layers, trainable):
 
         bwt1 = (b1, W1, trainable)
         bwt2 = (b2, W2, trainable)
-        net_out, rpn_out = model(x_in, layer_id, bwt1, bwt2)
+        net_out, rpn_out = model(x_in, layer_name, bwt1, bwt2)
         out.append(rpn_out)
 
         x_in = net_out

@@ -290,30 +290,24 @@ class BBox(DataSet):
             y_bbox = y_bbox['y_bbox']
             assert isinstance(y_bbox, dict)
 
-            ft_max = self.conf.height // (2 ** self.conf.num_pools_shared)
-            ft_max = ft_max // 2
-            ft_min = ft_max // (2 ** (self.conf.num_pools_rpn - 1))
-            net_id = -1
             all_labels.append(collections.defaultdict(list))
-            for (ft_height, ft_width), bbox in reversed(sorted(y_bbox.items())):
-                if not (ft_min <= ft_height <= ft_max):
-                    continue
-                net_id += 1
+            for ft_dim in self.conf.rpn_out_dims:
+                bbox = y_bbox[ft_dim]
 
                 assert bbox.shape[0] == 5
                 labels, bboxes = bbox[0], bbox[1:]
-                assert labels.shape == (ft_height, ft_width)
+                assert labels.shape == ft_dim
 
                 # Convert the integer label to one-hot-encoding.
                 labels = self.toHotLabels(labels, num_classes)
-                assert labels.shape == (num_classes, ft_height, ft_width)
+                assert labels.shape == (num_classes, *ft_dim)
 
                 # Stack the feature vector. Its first 4 dimensions are the BBox
-                # data, the remaining are the class labels.
+                # data and the remaining ones the class labels.
                 labels = np.vstack([bboxes, labels])
-                assert labels.shape == (4 + num_classes, ft_height, ft_width)
+                assert labels.shape == (4 + num_classes, *ft_dim)
 
-                all_labels[-1][net_id] = np.array(labels, np.float32)
+                all_labels[-1][ft_dim] = np.array(labels, np.float32)
 
             all_features.append(img)
             meta.append(self.MetaData(fname))
