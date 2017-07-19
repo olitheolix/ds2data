@@ -176,40 +176,38 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
         assert img.ndim == 3 and isinstance(ys, dict)
 
         # Compile the feed dictionary so that we can train all RPCNs.
-        x = np.expand_dims(img, 0)
-        fd = {x_in: x, lrate_in: lrate}
+        fd = {x_in: np.expand_dims(img, 0), lrate_in: lrate}
         for rpn_dim in rpnc_dims:
-            y = ys[rpn_dim]
             # Determine the mask for the cost function because we only want to
             # learn BBoxes where there are objects. Similarly, we also do not
             # want to learn the class label at every location since most
             # correspond to the 'background' class and bias the training.
-            mask_cls, mask_bbox = computeMasks(img, y)
+            mask_cls, mask_bbox = computeMasks(img, ys[rpn_dim])
 
             # Run optimiser and log the cost.
-            name = f'{rpn_dim[0]}x{rpn_dim[1]}'
-            fd[g(f'rpn-{name}-cost/y:0')] = np.expand_dims(y, 0)
-            fd[g(f'rpn-{name}-cost/mask_cls:0')] = np.expand_dims(mask_cls, 0)
-            fd[g(f'rpn-{name}-cost/mask_bbox:0')] = np.expand_dims(mask_bbox, 0)
-            del rpn_dim, y, mask_cls, mask_bbox, name
+            layer_name = f'{rpn_dim[0]}x{rpn_dim[1]}'
+            fd[g(f'rpn-{layer_name}-cost/y:0')] = np.expand_dims(ys[rpn_dim], 0)
+            fd[g(f'rpn-{layer_name}-cost/mask_cls:0')] = np.expand_dims(mask_cls, 0)
+            fd[g(f'rpn-{layer_name}-cost/mask_bbox:0')] = np.expand_dims(mask_bbox, 0)
+            del rpn_dim, mask_cls, mask_bbox, layer_name
 
         # Run one optimisation step.
         cost, _ = sess.run([g('cost:0'), opt], feed_dict=fd)
         log['cost'].append(cost)
         del fd
 
+        feed_dict = {x_in: np.expand_dims(img, 0)}
         for rpn_dim in rpnc_dims:
-            y = ys[rpn_dim]
             layer_name = f'{rpn_dim[0]}x{rpn_dim[1]}'
 
             # Predict. Ensure there are no NaN in the output.
-            pred = sess.run(g(f'rpn-{layer_name}/rpn_out:0'), feed_dict={x_in: x})
+            pred = sess.run(g(f'rpn-{layer_name}/rpn_out:0'), feed_dict=feed_dict)
             pred = pred[0]
             assert not np.any(np.isnan(pred))
 
             # Compute training statistics.
-            mask_cls, mask_bbox = computeMasks(img, y)
-            acc = accuracy(y, pred, mask_cls, mask_bbox)
+            mask_cls, mask_bbox = computeMasks(img, ys[rpn_dim])
+            acc = accuracy(ys[rpn_dim], pred, mask_cls, mask_bbox)
             num_bb = acc.bbox_err.shape[1]
 
             # Compute maximum/median BBox errors. If this features map did not
