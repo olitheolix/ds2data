@@ -246,6 +246,7 @@ class BBox(DataSet):
 
         # The size of the returned images.
         dims = (chan, height, width)
+        self.rpnc_dims = self.conf.rpn_out_dims
 
         # Find all training images. Abort if there are none.
         fnames = glob.glob(f'{self.conf.path}/*.jpg')
@@ -291,7 +292,7 @@ class BBox(DataSet):
             assert isinstance(y_bbox, dict)
 
             all_labels.append(collections.defaultdict(list))
-            for ft_dim in self.conf.rpn_out_dims:
+            for ft_dim in self.rpnc_dims:
                 bbox = y_bbox[ft_dim]
 
                 assert bbox.shape[0] == 5
@@ -328,6 +329,9 @@ class BBox(DataSet):
                 assert 0 <= label < num_classes
                 out[label, y, x] = 1
         return out
+
+    def getRpncDimensions(self):
+        return tuple(self.rpnc_dims)
 
 
 class Folder(DataSet):
