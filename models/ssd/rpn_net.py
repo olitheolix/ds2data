@@ -137,6 +137,12 @@ def setup(fname, x_in, num_classes, layer_out_dims, trainable):
     num_features_out = 64
 
     out = []
+    print(f'RPN ({len(layer_out_dims)} layers):')
+    if fname is None:
+        print(f'  Restored from <{fname}>')
+    else:
+        print('  Randomly initialised weights')
+
     for layer_dim in layer_out_dims:
         assert isinstance(layer_dim, tuple) and len(layer_dim) == 2
         assert x_in.shape.as_list()[2:] == list(2 * np.array(layer_dim))
@@ -152,20 +158,18 @@ def setup(fname, x_in, num_classes, layer_out_dims, trainable):
         W2_dim = (9, 9, num_features_out, 4 + num_classes)
         b2_dim = (4 + num_classes, 1, 1)
 
-        rf = int(W2_dim[0] * (512 / layer_dim[0]))
-        print(f'Receptive field: {rf}x{rf}')
-
         if fname is None:
-            print('RPN: random init')
             b1 = 0.5 + np.zeros(b1_dim).astype(dtype)
             W1 = np.random.normal(0.0, 0.1, W1_dim).astype(dtype)
             b2 = 0.5 + np.zeros(b2_dim).astype(dtype)
             W2 = np.random.normal(0.0, 0.1, W2_dim).astype(dtype)
         else:
-            print(f'RPN: restored from <{fname}>')
             net = load(fname)
             b1, W1 = net[layer_dim]['b1'], net[layer_dim]['W1']
             b2, W2 = net[layer_dim]['b2'], net[layer_dim]['W2']
+
+        rf = int(W2_dim[0] * (512 / layer_dim[0]))
+        print(f'  Feature size: {layer_dim}  Receptive field: {rf}x{rf}')
 
         assert b1.dtype == W1.dtype == dtype
         assert b1.shape == b1_dim and W1.shape == W1_dim
