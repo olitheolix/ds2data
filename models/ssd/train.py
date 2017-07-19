@@ -192,6 +192,7 @@ def main():
         'meta': os.path.join(net_path, 'rpn-meta.pickle'),
         'rpn_net': os.path.join(net_path, 'rpn-net.pickle'),
         'shared_net': os.path.join(net_path, 'shared-net.pickle'),
+        'checkpt': os.path.join(net_path, 'tf-checkpoint.pickle'),
     }
 
     # Restore the configuration if it exists, otherwise create a new one.
@@ -224,18 +225,10 @@ def main():
     assert conf.dtype in ['float32', 'float16']
     tf_dtype = tf.float32 if conf.dtype == 'float32' else tf.float16
 
-    # Determine which network state to restore, if any.
-    if restore:
-        fn_shd = fnames['shared_net']
-        fn_rpn = fnames['rpn_net']
-    else:
-        fn_shd = fn_rpn = None
-
     # Create the input variable, the shared network and the RPN.
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
-    shared_out = shared_net.setup(fn_shd, x_in, conf.num_pools_shared, True)
-    rpn_net.setup(fn_rpn, shared_out, num_cls, conf.rpn_out_dims, True)
-    del fn_shd, fn_rpn
+    shared_out = shared_net.setup(None, x_in, conf.num_pools_shared, True)
+    rpn_net.setup(None, shared_out, num_cls, conf.rpn_out_dims, True)
 
     # The size of the shared-net output determines the size of the RPN input.
     # We only need this for training purposes in order to create the masks and
@@ -248,6 +241,12 @@ def main():
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
     sess.run(tf.global_variables_initializer())
     del cost
+
+    # Restore the network from Tensorflow's checkpoint file.
+    saver = tf.train.Saver()
+    if restore:
+        print('\nRestored Tensorflow checkpoint file')
+        saver.restore(sess, fnames['checkpt'])
 
     print(f'\n----- Training for another {param.N} Epochs -----')
     try:
@@ -267,6 +266,7 @@ def main():
             log['conf'] = conf
             meta = {'conf': conf, 'log': log}
             pickle.dump(meta, open(fnames['meta'], 'wb'))
+            saver.save(sess, fnames['checkpt'])
     except KeyboardInterrupt:
         pass
 
