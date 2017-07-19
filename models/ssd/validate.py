@@ -86,8 +86,7 @@ def predictImage(sess, rpn_out_dims, x_in, img, ys):
     return preds, bb_dims_out, pred_labels_out, true_labels_out
 
 
-def validateEpoch(log, sess, ds, x_in, dset='train'):
-    print('\nWARNING: using training set\n')
+def validateEpoch(log, sess, ds, x_in, dset='test'):
     # Predict the BBoxes for every image in the test data set and accumulate
     # error statistics.
     ds.reset()
