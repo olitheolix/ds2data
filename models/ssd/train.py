@@ -160,6 +160,10 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
     x_in = g('x_in:0')
     lrate_in = g('lrate:0')
 
+    rpnc_dims = ds.getRpncDimensions()
+    if 'rpnc' not in log:
+        log['rpnc'] = {dim: collections.defaultdict(list) for dim in rpnc_dims}
+
     batch = -1
     while True:
         batch += 1
@@ -217,18 +221,16 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
                 bb_med = np.median(acc.bbox_err, axis=1)
 
             # Log training stats for plotting later.
-            if rpn_dim not in log:
-                log[rpn_dim] = collections.defaultdict(list)
-            log[rpn_dim]['num_bb'].append(num_bb)
-            log[rpn_dim]['err_x'].append([bb_med[0], bb_max[0]])
-            log[rpn_dim]['err_y'].append([bb_med[1], bb_max[1]])
-            log[rpn_dim]['err_w'].append([bb_med[2], bb_max[2]])
-            log[rpn_dim]['err_h'].append([bb_med[3], bb_max[3]])
-            log[rpn_dim]['err_fg'].append(acc.fg_err)
-            log[rpn_dim]['fg_falsepos'].append(acc.pred_fg_falsepos)
-            log[rpn_dim]['bg_falsepos'].append(acc.pred_bg_falsepos)
-            log[rpn_dim]['gt_fg_tot'].append(acc.gt_fg_tot)
-            log[rpn_dim]['gt_bg_tot'].append(acc.gt_bg_tot)
+            log['rpnc'][rpn_dim]['num_bb'].append(num_bb)
+            log['rpnc'][rpn_dim]['err_x'].append([bb_med[0], bb_max[0]])
+            log['rpnc'][rpn_dim]['err_y'].append([bb_med[1], bb_max[1]])
+            log['rpnc'][rpn_dim]['err_w'].append([bb_med[2], bb_max[2]])
+            log['rpnc'][rpn_dim]['err_h'].append([bb_med[3], bb_max[3]])
+            log['rpnc'][rpn_dim]['err_fg'].append(acc.fg_err)
+            log['rpnc'][rpn_dim]['fg_falsepos'].append(acc.pred_fg_falsepos)
+            log['rpnc'][rpn_dim]['bg_falsepos'].append(acc.pred_bg_falsepos)
+            log['rpnc'][rpn_dim]['gt_fg_tot'].append(acc.gt_fg_tot)
+            log['rpnc'][rpn_dim]['gt_bg_tot'].append(acc.gt_bg_tot)
 
             # Print progress report to terminal.
             fp_bg = acc.pred_bg_falsepos
