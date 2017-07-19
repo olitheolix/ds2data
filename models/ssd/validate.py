@@ -320,15 +320,15 @@ def showPredictedBBoxes(img_chw, bboxes, pred_labels, true_labels, int2name):
     font = dict(color='white', alpha=0.5, size=12, weight='normal')
     rect_opts = dict(linewidth=1, facecolor='none', edgecolor=None)
 
-    # Show the input image.
-    plt.figure()
-    ax = plt.gca()
-    ax.set_axis_off()
-    ax.imshow(img)
-
     # Add the predicted BBoxes and their labels.
     assert len(bboxes) == len(pred_labels) == len(true_labels)
     for layer_dim in bboxes:
+        # Show the input image.
+        plt.figure()
+        ax = plt.gca()
+        ax.set_axis_off()
+        ax.imshow(img)
+
         bb = bboxes[layer_dim]
         pred_lab = pred_labels[layer_dim]
         true_lab = true_labels[layer_dim]
@@ -338,6 +338,7 @@ def showPredictedBBoxes(img_chw, bboxes, pred_labels, true_labels, int2name):
             rect_opts['edgecolor'] = 'g' if label == gt_label else 'r'
             ax.add_patch(patches.Rectangle((x0, y0), w, h, **rect_opts))
             ax.text(x0, y0, f'P: {int2name[label]}', fontdict=font)
+        plt.title(f'Layer {layer_dim}')
     return plt
 
 
