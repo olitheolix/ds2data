@@ -204,7 +204,6 @@ def smoothSignal(sig, keep_percentage):
 
 def plotTrainingProgress(log):
     plt.figure()
-    plt.subplot(2, 3, 1)
     cost = log['cost']
     cost_s = smoothSignal(cost, 0.5)
     plt.semilogy(cost)
