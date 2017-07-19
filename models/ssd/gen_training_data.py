@@ -43,8 +43,8 @@ def parseCmdline():
     # Add the command line options.
     padd('-N', metavar='', type=int, default=100,
          help='Number of output images')
-    padd('-width', metavar='', type=int, default=64, help='Width (default 64)')
-    padd('-height', metavar='', type=int, default=64, help='Height (default 64)')
+    padd('-width', metavar='', type=int, default=128, help='Width (default 128)')
+    padd('-height', metavar='', type=int, default=128, help='Height (default 128)')
     padd('-seed', metavar='', type=int, default=None,
          help='Seed value for reproducible results (default None)')
     padd('-num-pools', metavar='', type=int, default=2,

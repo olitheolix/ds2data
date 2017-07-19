@@ -43,7 +43,7 @@ def stampImage(background, fg_shapes, N):
         im_height, im_width = np.array(fg.shape[:2], np.float32)
 
         # Compute random region in foreground image to put the object.
-        w, h = np.random.uniform(0.5, 1.0) * np.array([im_width, im_height])
+        w, h = np.random.uniform(0.25, 1.0) * np.array([im_width, im_height])
         w, h = int(w), int(h)
         x0 = np.random.randint(0, 1 + bg_width - w)
         y0 = np.random.randint(0, 1 + bg_height - h)
