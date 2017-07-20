@@ -215,16 +215,16 @@ def showBBoxData(img, y_bbox, y_score):
 
     plt.subplot(2, 2, 2)
     plt.imshow(img_bbox)
-    plt.title('Pred BBoxes')
+    plt.title('BBoxes')
 
     plt.subplot(2, 2, 3)
     plt.imshow(labels.astype(np.float32))
-    plt.title('GT Label')
+    plt.title(f'GT Label {labels.shape[1]}x{labels.shape[0]}')
 
     score = np.amax(y_score, axis=0).astype(np.float32)
     plt.subplot(2, 2, 4)
     plt.imshow(score, cmap='hot')
-    plt.title('GT Score')
+    plt.title(f'GT Score {score.shape[1]}x{score.shape[0]}')
 
 
 def compileBBoxData(args):
