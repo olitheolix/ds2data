@@ -313,7 +313,7 @@ def showPredictedBBoxes(img_chw, bboxes, pred_labels, true_labels, int2name):
     img = (255 * img).astype(np.uint8)
 
     # Parameters for the overlays that will state true/predicted label.
-    font = dict(color='white', alpha=0.5, size=12, weight='normal')
+    font = dict(color='white', alpha=0.5, size=5, weight='normal')
     rect_opts = dict(linewidth=1, facecolor='none', edgecolor=None)
 
     # Add the predicted BBoxes and their labels.
