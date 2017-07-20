@@ -86,6 +86,9 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
     anchor in the full image, and another two values to specify the
     absolute width/height in pixels.
     """
+    # The first score dimension enumerates BBox, *not* labels.
+    assert len(bboxes) == len(bbox_score)
+
     # Unpack dimension.
     ft_height, ft_width = ft_dim
     im_height, im_width = bbox_score.shape[1:]
@@ -105,29 +108,29 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
             anchor_x = int(np.round(anchor_x))
             anchor_y = int(np.round(anchor_y))
 
-            # Find out which BBox (if any) has the highest score in the
-            # vicinity of the anchor.
+            # Extract the anchor neighbourhood in the score-map.
             x0, x1 = anchor_x - ofs_x, anchor_x + ofs_x
             y0, y1 = anchor_y - ofs_y, anchor_y + ofs_y
             x0, x1 = np.clip([x0, x1], 0, im_width - 1)
             y0, y1 = np.clip([y0, y1], 0, im_height - 1)
-            tmp = bbox_score[:, y0:y1, x0:x1]
-            best = np.argmax(np.amax(tmp, axis=(1, 2)))
-            if bbox_score[best, anchor_y, anchor_x] <= thresh:
-                continue
-            del x0, x1, y0, y1, tmp
+            neigh = bbox_score[:, y0:y1, x0:x1]
+            del x0, x1, y0, y1
 
-            # Unpack the parameters and label for the BBox with the best score.
-            # The corners are in image coordinates.
-            bbox_x0, bbox_y0, bbox_x1, bbox_y1 = bboxes[best]
-
-            # Ignore this BBox if it is (partially) outside the image.
-            if bbox_x0 < 0 or bbox_x1 >= im_width:
-                continue
-            if bbox_y0 < 0 or bbox_y1 >= im_height:
+            # Skip this location if the neighbourhood is devoid of any BBoxes
+            # that exceed the score.
+            if np.amax(neigh) <= thresh:
                 continue
 
-            label_int = bbox_labels[best]
+            # Determine which BBox has the best score.
+            neigh = np.amax(neigh, axis=(1, 2))
+            best_idx = np.argmax(neigh)
+            assert 0 <= best_idx < len(bboxes)
+
+            # Unpack the label and parameters of the best BBox.
+            label_int = bbox_labels[best_idx]
+            bbox_x0, bbox_y0, bbox_x1, bbox_y1 = bboxes[best_idx]
+            assert 0 <= bbox_x0 < bbox_x1 < im_width
+            assert 0 <= bbox_y0 < bbox_y1 < im_height
 
             # Compute the BBox location, width and height relative to the
             # anchor (image coordinates).
