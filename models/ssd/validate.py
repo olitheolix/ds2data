@@ -117,7 +117,7 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
     ds.reset()
     N = ds.lenOfEpoch(dset)
     int2name = ds.classNames()
-    fig_opts = dict(dpi=300, transparent=True, bbox_inches='tight', pad_inches=0)
+    fig_opts = dict(dpi=150, transparent=True, bbox_inches='tight', pad_inches=0)
     rpnc_dims = ds.getRpncDimensions()
 
     etime = []
@@ -140,9 +140,11 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
         for _ in preds.values():
             assert not np.any(np.isnan(_))
 
-        # Create and save image with annotated BBoxes. Close all images but the
-        # first because we will show it as a specimen at the end.
+        # Show the input image and add the BBoxes. Save the result and close
+        # the Matplotlib figure unless it is the very first one, because we
+        # will show it for debug purposes once the script has finished.
         fig = showPredictedBBoxes(img, bb_rects, bb_labels, gt_labels, int2name)
+        fig.gcf().set_size_inches(20, 11)
         fig.savefig(f'/tmp/bbox_{i:04d}.jpg', **fig_opts)
         if i == 0:
             plotPredictedLabelMap(rpnc_dims, img, preds, ys)
@@ -335,7 +337,6 @@ def showPredictedBBoxes(img_chw, bboxes, pred_labels, true_labels, int2name):
     img = (255 * img).astype(np.uint8)
 
     # Parameters for the overlays that will state true/predicted label.
-    font = dict(color='white', alpha=0.5, size=5, weight='normal')
     rect_opts = dict(linewidth=1, facecolor='none', edgecolor=None)
 
     # Add the predicted BBoxes and their labels.
@@ -355,12 +356,22 @@ def showPredictedBBoxes(img_chw, bboxes, pred_labels, true_labels, int2name):
         pred_lab = pred_labels[layer_dim]
         true_lab = true_labels[layer_dim]
         for label, (x0, y0, x1, y1), gt_label in zip(pred_lab, bb, true_lab):
+            # Width/height of BBox.
             w = x1 - x0 + 1
             h = y1 - y0 + 1
+
+            # Draw the rectangle.
             rect_opts['edgecolor'] = 'g' if label == gt_label else 'r'
             ax.add_patch(patches.Rectangle((x0, y0), w, h, **rect_opts))
-            ax.text(x0, y0, f'P: {int2name[label]}', fontdict=font)
-        plt.title(f'Layer {layer_dim}')
+
+            # Place the predicted label in the middle of the top BBox line.
+            ax.text(
+                x0 + w / 2, y0, f' {int2name[label]} ',
+                bbox={'facecolor': 'black', 'pad': 0},
+                fontdict=dict(color='white', size=12, weight='normal'),
+                horizontalalignment='center', verticalalignment='center'
+            )
+        plt.title(f'RPCN Layer Size: {layer_dim[0]}x{layer_dim[1]}')
     return plt
 
 
