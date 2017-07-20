@@ -31,8 +31,8 @@ def predictBBoxes(sess, x_in, img, ys):
     Returns:
         preds: Dict[ft_dim: Tensor]
             Same structure as `ys`. Contains the raw prediction data.
-        bb_dims_out: Dict[ft_dim: Array[:, 4]]
-            Contains the four BBox parameters (x, y, w, h) that each RPCN found.
+        bb_rects_out: Dict[ft_dim: Array[:, 4]]
+            List of the four BBox parameters (x0, y0, x1, y1) from each RPCN.
         pred_labels_out: Dict[ft_dim: int]
             The predicted label for each BBox.
         true_labels_out: Dict[ft_dim: int]
@@ -54,7 +54,7 @@ def predictBBoxes(sess, x_in, img, ys):
     preds = {k: v[0] for k, v in preds.items()}
 
     # Compute the BBox predictions from every RPCN layer.
-    bb_dims_out = {}
+    bb_rects_out = {}
     true_labels_out, pred_labels_out = {}, {}
     for layer_dim in rpn_out_dims:
         # Unpack the tensors from the current RPCN network.
@@ -65,25 +65,25 @@ def predictBBoxes(sess, x_in, img, ys):
 
         # Compile BBox data from network output.
         hard = np.argmax(pred_labels, axis=0)
-        bb_dims, pick_yx = compile_bboxes.bboxFromNetOutput(img.shape[1:], bboxes, hard)
+        bb_rects, pick_yx = compile_bboxes.bboxFromNetOutput(img.shape[1:], bboxes, hard)
         del hard, bboxes, pred
 
         # Compute a score for each BBox for non-maximum-suppression. In this
         # case, the score is simply the largest Softmax value.
         scores = sess.run(tf.reduce_max(tf.nn.softmax(pred_labels, dim=0), axis=0))
         scores = scores[pick_yx]
-        assert len(scores) == len(bb_dims)
+        assert len(scores) == len(bb_rects)
 
         # Suppress overlapping BBoxes.
-        idx = sess.run(tf.image.non_max_suppression(bb_dims, scores, 30, 0.2))
-        bb_dims = bb_dims[idx]
+        idx = sess.run(tf.image.non_max_suppression(bb_rects, scores, 30, 0.2))
+        bb_rects = bb_rects[idx]
         del scores, idx
 
         # Compute the most likely label for every individual BBox.
         im2ft_rat = img.shape[1] / pred_labels.shape[1]
         pred_labels_out[layer_dim] = []
         true_labels_out[layer_dim] = []
-        for (x0, y0, x1, y1) in (bb_dims / im2ft_rat).astype(np.int16):
+        for (x0, y0, x1, y1) in (bb_rects / im2ft_rat).astype(np.int16):
             # Compute Gaussian mask to weigh label predictions across BBox.
             mx = 5 * (np.linspace(-1, 1, x1 - x0) ** 2)
             my = 5 * (np.linspace(-1, 1, y1 - y0) ** 2)
@@ -105,10 +105,10 @@ def predictBBoxes(sess, x_in, img, ys):
             true_labels_out[layer_dim].append(np.argmax(true_weighted_labels) + 1)
 
         # Store the BBoxes from this RPCN.
-        assert bb_dims.ndim == 2
-        bb_dims_out[layer_dim] = bb_dims.tolist()
+        assert bb_rects.ndim == 2
+        bb_rects_out[layer_dim] = bb_rects.tolist()
 
-    return preds, bb_dims_out, pred_labels_out, true_labels_out
+    return preds, bb_rects_out, pred_labels_out, true_labels_out
 
 
 def validateEpoch(log, sess, ds, x_in, dset='test'):
@@ -135,20 +135,20 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
 
         # Predict the BBoxes and ensure there are no NaNs in the output.
         t0 = time.perf_counter()
-        preds, bb_dims, bb_labels, gt_labels = predictBBoxes(sess, x_in, img, ys)
+        preds, bb_rects, bb_labels, gt_labels = predictBBoxes(sess, x_in, img, ys)
         etime.append(time.perf_counter() - t0)
         for _ in preds.values():
             assert not np.any(np.isnan(_))
 
         # Create and save image with annotated BBoxes. Close all images but the
         # first because we will show it as a specimen at the end.
-        fig = showPredictedBBoxes(img, bb_dims, bb_labels, gt_labels, int2name)
+        fig = showPredictedBBoxes(img, bb_rects, bb_labels, gt_labels, int2name)
         fig.savefig(f'/tmp/bbox_{i:04d}.jpg', **fig_opts)
         if i == 0:
             plotPredictedLabelMap(rpnc_dims, img, preds, ys)
         else:
             fig.close()
-        del bb_dims, bb_labels, gt_labels
+        del bb_rects, bb_labels, gt_labels
 
         # Compute accuracy metrics.
         for layer_dim in rpnc_dims:
