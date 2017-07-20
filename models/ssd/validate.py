@@ -188,7 +188,7 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
         _bb_med = np.mean(bb_med[layer_dim], axis=0)
 
         # Dump the stats to the terminal.
-        print(f' Layer: {layer_dim}')
+        print(f' RPCN Layer Size: {layer_dim}')
         print(f'  Correct Foreground Class: {_fg_correct:.1f}%')
         print(f'  BG False Pos: {_bg_fp:,}  Total: {_bg_tot:,}')
         print(f'  FG False Pos: {_fg_fp:,}  Total: {_fg_tot:,}')
