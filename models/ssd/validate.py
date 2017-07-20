@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 
-def predictImage(sess, x_in, img, ys):
+def predictBBoxes(sess, x_in, img, ys):
     """ Compile the list of BBoxes and assoicated label that each RPCN found.
 
     Input:
@@ -135,7 +135,7 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
 
         # Predict the BBoxes and ensure there are no NaNs in the output.
         t0 = time.perf_counter()
-        preds, bb_dims, bb_labels, gt_labels = predictImage(sess, x_in, img, ys)
+        preds, bb_dims, bb_labels, gt_labels = predictBBoxes(sess, x_in, img, ys)
         etime.append(time.perf_counter() - t0)
         for _ in preds.values():
             assert not np.any(np.isnan(_))
