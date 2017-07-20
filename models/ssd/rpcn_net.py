@@ -175,8 +175,10 @@ def setup(fname, x_in, num_classes, layer_out_dims, trainable):
             b1, W1 = net[layer_dim]['b1'], net[layer_dim]['W1']
             b2, W2 = net[layer_dim]['b2'], net[layer_dim]['W2']
 
+        # Compute receptive field based on a 512x512 input image.
         rf = int(W2_dim[0] * (512 / layer_dim[0]))
-        print(f'  Feature size: {layer_dim}  Receptive field: {rf}x{rf}')
+        print(f'  Feature size: {layer_dim}  '
+              f'  Receptive field on 512x512 image: {rf}x{rf}')
 
         assert b1.dtype == W1.dtype == dtype
         assert b1.shape == b1_dim and W1.shape == W1_dim
