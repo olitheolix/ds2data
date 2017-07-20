@@ -27,13 +27,13 @@ def stampImage(background, fg_shapes, N):
     # Convenience
     bg_height, bg_width = background.shape[:2]
     out = np.array(background, np.uint8)
-    bboxes, labels = [], []
+    bb_rects, bb_labels = [], []
     occupied = np.zeros_like(out)
 
     # Stamp N non-overlapping shapes onto the background. If this proves
     # difficult, abort after `max_attempts` and return what we have so far.
     attempts, max_attempts = 0, 10 * N
-    while len(labels) < N and attempts < max_attempts:
+    while len(bb_labels) < N and attempts < max_attempts:
         attempts += 1
 
         # Pick a random foreground label and specimen.
@@ -54,9 +54,9 @@ def stampImage(background, fg_shapes, N):
         # Verify if the region is already occupied. Do nothing if it is.
         if np.sum(occupied[y0:y1, x0:x1]) > 0:
             continue
-        labels.append(label)
+        bb_labels.append(label)
         occupied[y0:y1, x0:x1] = 1
-        bboxes.append([x0, y0, x1, y1])
+        bb_rects.append([x0, y0, x1, y1])
 
         # Scale the foreground image.
         fg = Image.fromarray(fg.astype(np.uint8)).resize((w, h), Image.BILINEAR)
@@ -69,8 +69,8 @@ def stampImage(background, fg_shapes, N):
 
         # Stamp the foreground object into the background image.
         out[y0:y1, x0:x1] = (1 - alpha) * out[y0:y1, x0:x1] + alpha * fg
-    assert len(bboxes) == len(labels)
-    return out, bboxes, labels
+    assert len(bb_rects) == len(bb_labels)
+    return out, bb_rects, bb_labels
 
 
 def generate(dst_path, param, bg_fnames, fg_shapes, int2name):
@@ -83,14 +83,14 @@ def generate(dst_path, param, bg_fnames, fg_shapes, int2name):
         img = np.array(img, np.uint8)
 
         # Stamp foreground shapes into background image.
-        img, bboxes, labels = stampImage(img, fg_shapes, param.num_stamps)
+        img, bb_rects, bb_labels = stampImage(img, fg_shapes, param.num_stamps)
 
         # File name prefix for image and meta data.
         fname = os.path.join(dst_path, f'{i:04d}')
 
         # Save meta data.
         meta = {
-            'bboxes': bboxes, 'labels': labels,
+            'bb_rects': bb_rects, 'labels': bb_labels,
             'int2name': int2name, 'param': param,
         }
         pickle.dump(meta, open(fname + '-meta.pickle', 'wb'))

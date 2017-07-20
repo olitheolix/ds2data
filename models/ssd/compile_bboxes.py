@@ -263,7 +263,7 @@ def compileBBoxData(args):
     im_dim = img.shape[1:]
 
     # Unpack the BBox data and map the human readable labels to numeric ones.
-    bboxes = np.array(meta['bboxes'], np.int32)
+    bboxes = np.array(meta['bb_rects'], np.int32)
     name2int = {v: k for k, v in meta['int2name'].items()}
     bbox_labels = [name2int[_] for _ in meta['labels']]
 
