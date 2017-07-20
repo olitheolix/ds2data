@@ -17,39 +17,64 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 
-def predictImage(sess, rpn_out_dims, x_in, img, ys):
+def predictImage(sess, x_in, img, ys):
+    """ Compile the list of BBoxes and assoicated label that each RPCN found.
+
+    Input:
+        sess: Tenseorflow sessions
+        img: CHW image
+        x_in: Tensorflow Placeholder
+        ys: Dict[ft_dim: Tensor]
+            The keys are RPCN feature dimensions (eg (64, 64)) and the values
+            are the ground truth tensors for that particular RPCN.
+
+    Returns:
+        preds: Dict[ft_dim: Tensor]
+            Same structure as `ys`. Contains the raw prediction data.
+        bb_dims_out: Dict[ft_dim: Array[:, 4]]
+            Contains the four BBox parameters (x, y, w, h) that each RPCN found.
+        pred_labels_out: Dict[ft_dim: int]
+            The predicted label for each BBox.
+        true_labels_out: Dict[ft_dim: int]
+            The ground truth label for each BBox.
+    """
     # Predict BBoxes and labels.
     assert isinstance(ys, dict)
     assert img.ndim == 3 and img.shape[0] == 3
 
+    # Convenience.
+    rpn_out_dims = list(ys.keys())
+
+    # Compile the list of RPCN output nodes.
     g = tf.get_default_graph().get_tensor_by_name
     rpn_out = {_: g(f'rpn-{_[0]}x{_[1]}/rpn_out:0') for _ in rpn_out_dims}
 
+    # Run the input through all RPCN nodes, then strip off the batch dimension.
     preds = sess.run(rpn_out, feed_dict={x_in: np.expand_dims(img, 0)})
-    assert len(preds) == len(rpn_out)
     preds = {k: v[0] for k, v in preds.items()}
 
+    # Compute the BBox predictions from every RPCN layer.
     bb_dims_out = {}
     true_labels_out, pred_labels_out = {}, {}
     for layer_dim in rpn_out_dims:
-        y = ys[layer_dim]
+        # Unpack the tensors from the current RPCN network.
+        true_labels = ys[layer_dim][4:]
         pred = preds[layer_dim]
-
-        # Unpack tensors.
-        true_labels = y[4:]
         bboxes, pred_labels = pred[:4], pred[4:]
         assert img.ndim == 3 and img.shape[0] == 3
-        del y
 
         # Compile BBox data from network output.
         hard = np.argmax(pred_labels, axis=0)
         bb_dims, pick_yx = compile_bboxes.bboxFromNetOutput(img.shape[1:], bboxes, hard)
-        del hard, bboxes
+        del hard, bboxes, pred
 
-        # Suppress overlapping BBoxes.
+        # Compute a score for each BBox for non-maximum-suppression. In this
+        # case, the score is simply the largest Softmax value.
         scores = sess.run(tf.reduce_max(tf.nn.softmax(pred_labels, dim=0), axis=0))
         scores = scores[pick_yx]
         assert len(scores) == len(bb_dims)
+
+        # Suppress overlapping BBoxes.
         idx = sess.run(tf.image.non_max_suppression(bb_dims, scores, 30, 0.2))
         bb_dims = bb_dims[idx]
         del scores, idx
@@ -66,21 +91,20 @@ def predictImage(sess, rpn_out_dims, x_in, img, ys):
 
             # Weigh up the predictions inside the BBox to decide which label
             # corresponds best to the BBox. NOTE: remove the background label
-            # because a) the presence of the BBox precludes it and b) it will most
-            # likely dominate everywhere except near the centre of the BBox, since
-            # this is how we trained the network.
-            pred_w_labels = pred_labels[1:, y0:y1, x0:x1] * mask
-            true_w_labels = true_labels[1:, y0:y1, x0:x1] * mask
-            pred_w_labels = np.sum(pred_w_labels, axis=(1, 2))
-            true_w_labels = np.sum(true_w_labels, axis=(1, 2))
+            # because a) its presence would preclude the existence of a BBox
+            # and b) it would most likely dominate everywhere except near the
+            # BBox centre since this is how we trained the network.
+            pred_weighted_labels = pred_labels[1:, y0:y1, x0:x1] * mask
+            true_weighted_labels = true_labels[1:, y0:y1, x0:x1] * mask
+            pred_weighted_labels = np.sum(pred_weighted_labels, axis=(1, 2))
+            true_weighted_labels = np.sum(true_weighted_labels, axis=(1, 2))
 
-            # Softmax the predictions and determine the ID of the best one. Add '1'
-            # to that ID to account for the removed background and map the ID to a
-            # human readable name.
-            pred_sm = np.exp(pred_w_labels) / np.sum(np.exp(pred_w_labels))
-            true_sm = np.exp(true_w_labels) / np.sum(np.exp(true_w_labels))
-            pred_labels_out[layer_dim].append(np.argmax(pred_sm) + 1)
-            true_labels_out[layer_dim].append(np.argmax(true_sm) + 1)
+            # Determine the most likely label for the current BBox. Add +1 to
+            # that ID to account for the removed background label above.
+            pred_labels_out[layer_dim].append(np.argmax(pred_weighted_labels) + 1)
+            true_labels_out[layer_dim].append(np.argmax(true_weighted_labels) + 1)
+
+        # Store the BBoxes from this RPCN.
         assert bb_dims.ndim == 2
         bb_dims_out[layer_dim] = bb_dims.tolist()
 
@@ -111,7 +135,7 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
 
         # Predict the BBoxes and ensure there are no NaNs in the output.
         t0 = time.perf_counter()
-        preds, bb_dims, bb_labels, gt_labels = predictImage(sess, rpnc_dims, x_in, img, ys)
+        preds, bb_dims, bb_labels, gt_labels = predictImage(sess, x_in, img, ys)
         etime.append(time.perf_counter() - t0)
         for _ in preds.values():
             assert not np.any(np.isnan(_))
