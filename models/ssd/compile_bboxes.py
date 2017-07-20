@@ -80,14 +80,37 @@ def ft2im(val, ft_dim: int, im_dim: int):
 
 
 def genBBoxData(bb_rects, bb_labels, bb_scores, ft_dim, thresh):
-    """
-    Compute the BBox parameters that the network will ultimately learn.
-    These are two values to encode the BBox centre relative to the
-    anchor in the full image, and another two values to specify the
-    absolute width/height in pixels.
+    """Compute BBox training output for network.
+
+    Returns a 3D array which, for each location, contains the label and BBox
+    parameters. If the label is Zero then the BBox parameters are meaningless
+    because it means the anchor is over the background.
+
+    The returned BBox parameters are in image coordinates.
+
+    Inputs:
+        bb_rects: Array[N, 4]
+            List of N BBox rectangles (x0, y0, x1, y1)
+        bb_labels: Array[N]
+            List of N machine readable labels (ie integers).
+        bb_scores: Array[N, im_height, im_width]
+            A score for each BBox at every image position.
+        ft_dim: tuple(ft_height, ft_width)
+            Feature map dimension
+        thresh: 0.0 <= thresh <= 1.0
+            Only those locations with a BBox score greater than `thresh` will
+            be considered as having an object at that location.
+
+    Output:
+        Array[5, ft_height, ft_width]: BBox and label
+            The 5 elements are [label_int, rel_x, rel_y, rel_w, rel_h] where
+            `rel_{x,y}` is the BBox position relative to the anchor.
+            `rel_{w,h}` denote the absolute size of the BBox. All 4 BBox
+            parameters are in image coordinates.
     """
     # The first score dimension enumerates BBox, *not* labels.
-    assert len(bb_rects) == len(bb_scores)
+    assert 0 <= thresh <= 1.0
+    assert len(bb_labels) == len(bb_rects) == len(bb_scores)
 
     # Unpack dimension.
     ft_height, ft_width = ft_dim
