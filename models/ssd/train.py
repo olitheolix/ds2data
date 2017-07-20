@@ -220,9 +220,7 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
 
 
 def main():
-    # Number of epochs to simulate.
     param = parseCmdline()
-
     sess = tf.Session()
 
     # File names.
