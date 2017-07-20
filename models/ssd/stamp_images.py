@@ -87,7 +87,10 @@ def generate(dst_path, param, bg_fnames, fg_shapes, int2name):
         fname = os.path.join(dst_path, f'{i:04d}')
 
         # Save meta data.
-        meta = {'bboxes': bboxes, 'labels': labels, 'int2name': int2name}
+        meta = {
+            'bboxes': bboxes, 'labels': labels,
+            'int2name': int2name, 'param': param,
+        }
         pickle.dump(meta, open(fname + '-meta.pickle', 'wb'))
 
         # Save the stamped image.
