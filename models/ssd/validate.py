@@ -17,16 +17,20 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 
-def predictBBoxes(sess, x_in, img, ys):
+def predictBBoxes(sess, x_in, img, rpcn_dims, ys):
     """ Compile the list of BBoxes and assoicated label that each RPCN found.
 
     Input:
         sess: Tenseorflow sessions
         img: CHW image
         x_in: Tensorflow Placeholder
+        rpcn_dims: List[Tuple(ft_height, ft_width)]
+            Invoke only the RPCNs with those feature maps sizes. Each feature
+            map size must also be a key in `ys`.
         ys: Dict[ft_dim: Tensor]
             The keys are RPCN feature dimensions (eg (64, 64)) and the values
-            are the ground truth tensors for that particular RPCN.
+            are the ground truth tensors for that particular RPCN. Set this
+            value to *None* if no ground truth data is available.
 
     Returns:
         preds: Dict[ft_dim: Tensor]
@@ -39,15 +43,13 @@ def predictBBoxes(sess, x_in, img, ys):
             The ground truth label for each BBox.
     """
     # Predict BBoxes and labels.
-    assert isinstance(ys, dict)
+    assert ys is None or isinstance(ys, dict)
     assert img.ndim == 3 and img.shape[0] == 3
-
-    # Convenience.
-    rpn_out_dims = list(ys.keys())
+    im_dim = img.shape[1:]
 
     # Compile the list of RPCN output nodes.
     g = tf.get_default_graph().get_tensor_by_name
-    rpn_out = {_: g(f'rpn-{_[0]}x{_[1]}/rpn_out:0') for _ in rpn_out_dims}
+    rpn_out = {_: g(f'rpn-{_[0]}x{_[1]}/rpn_out:0') for _ in rpcn_dims}
 
     # Run the input through all RPCN nodes, then strip off the batch dimension.
     preds = sess.run(rpn_out, feed_dict={x_in: np.expand_dims(img, 0)})
@@ -56,16 +58,16 @@ def predictBBoxes(sess, x_in, img, ys):
     # Compute the BBox predictions from every RPCN layer.
     bb_rects_out = {}
     true_labels_out, pred_labels_out = {}, {}
-    for layer_dim in rpn_out_dims:
+    for layer_dim in rpcn_dims:
         # Unpack the tensors from the current RPCN network.
-        true_labels = ys[layer_dim][4:]
+        true_labels = ys[layer_dim][4:] if ys is not None else preds[layer_dim][4:]
         pred = preds[layer_dim]
         bboxes, pred_labels = pred[:4], pred[4:]
         assert img.ndim == 3 and img.shape[0] == 3
 
         # Compile BBox data from network output.
         hard = np.argmax(pred_labels, axis=0)
-        bb_rects, pick_yx = compile_bboxes.bboxFromNetOutput(img.shape[1:], bboxes, hard)
+        bb_rects, pick_yx = compile_bboxes.bboxFromNetOutput(im_dim, bboxes, hard)
         del hard, bboxes, pred
 
         # Compute a score for each BBox for non-maximum-suppression. In this
@@ -135,7 +137,8 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
 
         # Predict the BBoxes and ensure there are no NaNs in the output.
         t0 = time.perf_counter()
-        preds, bb_rects, bb_labels, gt_labels = predictBBoxes(sess, x_in, img, ys)
+        preds = predictBBoxes(sess, x_in, img, rpnc_dims, ys)
+        preds, bb_rects, bb_labels, gt_labels = preds
         etime.append(time.perf_counter() - t0)
         for _ in preds.values():
             assert not np.any(np.isnan(_))
