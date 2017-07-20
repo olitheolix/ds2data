@@ -135,6 +135,7 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
     bg_tot = collections.defaultdict(list)
     fg_correct = collections.defaultdict(list)
 
+    print('\n----- Validating Images -----')
     for i in tqdm.tqdm(range(N)):
         img, ys, meta = ds.nextSingle(dset)
         assert img is not None
@@ -199,14 +200,14 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
         _bb_med = np.mean(bb_med[layer_dim], axis=0)
 
         # Dump the stats to the terminal.
-        print(f' RPCN Layer Size: {layer_dim}')
-        print(f'  Correct Foreground Class: {_fg_correct:.1f}%')
-        print(f'  BG False Pos: {_bg_fp:,}  Total: {_bg_tot:,}')
-        print(f'  FG False Pos: {_fg_fp:,}  Total: {_fg_tot:,}')
-        print(f'  X: {_bb_med[0]:.1f} {_bb_max[0]:.1f}')
-        print(f'  Y: {_bb_med[1]:.1f} {_bb_max[1]:.1f}')
-        print(f'  W: {_bb_med[2]:.1f} {_bb_max[2]:.1f}')
-        print(f'  H: {_bb_med[3]:.1f} {_bb_max[3]:.1f}')
+        print(f'  RPCN Layer Size: {layer_dim}')
+        print(f'    Correct Foreground Class: {_fg_correct:.1f}%')
+        print(f'    BG False Pos: {_bg_fp:,}  Total: {_bg_tot:,}')
+        print(f'    FG False Pos: {_fg_fp:,}  Total: {_fg_tot:,}')
+        print(f'    X: {_bb_med[0]:.1f} {_bb_max[0]:.1f}')
+        print(f'    Y: {_bb_med[1]:.1f} {_bb_max[1]:.1f}')
+        print(f'    W: {_bb_med[2]:.1f} {_bb_max[2]:.1f}')
+        print(f'    H: {_bb_med[3]:.1f} {_bb_max[3]:.1f}\n')
 
     # Compute average prediction time.
     etime.sort()
@@ -399,6 +400,7 @@ def main():
     conf, log = meta['conf'], meta['log']
 
     # Load the BBox training data.
+    print('\n----- Data Set -----')
     ds = data_loader.BBox(conf)
     ds.printSummary()
     int2name = ds.int2name()
@@ -409,6 +411,7 @@ def main():
     tf_dtype = tf.float32 if conf.dtype == 'float32' else tf.float16
 
     # Build the shared layers and connect it to the RPCN layers.
+    print('\n----- Network Setup -----')
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
     sh_out = shared_net.setup(fnames['shared_net'], x_in, conf.num_pools_shared, True)
     rpcn_net.setup(fnames['rpcn_net'], sh_out, len(int2name), conf.rpcn_out_dims, True)

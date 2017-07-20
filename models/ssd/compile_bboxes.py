@@ -329,7 +329,7 @@ def generate(path, thresh, num_pools, debug):
         it = pool.imap(compileBBoxData, args)
 
         # Consume the iterator to actually start the processes.
-        print('Compiling training output for network')
+        print('\nCompiling training output for network')
         for i in tqdm.tqdm(range(len(args))):
             next(it)
 

@@ -83,7 +83,7 @@ def stampImage(background, fg_shapes, N):
 def generate(dst_path, param, bg_fnames, fg_shapes, int2name):
     """Create N stamped background images and save them."""
     # Create N images.
-    print('Compiling training images with foreground shapes stamped into backgrounds')
+    print('Stamping foreground shapes into background images')
     for i in tqdm.tqdm(range(param.N)):
         # Load background image as NumPy array.
         img = Image.open(bg_fnames[i % len(bg_fnames)]).convert('RGB')
