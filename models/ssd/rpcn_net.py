@@ -116,7 +116,7 @@ def cost(rpcn_dim):
     return cost_tot
 
 
-def save(fname, sess, layer_out_dims):
+def save(fname, sess, ft_out_dims):
     """ Save the pickled network state to `fname`.
 
     Args:
@@ -127,7 +127,7 @@ def save(fname, sess, layer_out_dims):
     # Query the state of the shared network (weights and biases).
     g = tf.get_default_graph().get_tensor_by_name
     state = {}
-    for layer_dim in layer_out_dims:
+    for layer_dim in ft_out_dims:
         layer_name = f'{layer_dim[0]}x{layer_dim[1]}'
         W1, b1 = sess.run([g(f'rpcn-{layer_name}/W1:0'), g(f'rpcn-{layer_name}/b1:0')])
         W2, b2 = sess.run([g(f'rpcn-{layer_name}/W2:0'), g(f'rpcn-{layer_name}/b2:0')])
@@ -141,16 +141,16 @@ def load(fname):
     return pickle.load(open(fname, 'rb'))
 
 
-def setup(fname, x_in, num_classes, layer_out_dims, trainable):
+def setup(fname, x_in, num_classes, ft_out_dims, trainable):
     assert x_in.dtype in [tf.float16, tf.float32]
     dtype = np.float16 if x_in.dtype == tf.float16 else np.float32
     num_features_out = 64
 
     out = []
-    print(f'RPCN ({len(layer_out_dims)} layers):')
+    print(f'RPCN ({len(ft_out_dims)} layers):')
     print(f'  Restored from <{fname}>')
 
-    for layer_dim in layer_out_dims:
+    for layer_dim in ft_out_dims:
         assert isinstance(layer_dim, tuple) and len(layer_dim) == 2
         assert x_in.shape.as_list()[2:] == list(2 * np.array(layer_dim))
 
