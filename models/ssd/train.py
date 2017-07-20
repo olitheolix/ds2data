@@ -257,7 +257,7 @@ def main():
     print('\n----- Data Set -----')
     ds = data_loader.BBox(conf)
     ds.printSummary()
-    num_cls = len(ds.classNames())
+    int2name = ds.int2name()
     im_dim = ds.imageDimensions().tolist()
 
     # Input/output/parameter tensors for network.
@@ -269,7 +269,7 @@ def main():
     lrate_in = tf.placeholder(tf.float32, name='lrate')
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
     shared_out = shared_net.setup(None, x_in, conf.num_pools_shared, True)
-    rpn_net.setup(None, shared_out, num_cls, conf.rpn_out_dims, True)
+    rpn_net.setup(None, shared_out, len(int2name), conf.rpn_out_dims, True)
 
     # Select cost function and optimiser, then initialise the TF graph.
     cost = [rpn_net.cost(rpn_dim) for rpn_dim in conf.rpn_out_dims]
@@ -300,7 +300,7 @@ def main():
             shared_net.save(fnames['shared_net'], sess)
             conf = conf._replace(num_epochs=epoch)
             log['conf'] = conf
-            meta = {'conf': conf, 'int2name': ds.classNames(), 'log': log}
+            meta = {'conf': conf, 'int2name': int2name, 'log': log}
             pickle.dump(meta, open(fnames['meta'], 'wb'))
             saver.save(sess, fnames['checkpt'])
     except KeyboardInterrupt:

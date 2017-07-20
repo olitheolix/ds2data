@@ -129,8 +129,8 @@ class DataSet:
             assert dset in self.handles, f'Unknown data set <{dset}>'
             self.ofs[dset] = 0
 
-    def classNames(self):
-        """ Return the machine/human readable labels"""
+    def int2name(self):
+        """ Return the mapping between machine/human readable labels"""
         return dict(self.label2name)
 
     def lenOfEpoch(self, dset):

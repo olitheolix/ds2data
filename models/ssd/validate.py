@@ -118,7 +118,7 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
     # error statistics.
     ds.reset()
     N = ds.lenOfEpoch(dset)
-    int2name = ds.classNames()
+    int2name = ds.int2name()
     fig_opts = dict(dpi=150, transparent=True, bbox_inches='tight', pad_inches=0)
     rpnc_dims = ds.getRpncDimensions()
 
@@ -397,7 +397,7 @@ def main():
     # Load the BBox training data.
     ds = data_loader.BBox(conf)
     ds.printSummary()
-    num_cls = len(ds.classNames())
+    int2name = ds.int2name()
     im_dim = ds.imageDimensions().tolist()
 
     # Precision.
@@ -407,7 +407,7 @@ def main():
     # Build the shared layers and connect it to the RPN layers.
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
     sh_out = shared_net.setup(fnames['shared_net'], x_in, conf.num_pools_shared, True)
-    rpn_net.setup(fnames['rpn_net'], sh_out, num_cls, conf.rpn_out_dims, True)
+    rpn_net.setup(fnames['rpn_net'], sh_out, len(int2name), conf.rpn_out_dims, True)
 
     sess.run(tf.global_variables_initializer())
 
