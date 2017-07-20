@@ -302,7 +302,7 @@ def main():
             shared_net.save(fnames['shared_net'], sess)
             conf = conf._replace(num_epochs=epoch)
             log['conf'] = conf
-            meta = {'conf': conf, 'log': log}
+            meta = {'conf': conf, 'int2name': ds.classNames(), 'log': log}
             pickle.dump(meta, open(fnames['meta'], 'wb'))
             saver.save(sess, fnames['checkpt'])
     except KeyboardInterrupt:
