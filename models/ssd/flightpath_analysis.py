@@ -1,11 +1,11 @@
-"""Predict BBoxes for all flight path images.
-"""
+"""Predict BBoxes for all flight path images."""
 import os
 import glob
 import tqdm
 import pickle
 import rpn_net
 import validate
+import argparse
 import shared_net
 
 import numpy as np
@@ -13,6 +13,28 @@ import tensorflow as tf
 import PIL.Image as Image
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+
+
+def parseCmdline():
+    """Parse the command line arguments."""
+    # Create a parser and program description.
+    parser = argparse.ArgumentParser(
+        description='Predict BBoxes im images')
+    padd = parser.add_argument
+    padd('-N', metavar='', type=int, default=None,
+         help='Predict only first N images (default all)')
+    padd('-src', metavar='', type=str, default=None,
+         help='Folder with images (default ./data/flightpath)')
+    padd('-dst', metavar='', type=str, default=None,
+         help='Images with BBoxes will be written here (default /tmp/flightpath)')
+
+    param = parser.parse_args()
+    if param.src is None:
+        cwd = os.path.dirname(os.path.abspath(rpn_net.__file__))
+        param.src = os.path.join(cwd, 'data', 'flightpath')
+    if param.dst is None:
+        param.dst = os.path.join('/', 'tmp', 'flightpath')
+    return param
 
 
 def analyseImage(sess, x_in, int2name, rpcn_dims, fname):
@@ -69,12 +91,12 @@ def analyseImage(sess, x_in, int2name, rpcn_dims, fname):
 
 
 def main():
+    param = parseCmdline()
+
     # File paths.
     cwd = os.path.dirname(os.path.abspath(rpn_net.__file__))
     net_dir = os.path.join(cwd, 'netstate')
-    out_dir = os.path.join('/', 'tmp', 'flightpath')
     fn_meta = os.path.join(net_dir, 'rpn-meta.pickle')
-    flight_path = os.path.join(cwd, 'data', 'flightpath')
     fn_rpn_net = os.path.join(net_dir, 'rpn-net.pickle')
     fn_shared_net = os.path.join(net_dir, 'shared-net.pickle')
 
@@ -97,17 +119,19 @@ def main():
     sess.run(tf.global_variables_initializer())
     del num_cls, im_dim, meta, conf, fn_meta, fn_rpn_net, fn_shared_net, net_dir
 
-    # Compile the list of images to analyse.
-    fnames = ['data/flightpath/0320.jpg']
-    fnames = glob.glob(os.path.join(flight_path, '*.jpg'))[:2]
+    # Find as many image files as the user has requested.
+    fnames = glob.glob(os.path.join(param.src, '*.jpg'))[:2]
+    if param.N is not None:
+        assert param.N > 0
+        fnames = fnames[:param.N]
 
     # Predict the BBoxes for each image and save the result.
-    os.makedirs(out_dir, exist_ok=True)
-    print(f'\n-----Predicting BBoxes and saving results to {out_dir} -----')
+    os.makedirs(param.dst, exist_ok=True)
+    print(f'\n-----Predicting BBoxes and saving results to {param.dst} -----')
     fig_opts = dict(dpi=150, transparent=True, bbox_inches='tight', pad_inches=0)
     for i, fname in enumerate(tqdm.tqdm(fnames)):
         fig = analyseImage(sess, x_in, int2name, rpcn_out_dims, fname)
-        fig.savefig(os.path.join(out_dir, f'flight_{i:04d}.jpg'), **fig_opts)
+        fig.savefig(os.path.join(param.dst, f'flight_{i:04d}.jpg'), **fig_opts)
         if i > 0:
             plt.close(fig)
     plt.show()
