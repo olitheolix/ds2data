@@ -49,10 +49,10 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys):
 
     # Compile the list of RPCN output nodes.
     g = tf.get_default_graph().get_tensor_by_name
-    rpn_out = {_: g(f'rpn-{_[0]}x{_[1]}/rpn_out:0') for _ in rpcn_dims}
+    rpcn_out = {_: g(f'rpcn-{_[0]}x{_[1]}/rpcn_out:0') for _ in rpcn_dims}
 
     # Run the input through all RPCN nodes, then strip off the batch dimension.
-    preds = sess.run(rpn_out, feed_dict={x_in: np.expand_dims(img, 0)})
+    preds = sess.run(rpcn_out, feed_dict={x_in: np.expand_dims(img, 0)})
     preds = {k: v[0] for k, v in preds.items()}
 
     # Compute the BBox predictions from every RPCN layer.
@@ -120,7 +120,7 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
     N = ds.lenOfEpoch(dset)
     int2name = ds.int2name()
     fig_opts = dict(dpi=150, transparent=True, bbox_inches='tight', pad_inches=0)
-    rpnc_dims = ds.getRpncDimensions()
+    rpcn_dims = ds.getRpcnDimensions()
 
     etime = []
     bb_max = collections.defaultdict(list)
@@ -137,7 +137,7 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
 
         # Predict the BBoxes and ensure there are no NaNs in the output.
         t0 = time.perf_counter()
-        preds = predictBBoxes(sess, x_in, img, rpnc_dims, ys)
+        preds = predictBBoxes(sess, x_in, img, rpcn_dims, ys)
         preds, bb_rects, bb_labels, gt_labels = preds
         etime.append(time.perf_counter() - t0)
         for _ in preds.values():
@@ -152,13 +152,13 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
         # for debug purposes at the end of the script. Similarly, create a
         # single plot with the predicted label map.
         if i == 0:
-            plotPredictedLabelMap(rpnc_dims, img, preds, ys)
+            plotPredictedLabelMap(rpcn_dims, img, preds, ys)
         else:
             plt.close(fig)
         del bb_rects, bb_labels, gt_labels
 
         # Compute accuracy metrics.
-        for layer_dim in rpnc_dims:
+        for layer_dim in rpcn_dims:
             y = ys[layer_dim]
             pred = preds[layer_dim]
             _, mask_bbox = feature_masks.computeMasks(img, y)
@@ -183,7 +183,7 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
 
     # Compute the average class prediction error.
     print(f'\nResults for <{dset}> data set ({N} samples)')
-    for layer_dim in rpnc_dims:
+    for layer_dim in rpcn_dims:
         _fg_correct = 100 * np.mean(fg_correct[layer_dim])
         _bg_fp = int(np.mean(bg_fp[layer_dim]))
         _fg_fp = int(np.mean(fg_fp[layer_dim]))
@@ -213,11 +213,11 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
     print(f'Prediction time per image: {1000 * etime:.0f}ms')
 
 
-def plotPredictedLabelMap(rpnc_dims, img, preds, ys):
+def plotPredictedLabelMap(rpcn_dims, img, preds, ys):
     plt.figure()
     num_cols = 3
-    num_rows = len(rpnc_dims)
-    for idx, layer_dim in enumerate(rpnc_dims):
+    num_rows = len(rpcn_dims)
+    for idx, layer_dim in enumerate(rpcn_dims):
         true_labels = ys[layer_dim][4:]
         pred_labels = preds[layer_dim][4:]
 
@@ -267,10 +267,10 @@ def plotTrainingProgress(log):
     plt.ylim(0, max(log['cost']))
 
     plt.figure()
-    num_rows = len(log['conf'].rpn_out_dims)
+    num_rows = len(log['conf'].rpcn_out_dims)
     num_cols = 4
-    for idx, layer_dim in enumerate(log['conf'].rpn_out_dims):
-        layer_log = log['rpnc'][layer_dim]
+    for idx, layer_dim in enumerate(log['conf'].rpcn_out_dims):
+        layer_log = log['rpcn'][layer_dim]
 
         plt.subplot(num_rows, num_cols, num_cols * idx + 1)
         cost = layer_log['cost']
@@ -348,9 +348,9 @@ def showPredictedBBoxes(img_chw, bboxes, pred_labels, true_labels, int2name):
     assert len(bboxes) == len(pred_labels) == len(true_labels)
     fig = plt.figure()
 
-    rpnc_dims = list(bboxes.keys())
-    num_cols = len(rpnc_dims)
-    for idx, layer_dim in enumerate(rpnc_dims):
+    rpcn_dims = list(bboxes.keys())
+    num_cols = len(rpcn_dims)
+    for idx, layer_dim in enumerate(rpcn_dims):
         # Show the input image.
         ax = plt.subplot(1, num_cols, idx + 1)
         ax = plt.gca()
@@ -386,8 +386,8 @@ def main():
     net_path = os.path.join(cur_dir, 'netstate')
 
     fnames = {
-        'meta': os.path.join(net_path, 'rpn-meta.pickle'),
-        'rpn_net': os.path.join(net_path, 'rpn-net.pickle'),
+        'meta': os.path.join(net_path, 'rpcn-meta.pickle'),
+        'rpcn_net': os.path.join(net_path, 'rpcn-net.pickle'),
         'shared_net': os.path.join(net_path, 'shared-net.pickle'),
     }
 
@@ -404,10 +404,10 @@ def main():
     assert conf.dtype in ['float32', 'float16']
     tf_dtype = tf.float32 if conf.dtype == 'float32' else tf.float16
 
-    # Build the shared layers and connect it to the RPN layers.
+    # Build the shared layers and connect it to the RPCN layers.
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
     sh_out = shared_net.setup(fnames['shared_net'], x_in, conf.num_pools_shared, True)
-    rpn_net.setup(fnames['rpn_net'], sh_out, len(int2name), conf.rpn_out_dims, True)
+    rpn_net.setup(fnames['rpcn_net'], sh_out, len(int2name), conf.rpcn_out_dims, True)
 
     sess.run(tf.global_variables_initializer())
 

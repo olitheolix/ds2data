@@ -202,11 +202,12 @@ class DataSet:
 
 
 class BBox(DataSet):
-    """ Create training images with randomly placed objects.
+    """Create training images with randomly placed objects.
 
-    This class will not only produce the training images but also the
-    target values for the RPN. Specifically, it will provide the overlap of
-    each BBox with the anchor and the precise dimensions of the BBox.
+    This class will not only produce the training images but also the target
+    values for the RPCN. Specifically, it will provide the overlap of each BBox
+    with the anchor and the precise dimensions of the BBox.
+
     """
     MetaData = namedtuple('MetaData', 'filename')
 
@@ -245,7 +246,7 @@ class BBox(DataSet):
 
         # The size of the returned images.
         dims = (chan, height, width)
-        self.rpnc_dims = self.conf.rpn_out_dims
+        self.rpcn_dims = self.conf.rpcn_out_dims
 
         # Find all training images. Abort if there are none.
         fnames = glob.glob(f'{self.conf.path}/*.jpg')
@@ -291,7 +292,7 @@ class BBox(DataSet):
             assert isinstance(y_bbox, dict)
 
             all_labels.append(collections.defaultdict(list))
-            for ft_dim in self.rpnc_dims:
+            for ft_dim in self.rpcn_dims:
                 bbox = y_bbox[ft_dim]
 
                 assert bbox.shape[0] == 5
@@ -329,5 +330,5 @@ class BBox(DataSet):
                 out[label, y, x] = 1
         return out
 
-    def getRpncDimensions(self):
-        return tuple(self.rpnc_dims)
+    def getRpcnDimensions(self):
+        return tuple(self.rpcn_dims)

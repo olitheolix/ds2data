@@ -6,7 +6,7 @@ import tensorflow as tf
 def model(x_in, name, bwt1, bwt2):
     # Convenience
     conv_opts = dict(padding='SAME', data_format='NCHW')
-    with tf.variable_scope(f'rpn-{name}'):
+    with tf.variable_scope(f'rpcn-{name}'):
         # Convolution layer to downsample the feature map.
         # Shape: [-1, 64, 64, 64] ---> [-1, 64, 32, 32]
         # Kernel: 3x3
@@ -21,18 +21,18 @@ def model(x_in, name, bwt1, bwt2):
         b2 = tf.Variable(bwt2[0], trainable=bwt2[2], name='b2')
         W2 = tf.Variable(bwt2[1], trainable=bwt2[2], name='W2')
 
-        rpn_out = tf.nn.conv2d(net_out, W2, [1, 1, 1, 1], **conv_opts)
-        rpn_out = tf.add(rpn_out, b2, name='rpn_out')
-    return net_out, rpn_out
+        rpcn_out = tf.nn.conv2d(net_out, W2, [1, 1, 1, 1], **conv_opts)
+        rpcn_out = tf.add(rpcn_out, b2, name='rpcn_out')
+    return net_out, rpcn_out
 
 
-def cost(rpn_dim):
+def cost(rpcn_dim):
     """ Return the scalar cost node."""
-    assert len(rpn_dim) == 2
-    assert isinstance(rpn_dim[0], int) and isinstance(rpn_dim[1], int)
+    assert len(rpcn_dim) == 2
+    assert isinstance(rpcn_dim[0], int) and isinstance(rpcn_dim[1], int)
     g = tf.get_default_graph().get_tensor_by_name
-    name = f'{rpn_dim[0]}x{rpn_dim[1]}'
-    pred_net = g(f'rpn-{name}/rpn_out:0')
+    name = f'{rpcn_dim[0]}x{rpcn_dim[1]}'
+    pred_net = g(f'rpcn-{name}/rpcn_out:0')
     chan, ft_height, ft_width = pred_net.shape.as_list()[1:]
 
     num_classes = chan - 4
@@ -40,7 +40,7 @@ def cost(rpn_dim):
 
     dtype = pred_net.dtype
     cost_ce = tf.nn.softmax_cross_entropy_with_logits
-    with tf.variable_scope(f'rpn-{name}-cost'):
+    with tf.variable_scope(f'rpcn-{name}-cost'):
         y_in = tf.placeholder(dtype, pred_net.shape, name='y')
         mask_cls = tf.placeholder(dtype, [None, ft_height, ft_width], name='mask_cls')
         mask_bbox = tf.placeholder(dtype, [None, ft_height, ft_width], name='mask_bbox')
@@ -119,8 +119,8 @@ def save(fname, sess, layer_out_dims):
     state = {}
     for layer_dim in layer_out_dims:
         layer_name = f'{layer_dim[0]}x{layer_dim[1]}'
-        W1, b1 = sess.run([g(f'rpn-{layer_name}/W1:0'), g(f'rpn-{layer_name}/b1:0')])
-        W2, b2 = sess.run([g(f'rpn-{layer_name}/W2:0'), g(f'rpn-{layer_name}/b2:0')])
+        W1, b1 = sess.run([g(f'rpcn-{layer_name}/W1:0'), g(f'rpcn-{layer_name}/b1:0')])
+        W2, b2 = sess.run([g(f'rpcn-{layer_name}/W2:0'), g(f'rpcn-{layer_name}/b2:0')])
         state[layer_dim] = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
 
     # Save the state.
@@ -137,7 +137,7 @@ def setup(fname, x_in, num_classes, layer_out_dims, trainable):
     num_features_out = 64
 
     out = []
-    print(f'RPN ({len(layer_out_dims)} layers):')
+    print(f'RPCN ({len(layer_out_dims)} layers):')
     if fname is None:
         print(f'  Restored from <{fname}>')
     else:
@@ -178,8 +178,8 @@ def setup(fname, x_in, num_classes, layer_out_dims, trainable):
 
         bwt1 = (b1, W1, trainable)
         bwt2 = (b2, W2, trainable)
-        net_out, rpn_out = model(x_in, layer_name, bwt1, bwt2)
-        out.append(rpn_out)
+        net_out, rpcn_out = model(x_in, layer_name, bwt1, bwt2)
+        out.append(rpcn_out)
 
         x_in = net_out
     return out
