@@ -79,7 +79,7 @@ def ft2im(val, ft_dim: int, im_dim: int):
     return np.interp(val, [0, ft_dim - 1], [ofs, im_dim - ofs - 1])
 
 
-def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
+def genBBoxData(bb_rects, bb_labels, bb_scores, ft_dim, thresh):
     """
     Compute the BBox parameters that the network will ultimately learn.
     These are two values to encode the BBox centre relative to the
@@ -87,11 +87,11 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
     absolute width/height in pixels.
     """
     # The first score dimension enumerates BBox, *not* labels.
-    assert len(bboxes) == len(bbox_score)
+    assert len(bb_rects) == len(bb_scores)
 
     # Unpack dimension.
     ft_height, ft_width = ft_dim
-    im_height, im_width = bbox_score.shape[1:]
+    im_height, im_width = bb_scores.shape[1:]
 
     # Uncertainty when mapping from feature -> image dimensions. We will need
     # this to search a reasonable neighbourhood laer.
@@ -113,7 +113,7 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
             y0, y1 = anchor_y - ofs_y, anchor_y + ofs_y
             x0, x1 = np.clip([x0, x1], 0, im_width - 1)
             y0, y1 = np.clip([y0, y1], 0, im_height - 1)
-            neigh = bbox_score[:, y0:y1, x0:x1]
+            neigh = bb_scores[:, y0:y1, x0:x1]
             del x0, x1, y0, y1
 
             # Skip this location if the neighbourhood is devoid of any BBoxes
@@ -124,11 +124,11 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
             # Determine which BBox has the best score.
             neigh = np.amax(neigh, axis=(1, 2))
             best_idx = np.argmax(neigh)
-            assert 0 <= best_idx < len(bboxes)
+            assert 0 <= best_idx < len(bb_rects)
 
             # Unpack the label and parameters of the best BBox.
-            label_int = bbox_labels[best_idx]
-            bbox_x0, bbox_y0, bbox_x1, bbox_y1 = bboxes[best_idx]
+            label_int = bb_labels[best_idx]
+            bbox_x0, bbox_y0, bbox_x1, bbox_y1 = bb_rects[best_idx]
             assert 0 <= bbox_x0 < bbox_x1 < im_width
             assert 0 <= bbox_y0 < bbox_y1 < im_height
 
@@ -136,8 +136,8 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
             # anchor (image coordinates).
             rel_x = np.mean([bbox_x0, bbox_x1]) - anchor_x
             rel_y = np.mean([bbox_y0, bbox_y1]) - anchor_y
-            rel_w = (bbox_x1 - bbox_x0)
-            rel_h = (bbox_y1 - bbox_y0)
+            rel_w = bbox_x1 - bbox_x0
+            rel_h = bbox_y1 - bbox_y0
 
             # Insert the BBox parameters into the training vector at the
             # respective image position.
