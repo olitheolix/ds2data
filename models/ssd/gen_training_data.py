@@ -45,8 +45,8 @@ def parseCmdline():
          help='Number of output images')
     padd('-width', metavar='', type=int, default=128, help='Width (default 128)')
     padd('-height', metavar='', type=int, default=128, help='Height (default 128)')
-    padd('-seed', metavar='', type=int, default=None,
-         help='Seed value for reproducible results (default None)')
+    padd('-seed', metavar='', type=int, default=0,
+         help='Seed value for reproducible results (default 0)')
     padd('-num-pools', metavar='', type=int, default=2,
          help='Number of downsampling operations in network (default 2)')
     padd('-score-thresh', metavar='', type=float, default=0.8,
