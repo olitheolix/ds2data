@@ -162,7 +162,7 @@ def setup(fname, x_in, num_classes, ft_out_dims, trainable):
 
         W1_dim = (3, 3, num_features_in, num_features_out)
         b1_dim = (num_features_out, 1, 1)
-        W2_dim = (9, 9, num_features_out, 4 + num_classes)
+        W2_dim = (31, 31, num_features_out, 4 + num_classes)
         b2_dim = (4 + num_classes, 1, 1)
 
         if fname is None:
