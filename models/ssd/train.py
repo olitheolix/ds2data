@@ -107,7 +107,7 @@ def accuracy(gt, pred, mask_cls, mask_bbox):
     return AccuracyMetrics(bbox_err, bg_fp, fg_fp, fg_err, gt_bg_tot, gt_fg_tot)
 
 
-def trainEpoch(conf, ds, sess, log, opt, lrate):
+def trainEpoch(ds, sess, log, opt, lrate):
     """Train network for one full epoch of data in `ds`.
 
     Input:
@@ -293,7 +293,7 @@ def main():
             print(f'\nEpoch {tot_epoch} ({epoch+1}/{param.N} in this training cycle)')
 
             ds.reset()
-            trainEpoch(conf, ds, sess, log, opt, lrates[epoch])
+            trainEpoch(ds, sess, log, opt, lrates[epoch])
 
             # Save the network state and log data.
             rpn_net.save(fnames['rpn_net'], sess, conf.rpn_out_dims)
