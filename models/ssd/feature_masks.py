@@ -12,7 +12,7 @@ def plotMasks(img_chw, ys):
         assert y.ndim == 3
         min_len, max_len = computeBBoxLimits(img_chw.shape[1], y.shape[1])
 
-        print(f'Receptive field for feature map size '
+        print(f'Receptive field in 512x512 image for feature map size '
               f'{y.shape[1]}x{y.shape[2]}: '
               f'from {min_len}x{min_len} to {max_len}x{max_len} pixels')
 
@@ -125,13 +125,22 @@ def computeMasks(x, y):
 
 
 def main():
+    # Load the configuration from meta file.
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     fname = os.path.join(cur_dir, 'netstate', 'rpcn-meta.pickle')
-    conf = pickle.load(open(fname, 'rb'))['conf']
+    try:
+        conf = pickle.load(open(fname, 'rb'))['conf']
+    except FileNotFoundError:
+        print(f'Error: could not open <{fname}>')
+        print('Please run at least one training epoch first to create it')
+        return 1
+    conf = conf._replace(num_samples=10)
 
+    # Load the data set.
     ds = data_loader.BBox(conf)
     ds.printSummary()
 
+    # Pick one sample and show the masks for it.
     ds.reset()
     x, y, _ = ds.nextSingle('train')
     plotMasks(x, y)
