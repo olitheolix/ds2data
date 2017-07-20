@@ -218,15 +218,15 @@ def bboxFromNetOutput(im_dim, bb_rects, bb_labels):
 def showBBoxData(img, y_bbox, y_score):
     assert img.ndim == 3
     assert img.shape[2] == 3
+    assert img.shape[:2] == y_score.shape[1:]
 
     # Convert the training output to BBox positions.
     labels, bb_xywh = y_bbox[0], y_bbox[1:]
     bb_rect, pick_yx = bboxFromNetOutput(img.shape[:2], bb_xywh, labels)
-    bb_labels = labels[pick_yx]
 
     # Insert the BBox rectangle into the image.
     img_bbox = np.array(img)
-    for label, (x0, y0, x1, y1) in zip(bb_labels, bb_rect):
+    for x0, y0, x1, y1 in bb_rect:
         img_bbox[y0:y1, x0, :] = 255
         img_bbox[y0:y1, x1, :] = 255
         img_bbox[y0, x0:x1, :] = 255
