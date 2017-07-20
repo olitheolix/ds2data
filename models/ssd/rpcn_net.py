@@ -1,3 +1,13 @@
+"""Region Proposal and Classification Network (RPCN)
+
+Each RPCN comprises two conv-layer. The first one acts as another hidden layer
+and the second one predicts BBoxes and object label at each location.
+
+A network may have more than one RPCN. In that case, their only difference is
+the size of the input feature map. The idea is that smaller feature map
+correspond to a larger receptive field (the filter sizes are identical in all
+RPCN layers)
+"""
 import pickle
 import numpy as np
 import tensorflow as tf
