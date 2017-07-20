@@ -140,16 +140,18 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
         for _ in preds.values():
             assert not np.any(np.isnan(_))
 
-        # Show the input image and add the BBoxes. Save the result and close
-        # the Matplotlib figure unless it is the very first one, because we
-        # will show it for debug purposes once the script has finished.
+        # Show the input image and add the BBoxes and save the result.
         fig = showPredictedBBoxes(img, bb_rects, bb_labels, gt_labels, int2name)
-        fig.gcf().set_size_inches(20, 11)
+        fig.set_size_inches(20, 11)
         fig.savefig(f'/tmp/bbox_{i:04d}.jpg', **fig_opts)
+
+        # Close the figure unless it is the very first one which we will show
+        # for debug purposes at the end of the script. Similarly, create a
+        # single plot with the predicted label map.
         if i == 0:
             plotPredictedLabelMap(rpnc_dims, img, preds, ys)
         else:
-            fig.close()
+            plt.close(fig)
         del bb_rects, bb_labels, gt_labels
 
         # Compute accuracy metrics.
@@ -341,7 +343,7 @@ def showPredictedBBoxes(img_chw, bboxes, pred_labels, true_labels, int2name):
 
     # Add the predicted BBoxes and their labels.
     assert len(bboxes) == len(pred_labels) == len(true_labels)
-    plt.figure()
+    fig = plt.figure()
 
     rpnc_dims = list(bboxes.keys())
     num_cols = len(rpnc_dims)
@@ -372,7 +374,7 @@ def showPredictedBBoxes(img_chw, bboxes, pred_labels, true_labels, int2name):
                 horizontalalignment='center', verticalalignment='center'
             )
         plt.title(f'RPCN Layer Size: {layer_dim[0]}x{layer_dim[1]}')
-    return plt
+    return fig
 
 
 def main():
