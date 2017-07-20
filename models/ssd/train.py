@@ -289,7 +289,7 @@ def main():
     print(f'\n----- Training for another {param.N} Epochs -----')
     try:
         epoch_ofs = conf.num_epochs + 1
-        lrates = np.logspace(-3, -5, param.N)
+        lrates = np.logspace(-3, -4, param.N)
         for epoch in range(param.N):
             tot_epoch = epoch + epoch_ofs
             print(f'\nEpoch {tot_epoch} ({epoch+1}/{param.N} in this training cycle)')
