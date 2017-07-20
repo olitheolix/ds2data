@@ -115,9 +115,9 @@ def loadForegroundShapes(path, param):
     # Load cubes for all 10 labels.
     out = {}
     for i in range(10):
-        # Path to cubes with current label (ie number of side).
-        name = f'{i:02d}'
-        fnames = glob.glob(os.path.join(path, name, '*.jpg'))
+        # Path to cubes with current label (ie number on sides of cube).
+        fnames = glob.glob(os.path.join(path, f'{i:02d}', '*.jpg'))
+        name = str(i)
 
         # Load all cubes and assign an alpha map. Skip cubes that are too dark
         # as they have no chance of being identified.
