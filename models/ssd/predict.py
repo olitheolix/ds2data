@@ -33,7 +33,7 @@ def parseCmdline():
         cwd = os.path.dirname(os.path.abspath(rpcn_net.__file__))
         param.src = os.path.join(cwd, 'data', 'flightpath')
     if param.dst is None:
-        param.dst = os.path.join('/', 'tmp', 'flightpath')
+        param.dst = os.path.join('/', 'tmp', 'predictions')
     return param
 
 
@@ -120,10 +120,11 @@ def main():
     del num_cls, im_dim, meta, conf, fn_meta, fn_rpcn_net, fn_shared_net, net_dir
 
     # Find as many image files as the user has requested.
-    fnames = glob.glob(os.path.join(param.src, '*.jpg'))[:2]
+    fnames = glob.glob(os.path.join(param.src, '*.jpg'))
     if param.N is not None:
         assert param.N > 0
         fnames = fnames[:param.N]
+    fnames.sort()
 
     # Predict the BBoxes for each image and save the result.
     os.makedirs(param.dst, exist_ok=True)
@@ -131,7 +132,9 @@ def main():
     fig_opts = dict(dpi=150, transparent=True, bbox_inches='tight', pad_inches=0)
     for i, fname in enumerate(tqdm.tqdm(fnames)):
         fig = analyseImage(sess, x_in, int2name, rpcn_out_dims, fname)
-        fig.savefig(os.path.join(param.dst, f'flight_{i:04d}.jpg'), **fig_opts)
+        fname_out = os.path.basename(fname)
+        fname_out = os.path.join(param.dst, f'pred-{fname_out}')
+        fig.savefig(fname_out, **fig_opts)
         if i > 0:
             plt.close(fig)
     plt.show()
