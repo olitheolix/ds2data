@@ -86,6 +86,10 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys):
         pred_labels_out[layer_dim] = []
         true_labels_out[layer_dim] = []
         for (x0, y0, x1, y1) in (bb_rects / im2ft_rat).astype(np.int16):
+            # Ignore invalid BBoxes.
+            if x0 >= x1 or y0 >= y1:
+                continue
+
             # Compute Gaussian mask to weigh label predictions across BBox.
             mx = 5 * (np.linspace(-1, 1, x1 - x0) ** 2)
             my = 5 * (np.linspace(-1, 1, y1 - y0) ** 2)
