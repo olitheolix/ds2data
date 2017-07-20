@@ -32,7 +32,7 @@ def stampImage(background, fg_shapes, N):
 
     # Stamp N non-overlapping shapes onto the background. If this proves
     # difficult, abort after `max_attempts` and return what we have so far.
-    attempts, max_attempts = 0, 10 * N
+    attempts, max_attempts = 0, 20 * N
     while len(bb_labels) < N and attempts < max_attempts:
         attempts += 1
 
@@ -42,9 +42,16 @@ def stampImage(background, fg_shapes, N):
         fg = np.array(fg_shapes[label][idx])
         im_height, im_width = np.array(fg.shape[:2], np.float32)
 
-        # Compute random region in foreground image to put the object.
-        w, h = np.random.uniform(0.25, 1.0) * np.array([im_width, im_height])
+        # Randomly scale the shape. The scaling factors are drawn from a
+        # non-uniform distribution such that most shapes have "medium" size.
+        # For instance,if the input shapes were 256x256 then most shapes would
+        # have a size in between 64x64 and 192x192 pixels
+        r = np.random.uniform(0.25, 1.0)
+        scale = np.interp(r, [0, 0.25, 0.85, 1.0], [0.12, 0.25, 0.75, 1.0])
+        w, h = scale * np.array([im_width, im_height])
         w, h = int(w), int(h)
+
+        # Compute random region in foreground image to put the object.
         x0 = np.random.randint(0, bg_width - w - 1)
         y0 = np.random.randint(0, bg_height - h - 1)
         x1, y1 = x0 + w, y0 + h
