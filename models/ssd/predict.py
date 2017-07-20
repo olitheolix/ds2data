@@ -3,7 +3,7 @@ import os
 import glob
 import tqdm
 import pickle
-import rpn_net
+import rpcn_net
 import validate
 import argparse
 import shared_net
@@ -30,7 +30,7 @@ def parseCmdline():
 
     param = parser.parse_args()
     if param.src is None:
-        cwd = os.path.dirname(os.path.abspath(rpn_net.__file__))
+        cwd = os.path.dirname(os.path.abspath(rpcn_net.__file__))
         param.src = os.path.join(cwd, 'data', 'flightpath')
     if param.dst is None:
         param.dst = os.path.join('/', 'tmp', 'flightpath')
@@ -94,10 +94,10 @@ def main():
     param = parseCmdline()
 
     # File paths.
-    cwd = os.path.dirname(os.path.abspath(rpn_net.__file__))
+    cwd = os.path.dirname(os.path.abspath(rpcn_net.__file__))
     net_dir = os.path.join(cwd, 'netstate')
-    fn_meta = os.path.join(net_dir, 'rpn-meta.pickle')
-    fn_rpn_net = os.path.join(net_dir, 'rpn-net.pickle')
+    fn_meta = os.path.join(net_dir, 'rpcn-meta.pickle')
+    fn_rpcn_net = os.path.join(net_dir, 'rpcn-net.pickle')
     fn_shared_net = os.path.join(net_dir, 'shared-net.pickle')
 
     # Simulation parameters.
@@ -105,7 +105,7 @@ def main():
     im_dim = (3, 512, 512)
     meta = pickle.load(open(fn_meta, 'rb'))
     conf, int2name = meta['conf'], meta['int2name']
-    rpcn_out_dims = conf.rpn_out_dims
+    rpcn_out_dims = conf.rpcn_out_dims
 
     # Precision.
     tf_dtype = tf.float32 if conf.dtype == 'float32' else tf.float16
@@ -115,9 +115,9 @@ def main():
     print('\n----- Network Setup -----')
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
     sh_out = shared_net.setup(fn_shared_net, x_in, conf.num_pools_shared, True)
-    rpn_net.setup(fn_rpn_net, sh_out, num_cls, conf.rpn_out_dims, True)
+    rpcn_net.setup(fn_rpcn_net, sh_out, num_cls, conf.rpcn_out_dims, True)
     sess.run(tf.global_variables_initializer())
-    del num_cls, im_dim, meta, conf, fn_meta, fn_rpn_net, fn_shared_net, net_dir
+    del num_cls, im_dim, meta, conf, fn_meta, fn_rpcn_net, fn_shared_net, net_dir
 
     # Find as many image files as the user has requested.
     fnames = glob.glob(os.path.join(param.src, '*.jpg'))[:2]

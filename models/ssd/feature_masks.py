@@ -45,8 +45,8 @@ def plotMasks(img_chw, ys):
 
 def computeBBoxLimits(im_height, ft_height):
     # Determine the minimum and maximum BBox area that we can identify from the
-    # current feature map. We assume the RPN filters are square, eg 5x5 or 7x7.
-    # fixme: remove hard coded assumption that RPN filters are 9x9
+    # current feature map. We assume the RPCN filters are square, eg 5x5 or 7x7.
+    # fixme: remove hard coded assumption that RPCN filters are 9x9
     imft_rat = im_height / ft_height
     assert imft_rat >= 1
 
@@ -126,7 +126,7 @@ def computeMasks(x, y):
 
 def main():
     cur_dir = os.path.dirname(os.path.abspath(__file__))
-    fname = os.path.join(cur_dir, 'netstate', 'rpn-meta.pickle')
+    fname = os.path.join(cur_dir, 'netstate', 'rpcn-meta.pickle')
     conf = pickle.load(open(fname, 'rb'))['conf']
 
     ds = data_loader.BBox(conf)
