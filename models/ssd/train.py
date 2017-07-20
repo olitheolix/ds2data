@@ -28,22 +28,45 @@ def parseCmdline():
 
 
 def accuracy(gt, pred, mask_cls, mask_bbox):
+    """Return accuracy metrics in a named tuple.
+
+    NOTE: the accuracy is always with respect to `mask_cls` and `mask_bbox`.
+    This means that only those locations cleared by the masks enter the
+    statistics.
+
+    Input:
+        gt: Array [:, height, width]
+            Ground truth values.
+        pred: Array [:, height, width]
+            Contains the network predictions. Must be same size as `gt`
+        mask_cls: Array [height, width]
+            Only non-zero locations will be considered in the tally for
+            correctly predicted labels.
+        mask_bbox: Array [height, width]
+            Only non-zero locations will be considered in the error statistics
+            for the 4 BBox parameters (x, y, w, h).
+
+    Returns:
+        NamedTuple
+    """
+    # Mask must be 2D and have the same shape. Pred/GT must be 3D and also have
+    # the same shape.
     assert mask_cls.shape == mask_bbox.shape
     assert mask_cls.ndim == mask_bbox.ndim == 2
     assert pred.ndim == gt.ndim == 3
     assert pred.shape == gt.shape
+    assert pred.shape[1:] == mask_cls.shape
 
-    # Flatten the mask images into a 1D vector because it is more convenient
-    # that way.
+    # Flattened vectors will be more convenient.
     mask_cls = mask_cls.flatten()
     mask_bbox = mask_bbox.flatten()
 
-    # The first 4 dimensions are the BBox, the remaining ones are one-hot class
-    # labels. Use this to determine how many classes we have.
+    # First 4 dimensions are BBox parameters (x, y, w, h), the remaining ones
+    # are one-hot class labels. Use this to determine how many classes we have.
     num_classes = pred.shape[0] - 4
 
-    # Flatten the predicted tensor into a (4 + num_classes, height * width)
-    # tensor. Then unpack the 4 BBox parameters and all one-hot class labels.
+    # Flatten the prediction tensor into (4 + num_classes, height * width).
+    # Then unpack the 4 BBox parameters and one-hot labels.
     pred = pred.reshape([4 + num_classes, -1])
     pred_bbox, pred_label = pred[:4], pred[4:]
 
@@ -55,13 +78,14 @@ def accuracy(gt, pred, mask_cls, mask_bbox):
     gt_label = np.argmax(gt_label, axis=0)
     pred_label = np.argmax(pred_label, axis=0)
 
-    # Count the correct label predictions, but only at valid mask positions.
+    # Count the correct label predictions at all valid mask positions.
+    # fixme: rename idx -> valid_loc
     idx = np.nonzero(mask_cls)[0]
     wrong_cls = (gt_label != pred_label)
     wrong_cls = wrong_cls[idx]
 
-    # False positive for background: predicted background but is foreground.
-    # Similarly, compute false positive for foreground.
+    # False-positive for background: net predicted background but is actually
+    # foreground. Similarly for false-positive foreground.
     gt_bg_idx = set(np.nonzero(gt_label[idx] == 0)[0].tolist())
     gt_fg_idx = set(np.nonzero(gt_label[idx] != 0)[0].tolist())
     pred_bg_idx = set(np.nonzero(pred_label[idx] == 0)[0].tolist())
@@ -70,14 +94,13 @@ def accuracy(gt, pred, mask_cls, mask_bbox):
     fg_fp = len(pred_fg_idx - gt_fg_idx)
     gt_bg_tot, gt_fg_tot = len(gt_bg_idx), len(gt_fg_idx)
 
-    # Compute label error only for those locations with a foreground object.
+    # Compute label error rate only for foreground shapes (ie ignore background).
     gt_fg_idx = np.nonzero(gt_label != 0)[0]
     fg_err = (gt_label[gt_fg_idx] != pred_label[gt_fg_idx])
     fg_err = np.count_nonzero(fg_err)
 
-    # Compute the BBox prediction error (L1 norm). Only consider locations
-    # where the mask is valid (ie the locations where there actually was a BBox
-    # to predict).
+    # Compute the L1 error for x, y, w, h of BBoxes. Skip locations without an
+    # object because the BBox predictions there are meaningless.
     idx = np.nonzero(mask_bbox)[0]
     bbox_err = np.abs(gt_bbox - pred_bbox)
     bbox_err = bbox_err[:, idx]
@@ -85,15 +108,31 @@ def accuracy(gt, pred, mask_cls, mask_bbox):
 
 
 def trainEpoch(conf, ds, sess, log, opt, lrate):
+    """Train network for one full epoch of data in `ds`.
+
+    Input:
+        ds: DataStore instance
+        sess: Tensorflow sessions
+        log: dict
+            This will be populated with various statistics, eg cost, prediction
+            errors, etc.
+        opt: TF optimisation node (eg the AdamOptimizer)
+        lrate: float
+            Learning rate for this epoch.
+    """
     g = tf.get_default_graph().get_tensor_by_name
 
+    # Get missing placeholder variables.
     x_in = g('x_in:0')
     lrate_in = g('lrate:0')
 
+    # Get the RPNC dimensions of the network and initialise the log variable
+    # for all of them.
     rpnc_dims = ds.getRpncDimensions()
     if 'rpnc' not in log:
         log['rpnc'] = {dim: collections.defaultdict(list) for dim in rpnc_dims}
 
+    # Train on one image at a time.
     batch = -1
     while True:
         batch += 1
@@ -114,7 +153,8 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
             # correspond to the 'background' class and bias the training.
             mask_cls, mask_bbox = computeMasks(img, ys[rpn_dim])
 
-            # Run optimiser and log the cost.
+            # Fetch the variables and assign them the current values. We need
+            # to add the batch dimensions for Tensorflow.
             layer_name = f'{rpn_dim[0]}x{rpn_dim[1]}'
             fd[g(f'rpn-{layer_name}-cost/y:0')] = np.expand_dims(ys[rpn_dim], 0)
             fd[g(f'rpn-{layer_name}-cost/mask_cls:0')] = np.expand_dims(mask_cls, 0)
@@ -130,6 +170,8 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
         log['cost'].append(all_costs['tot'])
         del fd
 
+        # Predict the RPCN outputs for the current image and compute the error
+        # statistics. All statistics will be added to the log dictionary.
         feed_dict = {x_in: np.expand_dims(img, 0)}
         for rpn_dim in rpnc_dims:
             layer_name = f'{rpn_dim[0]}x{rpn_dim[1]}'
@@ -152,7 +194,7 @@ def trainEpoch(conf, ds, sess, log, opt, lrate):
                 bb_max = np.max(acc.bbox_err, axis=1)
                 bb_med = np.median(acc.bbox_err, axis=1)
 
-            # Log training stats for plotting later.
+            # Log training stats. The validations script will use these.
             rpn_cost = all_costs[rpn_dim]
             log['rpnc'][rpn_dim]['cost'].append(rpn_cost)
             log['rpnc'][rpn_dim]['num_bb'].append(num_bb)
@@ -226,16 +268,12 @@ def main():
     tf_dtype = tf.float32 if conf.dtype == 'float32' else tf.float16
 
     # Create the input variable, the shared network and the RPN.
+    lrate_in = tf.placeholder(tf.float32, name='lrate')
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
     shared_out = shared_net.setup(None, x_in, conf.num_pools_shared, True)
     rpn_net.setup(None, shared_out, num_cls, conf.rpn_out_dims, True)
 
-    # The size of the shared-net output determines the size of the RPN input.
-    # We only need this for training purposes in order to create the masks and
-    # desired output 'y'.
-    lrate_in = tf.placeholder(tf.float32, name='lrate')
-
-    # Select cost function, optimiser and initialise the TF graph.
+    # Select cost function and optimiser, then initialise the TF graph.
     cost = [rpn_net.cost(rpn_dim) for rpn_dim in conf.rpn_out_dims]
     cost = tf.add_n(cost, name='cost')
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
@@ -259,7 +297,7 @@ def main():
             ds.reset()
             trainEpoch(conf, ds, sess, log, opt, lrates[epoch])
 
-            # Save the network states and log data.
+            # Save the network state and log data.
             rpn_net.save(fnames['rpn_net'], sess, conf.rpn_out_dims)
             shared_net.save(fnames['shared_net'], sess)
             conf = conf._replace(num_epochs=epoch)
