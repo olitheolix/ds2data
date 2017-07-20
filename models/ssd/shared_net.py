@@ -100,8 +100,8 @@ def setup(fname, x_in, num_pools, trainable):
     W2_dim = W3_dim = W4_dim = (3, 3, num_filters, num_filters)
 
     print('Shared Network:')
+    print(f'  Restored from <{fname}>')
     if fname is None:
-        print(' Randomly initialised weights')
         b1 = 0.5 + np.zeros(b_dim).astype(dtype)
         b2 = 0.5 + np.zeros(b_dim).astype(dtype)
         b3 = 0.5 + np.zeros(b_dim).astype(dtype)
@@ -111,7 +111,6 @@ def setup(fname, x_in, num_pools, trainable):
         W3 = np.random.normal(0.0, 0.1, W3_dim).astype(dtype)
         W4 = np.random.normal(0.0, 0.1, W4_dim).astype(dtype)
     else:
-        print(f'  Restored from <{fname}>')
         net = load(fname)
         b1, W1 = net['b1'], net['W1']
         b2, W2 = net['b2'], net['W2']

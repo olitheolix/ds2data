@@ -148,10 +148,7 @@ def setup(fname, x_in, num_classes, layer_out_dims, trainable):
 
     out = []
     print(f'RPCN ({len(layer_out_dims)} layers):')
-    if fname is None:
-        print(f'  Restored from <{fname}>')
-    else:
-        print('  Randomly initialised weights')
+    print(f'  Restored from <{fname}>')
 
     for layer_dim in layer_out_dims:
         assert isinstance(layer_dim, tuple) and len(layer_dim) == 2
