@@ -75,7 +75,7 @@ def computeMasks(x, y):
     assert bb_width.shape == bb_height.shape == hot_labels.shape[1:]
     del y
 
-    # Determine the min/maximum BBox side length that can/should be learned
+    # Determine the min/max BBox side length that can/should be learned
     # from the current feature map size.
     min_len, max_len = computeBBoxLimits(im_height, ft_height)
 
@@ -104,7 +104,7 @@ def computeMasks(x, y):
         idx_bg = random.sample(idx_bg, n_fg)
     mask_cls[idx_bg] = 1
 
-    # Set the mask for all locations where there is an object.
+    # Set the mask for all locations with an object.
     tot = len(idx_bg)
     for i in range(num_classes - 1):
         idx = np.nonzero(hot_labels[i + 1])[0]
