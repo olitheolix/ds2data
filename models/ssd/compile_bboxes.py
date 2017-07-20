@@ -92,8 +92,8 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
 
     # Uncertainty when mapping from feature -> image dimensions. We will need
     # this to search a reasonable neighbourhood laer.
-    ofs_x = (im_width / ft_width) / 2
-    ofs_y = (im_height / ft_height) / 2
+    ofs_x = int(1 + (im_width / ft_width) / 2)
+    ofs_y = int(1 + (im_height / ft_height) / 2)
 
     out = np.zeros((5, *ft_dim), np.float16)
     for fy in range(ft_height):
@@ -105,12 +105,10 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
             anchor_x = int(np.round(anchor_x))
             anchor_y = int(np.round(anchor_y))
 
-            # Find out if the score in the neighbourhood of the anchor position
-            # exceeds the threshold. We need to search the neighbourhood, not
-            # just a single point, because of the inaccuracy when mapping
-            # feature coordinates to image coordinates.
-            x0, x1 = int(anchor_x - ofs_x - 1), int(anchor_x + ofs_x + 1)
-            y0, y1 = int(anchor_y - ofs_y - 1), int(anchor_y + ofs_y + 1)
+            # Find out which BBox (if any) has the highest score in the
+            # vicinity of the anchor.
+            x0, x1 = anchor_x - ofs_x, anchor_x + ofs_x
+            y0, y1 = anchor_y - ofs_y, anchor_y + ofs_y
             x0, x1 = np.clip([x0, x1], 0, im_width - 1)
             y0, y1 = np.clip([y0, y1], 0, im_height - 1)
             tmp = bbox_score[:, y0:y1, x0:x1]
