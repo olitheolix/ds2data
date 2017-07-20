@@ -79,17 +79,16 @@ def accuracy(gt, pred, mask_cls, mask_bbox):
     pred_label = np.argmax(pred_label, axis=0)
 
     # Count the correct label predictions at all valid mask positions.
-    # fixme: rename idx -> valid_loc
-    idx = np.nonzero(mask_cls)[0]
+    valid_idx = np.nonzero(mask_cls)[0]
     wrong_cls = (gt_label != pred_label)
-    wrong_cls = wrong_cls[idx]
+    wrong_cls = wrong_cls[valid_idx]
 
     # False-positive for background: net predicted background but is actually
     # foreground. Similarly for false-positive foreground.
-    gt_bg_idx = set(np.nonzero(gt_label[idx] == 0)[0].tolist())
-    gt_fg_idx = set(np.nonzero(gt_label[idx] != 0)[0].tolist())
-    pred_bg_idx = set(np.nonzero(pred_label[idx] == 0)[0].tolist())
-    pred_fg_idx = set(np.nonzero(pred_label[idx] != 0)[0].tolist())
+    gt_bg_idx = set(np.nonzero(gt_label[valid_idx] == 0)[0].tolist())
+    gt_fg_idx = set(np.nonzero(gt_label[valid_idx] != 0)[0].tolist())
+    pred_bg_idx = set(np.nonzero(pred_label[valid_idx] == 0)[0].tolist())
+    pred_fg_idx = set(np.nonzero(pred_label[valid_idx] != 0)[0].tolist())
     bg_fp = len(pred_bg_idx - gt_bg_idx)
     fg_fp = len(pred_fg_idx - gt_fg_idx)
     gt_bg_tot, gt_fg_tot = len(gt_bg_idx), len(gt_fg_idx)
