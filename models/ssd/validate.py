@@ -36,7 +36,6 @@ def predictImage(sess, rpn_out_dims, x_in, img, ys):
         pred = preds[layer_dim]
 
         # Unpack tensors.
-        # fixme: allow for y=None if true labels are unavailable.
         true_labels = y[4:]
         bboxes, pred_labels = pred[:4], pred[4:]
         assert img.ndim == 3 and img.shape[0] == 3
@@ -85,7 +84,6 @@ def predictImage(sess, rpn_out_dims, x_in, img, ys):
         assert bb_dims.ndim == 2
         bb_dims_out[layer_dim] = bb_dims.tolist()
 
-    # rename: pred_out_labels -> pred_labels_out
     return preds, bb_dims_out, pred_labels_out, true_labels_out
 
 
