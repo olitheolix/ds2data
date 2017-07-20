@@ -44,19 +44,20 @@ def plotMasks(img_chw, ys):
 
 
 def computeBBoxLimits(im_height, ft_height):
-    # Determine the minimum and maximum BBox area that we can identify from the
-    # current feature map. We assume the RPCN filters are square, eg 5x5 or 7x7.
-    # fixme: remove hard coded assumption that RPCN filters are 9x9
-    imft_rat = im_height / ft_height
-    assert imft_rat >= 1
+    """Return the minimum/maximum pixel range supported by `ft_height`
 
-    max_len = 9 * imft_rat
-    min_len = max_len / 2
-
-    # Add some slack to allow for BBoxes that are slightly smaller/larger.
-    l = 0.9 * min_len, 1.1 * max_len
-    min_len, max_len = np.round(l).astype(np.int32).tolist()
-    return min_len, max_len
+    This simply calculates how many images pixels correspond to a single
+    feature map pixel. The minimum size is that number. The maximum size is the
+    minimum times the filter size in the RPCN layer.
+    """
+    # Determine the minimum and maximum BBox side length we can identify from
+    # the current feature map. We assume the RPCN filters are square, eg 5x5 or
+    # 13x13.
+    # fixme: remove hard coded assumption that RPCN filters are 31x31
+    min_len = im_height / ft_height
+    assert min_len >= 1
+    max_len = 31 * min_len
+    return int(min_len), int(max_len)
 
 
 def computeMasks(x, y):
