@@ -18,14 +18,14 @@ import numpy as np
 import PIL.Image as Image
 
 
-def computeOverlapScore(img_dim_hw, bboxes):
-    assert bboxes.shape[1] == 4
+def computeOverlapScore(img_dim_hw, bb_rects):
+    assert bb_rects.shape[1] == 4
 
     # Find out where the anchor box will overlap with each BBox. To do
     # this by stamping a block of 1's into the image and convolve it
     # with the anchor box.
-    bbox_score = np.zeros((len(bboxes), *img_dim_hw), np.float16)
-    for i, (x0, y0, x1, y1) in enumerate(bboxes):
+    bb_score = np.zeros((len(bb_rects), *img_dim_hw), np.float16)
+    for i, (x0, y0, x1, y1) in enumerate(bb_rects):
         # BBox size in pixels.
         bbox_area = (x1 - x0) * (y1 - y0)
         assert bbox_area > 0
@@ -33,7 +33,7 @@ def computeOverlapScore(img_dim_hw, bboxes):
         # Stamp a BBox sized region into the otherwise empty image. This
         # "box" is what we will convolve with the anchor to compute the
         # overlap.
-        bbox_score[i, y0:y1, x0:x1] = 1
+        bb_score[i, y0:y1, x0:x1] = 1
         anchor = np.ones((y1 - y0, x1 - x0), np.float32)
 
         # Convolve the BBox with the anchor box. The FFT version is much
@@ -41,7 +41,7 @@ def computeOverlapScore(img_dim_hw, bboxes):
         # Fortunately, this is easy because we know the correct convolution
         # result contain real valued integers since both input signals also
         # only contained real valued integers.
-        overlap = scipy.signal.fftconvolve(bbox_score[i], anchor, mode='same')
+        overlap = scipy.signal.fftconvolve(bb_score[i], anchor, mode='same')
         overlap = np.round(np.abs(overlap))
 
         # To compute the ratio of overlap we need to know which box (BBox
@@ -50,9 +50,9 @@ def computeOverlapScore(img_dim_hw, bboxes):
         # 100%), and the convolution at that point will be identical to the
         # area of the smaller box. Therefore, find out which box has the
         # smaller area. Then compute the overlap ratio.
-        bbox_score[i] = overlap / bbox_area
+        bb_score[i] = overlap / bbox_area
         del i, x0, x1, y0, y1, overlap, bbox_area
-    return bbox_score
+    return bb_score
 
 
 def ft2im(val, ft_dim: int, im_dim: int):
@@ -168,29 +168,29 @@ def genBBoxData(bb_rects, bb_labels, bb_scores, ft_dim, thresh):
     return out
 
 
-def bboxFromNetOutput(im_dim, bboxes, labels):
-    assert bboxes.ndim == 3
-    assert bboxes.shape[0] == 4
-    assert labels.ndim == 2
+def bboxFromNetOutput(im_dim, bb_rects, bb_labels):
+    assert bb_rects.ndim == 3
+    assert bb_rects.shape[0] == 4
+    assert bb_labels.ndim == 2
 
     # Compute the ratio of feature/image dimension. From this, determine the
     # interpolation parameters to map feature locations to image locations.
     im_height, im_width = im_dim
-    ft_height, ft_width = labels.shape[:2]
+    ft_height, ft_width = bb_labels.shape[:2]
 
     # Find all locations that are *not* background, ie every location where the
     # predicted label is anything but zero.
-    pick_yx = np.nonzero(labels)
+    pick_yx = np.nonzero(bb_labels)
 
     # Convert the picked locations from feature- to image dimensions.
     anchor_x = ft2im(pick_yx[1], ft_width, im_width)
     anchor_y = ft2im(pick_yx[0], ft_height, im_height)
 
     # Pick the labels and BBox parameters from the valid locations.
-    x = bboxes[0][pick_yx]
-    y = bboxes[1][pick_yx]
-    w = bboxes[2][pick_yx]
-    h = bboxes[3][pick_yx]
+    x = bb_rects[0][pick_yx]
+    y = bb_rects[1][pick_yx]
+    w = bb_rects[2][pick_yx]
+    h = bb_rects[3][pick_yx]
 
     # Convert the BBox centre positions, which are still relative to the
     # anchor, to absolute positions in image coordinates.
@@ -220,8 +220,8 @@ def showBBoxData(img, y_bbox, y_score):
     assert img.shape[2] == 3
 
     # Convert the training output to BBox positions.
-    labels, bboxes = y_bbox[0], y_bbox[1:]
-    bb_rect, pick_yx = bboxFromNetOutput(img.shape[:2], bboxes, labels)
+    labels, bb_xywh = y_bbox[0], y_bbox[1:]
+    bb_rect, pick_yx = bboxFromNetOutput(img.shape[:2], bb_xywh, labels)
     bb_labels = labels[pick_yx]
 
     # Insert the BBox rectangle into the image.
@@ -263,13 +263,13 @@ def compileBBoxData(args):
     im_dim = img.shape[1:]
 
     # Unpack the BBox data and map the human readable labels to numeric ones.
-    bboxes = np.array(meta['bb_rects'], np.int32)
+    bb_rect = np.array(meta['bb_rects'], np.int32)
     name2int = {v: k for k, v in meta['int2name'].items()}
-    bbox_labels = [name2int[_] for _ in meta['labels']]
+    bb_labels = [name2int[_] for _ in meta['labels']]
 
     # Compute the score map for each individual bounding box.
-    y_score = computeOverlapScore(im_dim, bboxes)
-    assert y_score.shape == (bboxes.shape[0], *im_dim)
+    y_score = computeOverlapScore(im_dim, bb_rect)
+    assert y_score.shape == (bb_rect.shape[0], *im_dim)
 
     # Determine the image- and feature dimensions.
     out_bbox = {}
@@ -279,7 +279,7 @@ def compileBBoxData(args):
         if min(ft_dim) < 2:
             break
 
-        y_bbox = genBBoxData(bboxes, bbox_labels, y_score, ft_dim, thresh)
+        y_bbox = genBBoxData(bb_rect, bb_labels, y_score, ft_dim, thresh)
         assert y_bbox.shape == (5, *ft_dim)
         out_bbox[tuple(ft_dim)] = y_bbox
 
