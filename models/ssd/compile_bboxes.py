@@ -55,22 +55,53 @@ def computeOverlapScore(img_dim_hw, bboxes):
     return bbox_score
 
 
+def ft2im(val, ft_dim: int, im_dim: int):
+    """Return `val` in image coordinates.
+
+    Inputs:
+        val: float, Array
+            The values to interpolate
+        ft_dim: in
+            Size of feature dimension
+        im_dim: in
+            Size of image dimension
+
+    Returns:
+        float, Array: Same size as `val`
+    """
+    assert ft_dim <= im_dim
+    assert isinstance(ft_dim, int) and isinstance(im_dim, int)
+
+    # Each point in feature coordinate corresponds to an area in image
+    # coordinates. The `ofs` value here is to ensure that we hit the centre of
+    # that area.
+    ofs = (im_dim / ft_dim) / 2
+    return np.interp(val, [0, ft_dim - 1], [ofs, im_dim - ofs - 1])
+
+
 def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
-    # Compute the BBox parameters that the network will ultimately learn.
-    # These are two values to encode the BBox centre relative to the
-    # anchor in the full image, and another two values to specify the
-    # absolute width/height in pixels.
-    # fixme: remove loops in this function
-    img_height, img_width = bbox_score.shape[1:]
-    mul = img_height / ft_dim[0]
-    ofs = mul / 2
+    """
+    Compute the BBox parameters that the network will ultimately learn.
+    These are two values to encode the BBox centre relative to the
+    anchor in the full image, and another two values to specify the
+    absolute width/height in pixels.
+    """
+    # Unpack dimension.
+    ft_height, ft_width = ft_dim
+    im_height, im_width = bbox_score.shape[1:]
+
+    # Uncertainty when mapping from feature -> image dimensions. We will need
+    # this to search a reasonable neighbourhood laer.
+    ofs_x = (im_width / ft_width) / 2
+    ofs_y = (im_height / ft_height) / 2
+
     out = np.zeros((5, *ft_dim), np.float16)
     for fy in range(ft_dim[0]):
         for fx in range(ft_dim[1]):
             # Convert the current feature coordinates to image coordinates. This
             # is the centre of the anchor box in image coordinates.
-            anchor_x = np.interp(fx, [0, ft_dim[1] - 1], [ofs, img_width - ofs - 1])
-            anchor_y = np.interp(fy, [0, ft_dim[0] - 1], [ofs, img_height - ofs - 1])
+            anchor_x = ft2im(fx, ft_width, im_width)
+            anchor_y = ft2im(fy, ft_height, im_height)
             anchor_x = int(np.round(anchor_x))
             anchor_y = int(np.round(anchor_y))
 
@@ -78,10 +109,10 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
             # exceeds the threshold. We need to search the neighbourhood, not
             # just a single point, because of the inaccuracy when mapping
             # feature coordinates to image coordinates.
-            x0, x1 = int(anchor_x - ofs - 1), int(anchor_x + ofs + 1)
-            y0, y1 = int(anchor_y - ofs - 1), int(anchor_y + ofs + 1)
-            x0, x1 = np.clip([x0, x1], 0, img_width - 1)
-            y0, y1 = np.clip([y0, y1], 0, img_height - 1)
+            x0, x1 = int(anchor_x - ofs_x - 1), int(anchor_x + ofs_x + 1)
+            y0, y1 = int(anchor_y - ofs_y - 1), int(anchor_y + ofs_y + 1)
+            x0, x1 = np.clip([x0, x1], 0, im_width - 1)
+            y0, y1 = np.clip([y0, y1], 0, im_height - 1)
             tmp = bbox_score[:, y0:y1, x0:x1]
             best = np.argmax(np.amax(tmp, axis=(1, 2)))
             if bbox_score[best, anchor_y, anchor_x] <= thresh:
@@ -93,9 +124,9 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
             bbox_x0, bbox_y0, bbox_x1, bbox_y1 = bboxes[best]
 
             # Ignore this BBox if it is (partially) outside the image.
-            if bbox_x0 < 0 or bbox_x1 >= img_width:
+            if bbox_x0 < 0 or bbox_x1 >= im_width:
                 continue
-            if bbox_y0 < 0 or bbox_y1 >= img_height:
+            if bbox_y0 < 0 or bbox_y1 >= im_height:
                 continue
 
             label_int = bbox_labels[best]
@@ -116,21 +147,20 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
 def bboxFromNetOutput(im_dim, bboxes, labels):
     assert bboxes.ndim == 3
     assert bboxes.shape[0] == 4
+    assert labels.ndim == 2
 
     # Compute the ratio of feature/image dimension. From this, determine the
     # interpolation parameters to map feature locations to image locations.
     im_height, im_width = im_dim
-    ft_height = labels.shape[0]
-    ft2im_k = im_height / ft_height
-    ft2im_d = ft2im_k / 2
+    ft_height, ft_width = labels.shape[:2]
 
     # Find all locations that are *not* background, ie every location where the
     # predicted label is anything but zero.
     pick_yx = np.nonzero(labels)
 
-    # Convert the picked locations from feature dim to image dim.
-    anchor_x = np.array(pick_yx[1]) * ft2im_k + ft2im_d
-    anchor_y = np.array(pick_yx[0]) * ft2im_k + ft2im_d
+    # Convert the picked locations from feature- to image dimensions.
+    anchor_x = ft2im(pick_yx[1], ft_width, im_width)
+    anchor_y = ft2im(pick_yx[0], ft_height, im_height)
 
     # Pick the labels and BBox parameters from the valid locations.
     x = bboxes[0][pick_yx]
@@ -281,7 +311,7 @@ def generate(path, thresh, num_pools, debug):
 
     # Create a debug plot to verify everything went fine.
     if debug:
-        img, y_bbox, y_score = compileBBoxData(args[1])
+        img, y_bbox, y_score = compileBBoxData(args[0])
         img = np.transpose(img, [1, 2, 0])
         for _, bbox in sorted(y_bbox.items()):
             showBBoxData(img, bbox, y_score)
