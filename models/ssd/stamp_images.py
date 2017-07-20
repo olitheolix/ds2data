@@ -45,9 +45,11 @@ def stampImage(background, fg_shapes, N):
         # Compute random region in foreground image to put the object.
         w, h = np.random.uniform(0.25, 1.0) * np.array([im_width, im_height])
         w, h = int(w), int(h)
-        x0 = np.random.randint(0, 1 + bg_width - w)
-        y0 = np.random.randint(0, 1 + bg_height - h)
+        x0 = np.random.randint(0, bg_width - w - 1)
+        y0 = np.random.randint(0, bg_height - h - 1)
         x1, y1 = x0 + w, y0 + h
+        assert 0 <= x0 < x1 < bg_width
+        assert 0 <= y0 < y1 < bg_height
 
         # Verify if the region is already occupied. Do nothing if it is.
         if np.sum(occupied[y0:y1, x0:x1]) > 0:
