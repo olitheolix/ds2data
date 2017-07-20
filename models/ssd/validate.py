@@ -4,7 +4,7 @@ import tqdm
 import time
 import train
 import pickle
-import rpn_net
+import rpcn_net
 import shared_net
 import data_loader
 import collections
@@ -407,7 +407,7 @@ def main():
     # Build the shared layers and connect it to the RPCN layers.
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
     sh_out = shared_net.setup(fnames['shared_net'], x_in, conf.num_pools_shared, True)
-    rpn_net.setup(fnames['rpcn_net'], sh_out, len(int2name), conf.rpcn_out_dims, True)
+    rpcn_net.setup(fnames['rpcn_net'], sh_out, len(int2name), conf.rpcn_out_dims, True)
 
     sess.run(tf.global_variables_initializer())
 

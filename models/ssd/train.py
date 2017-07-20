@@ -1,7 +1,7 @@
 import os
 import pickle
 import config
-import rpn_net
+import rpcn_net
 import argparse
 import shared_net
 import data_loader
@@ -269,10 +269,10 @@ def main():
     lrate_in = tf.placeholder(tf.float32, name='lrate')
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
     shared_out = shared_net.setup(None, x_in, conf.num_pools_shared, True)
-    rpn_net.setup(None, shared_out, len(int2name), conf.rpcn_out_dims, True)
+    rpcn_net.setup(None, shared_out, len(int2name), conf.rpcn_out_dims, True)
 
     # Select cost function and optimiser, then initialise the TF graph.
-    cost = [rpn_net.cost(rpcn_dim) for rpcn_dim in conf.rpcn_out_dims]
+    cost = [rpcn_net.cost(rpcn_dim) for rpcn_dim in conf.rpcn_out_dims]
     cost = tf.add_n(cost, name='cost')
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
     sess.run(tf.global_variables_initializer())
@@ -296,7 +296,7 @@ def main():
             trainEpoch(ds, sess, log, opt, lrates[epoch])
 
             # Save the network state and log data.
-            rpn_net.save(fnames['rpcn_net'], sess, conf.rpcn_out_dims)
+            rpcn_net.save(fnames['rpcn_net'], sess, conf.rpcn_out_dims)
             shared_net.save(fnames['shared_net'], sess)
             conf = conf._replace(num_epochs=epoch)
             log['conf'] = conf
