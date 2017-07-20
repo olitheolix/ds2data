@@ -96,8 +96,8 @@ def genBBoxData(bboxes, bbox_labels, bbox_score, ft_dim, thresh):
     ofs_y = (im_height / ft_height) / 2
 
     out = np.zeros((5, *ft_dim), np.float16)
-    for fy in range(ft_dim[0]):
-        for fx in range(ft_dim[1]):
+    for fy in range(ft_height):
+        for fx in range(ft_width):
             # Convert the current feature coordinates to image coordinates. This
             # is the centre of the anchor box in image coordinates.
             anchor_x = ft2im(fx, ft_width, im_width)
@@ -245,7 +245,7 @@ def compileBBoxData(args):
 
     # Compute the score map for each individual bounding box.
     y_score = computeOverlapScore(im_dim, bboxes)
-    assert y_score.shape == (bboxes.shape[0], *im_dim), y_score.shape
+    assert y_score.shape == (bboxes.shape[0], *im_dim)
 
     # Determine the image- and feature dimensions.
     out_bbox = {}
