@@ -4,6 +4,7 @@ import tqdm
 import time
 import train
 import pickle
+import argparse
 import rpcn_net
 import shared_net
 import data_loader
@@ -15,6 +16,16 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+
+
+def parseCmdline():
+    """Parse the command line arguments."""
+    # Create a parser and program description.
+    parser = argparse.ArgumentParser(description='Train the network for N epochs')
+    parser.add_argument(
+        '-N', metavar='', type=int, default=None,
+        help='Limit the validation set to at most N images')
+    return parser.parse_args()
 
 
 def predictBBoxes(sess, x_in, img, rpcn_dims, ys):
@@ -386,6 +397,7 @@ def showPredictedBBoxes(img_chw, bboxes, pred_labels, true_labels, int2name):
 
 
 def main():
+    param = parseCmdline()
     sess = tf.Session()
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     net_path = os.path.join(cur_dir, 'netstate')
@@ -398,6 +410,7 @@ def main():
 
     meta = pickle.load(open(fnames['meta'], 'rb'))
     conf, log = meta['conf'], meta['log']
+    conf = conf._replace(num_samples=param.N)
 
     # Load the BBox training data.
     print('\n----- Data Set -----')
