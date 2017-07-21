@@ -399,13 +399,12 @@ def showPredictedBBoxes(img_chw, bboxes, pred_labels, true_labels, int2name):
 def main():
     param = parseCmdline()
     sess = tf.Session()
-    cur_dir = os.path.dirname(os.path.abspath(__file__))
-    net_path = os.path.join(cur_dir, 'netstate')
 
+    netstate_path = 'netstate'
     fnames = {
-        'meta': os.path.join(net_path, 'rpcn-meta.pickle'),
-        'rpcn_net': os.path.join(net_path, 'rpcn-net.pickle'),
-        'shared_net': os.path.join(net_path, 'shared-net.pickle'),
+        'meta': os.path.join(netstate_path, 'rpcn-meta.pickle'),
+        'rpcn_net': os.path.join(netstate_path, 'rpcn-net.pickle'),
+        'shared_net': os.path.join(netstate_path, 'shared-net.pickle'),
     }
 
     meta = pickle.load(open(fnames['meta'], 'rb'))
@@ -427,7 +426,9 @@ def main():
     print('\n----- Network Setup -----')
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
     sh_out = shared_net.setup(fnames['shared_net'], x_in, conf.num_pools_shared, True)
-    rpcn_net.setup(fnames['rpcn_net'], sh_out, len(int2name), conf.rpcn_out_dims, True)
+    rpcn_net.setup(
+        fnames['rpcn_net'], sh_out, len(int2name),
+        conf.rpcn_filter_size, conf.rpcn_out_dims, True)
 
     sess.run(tf.global_variables_initializer())
 

@@ -223,34 +223,33 @@ def main():
     sess = tf.Session()
 
     # File names.
-    cur_dir = os.path.dirname(os.path.abspath(__file__))
-    net_path = os.path.join(cur_dir, 'netstate')
-    data_path = os.path.join(cur_dir, 'data', 'stamped')
-    os.makedirs(net_path, exist_ok=True)
+    netstate_path = 'netstate'
+    os.makedirs(netstate_path, exist_ok=True)
     fnames = {
-        'meta': os.path.join(net_path, 'rpcn-meta.pickle'),
-        'rpcn_net': os.path.join(net_path, 'rpcn-net.pickle'),
-        'shared_net': os.path.join(net_path, 'shared-net.pickle'),
-        'checkpt': os.path.join(net_path, 'tf-checkpoint.pickle'),
+        'meta': os.path.join(netstate_path, 'rpcn-meta.pickle'),
+        'rpcn_net': os.path.join(netstate_path, 'rpcn-net.pickle'),
+        'shared_net': os.path.join(netstate_path, 'shared-net.pickle'),
+        'checkpt': os.path.join(netstate_path, 'tf-checkpoint.pickle'),
     }
+    del netstate_path
 
     # Restore the configuration if it exists, otherwise create a new one.
+    print('\n----- Simulation Parameters -----')
     restore = os.path.exists(fnames['meta'])
     if restore:
         meta = pickle.load(open(fnames['meta'], 'rb'))
         conf, log = meta['conf'], meta['log']
-        print('\n----- Restored Configuration -----')
+        print(f'Restored from <{fnames["meta"]}>')
     else:
         log = collections.defaultdict(list)
         conf = config.NetConf(
             seed=0, width=512, height=512, colour='rgb', dtype='float32',
-            path=data_path, train_rat=0.8,
+            path=os.path.join('data', 'stamped'), train_rat=0.8,
             num_pools_shared=2, rpcn_out_dims=[(64, 64), (32, 32)],
             rpcn_filter_size=31, num_epochs=0, num_samples=None
         )
-        print('\n----- New Configuration -----')
+        print(f'Restored from <{None}>')
     print(conf)
-    del cur_dir, net_path, data_path
 
     # Load the BBox training data.
     print('\n----- Data Set -----')
