@@ -106,7 +106,7 @@ def accuracy(gt, pred, mask_cls, mask_bbox):
     return AccuracyMetrics(bbox_err, bg_fp, fg_fp, fg_err, gt_bg_tot, gt_fg_tot)
 
 
-def trainEpoch(ds, sess, log, opt, lrate):
+def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
     """Train network for one full epoch of data in `ds`.
 
     Input:
@@ -150,7 +150,7 @@ def trainEpoch(ds, sess, log, opt, lrate):
             # learn BBoxes where there are objects. Similarly, we also do not
             # want to learn the class label at every location since most
             # correspond to the 'background' class and bias the training.
-            mask_cls, mask_bbox = computeMasks(img, ys[rpcn_dim])
+            mask_cls, mask_bbox = computeMasks(img, ys[rpcn_dim], rpcn_filter_size)
 
             # Fetch the variables and assign them the current values. We need
             # to add the batch dimensions for Tensorflow.
@@ -181,7 +181,7 @@ def trainEpoch(ds, sess, log, opt, lrate):
             assert not np.any(np.isnan(pred))
 
             # Compute training statistics.
-            mask_cls, mask_bbox = computeMasks(img, ys[rpcn_dim])
+            mask_cls, mask_bbox = computeMasks(img, ys[rpcn_dim], rpcn_filter_size)
             acc = accuracy(ys[rpcn_dim], pred, mask_cls, mask_bbox)
             num_bb = acc.bbox_err.shape[1]
 
@@ -293,7 +293,7 @@ def main():
             print(f'\nEpoch {tot_epoch} ({epoch+1}/{param.N} in this training cycle)')
 
             ds.reset()
-            trainEpoch(ds, sess, log, opt, lrates[epoch])
+            trainEpoch(ds, sess, log, opt, lrates[epoch], conf.rpcn_filter_size)
 
             # Save the network state and log data.
             rpcn_net.save(fnames['rpcn_net'], sess, conf.rpcn_out_dims)

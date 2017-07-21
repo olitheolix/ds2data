@@ -6,17 +6,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plotMasks(img_chw, ys):
+def plotMasks(img_chw, ys, rpcn_filter_size):
     assert img_chw.ndim == 3
     for ft_dim, y in sorted(ys.items()):
         assert y.ndim == 3
-        min_len, max_len = computeBBoxLimits(img_chw.shape[1], y.shape[1])
+        min_len, max_len = computeBBoxLimits(
+            img_chw.shape[1], y.shape[1], rpcn_filter_size)
 
         print(f'Receptive field in 512x512 image for feature map size '
               f'{y.shape[1]}x{y.shape[2]}: '
               f'from {min_len}x{min_len} to {max_len}x{max_len} pixels')
 
-        mask_cls, mask_bbox = computeMasks(img_chw, y)
+        mask_cls, mask_bbox = computeMasks(img_chw, y, rpcn_filter_size)
 
         # Mask must be Gray scale images, and img_chw must be RGB.
         assert mask_cls.ndim == mask_cls.ndim == 2
@@ -43,7 +44,7 @@ def plotMasks(img_chw, ys):
         plt.title(f'Valid BBox in Active Regions ({ft_dim})')
 
 
-def computeBBoxLimits(im_height, ft_height):
+def computeBBoxLimits(im_height, ft_height, rpcn_filter_size):
     """Return the minimum/maximum pixel range supported by `ft_height`
 
     This simply calculates how many images pixels correspond to a single
@@ -51,16 +52,14 @@ def computeBBoxLimits(im_height, ft_height):
     minimum times the filter size in the RPCN layer.
     """
     # Determine the minimum and maximum BBox side length we can identify from
-    # the current feature map. We assume the RPCN filters are square, eg 5x5 or
-    # 13x13.
-    # fixme: remove hard coded assumption that RPCN filters are 31x31
+    # the current feature map. We assume the RPCN filters are square, eg 5x5.
     min_len = im_height / ft_height
     assert min_len >= 1
-    max_len = 31 * min_len
+    max_len = rpcn_filter_size * min_len
     return int(min_len), int(max_len)
 
 
-def computeMasks(x, y):
+def computeMasks(x, y, rpcn_filter_size):
     assert x.ndim == 3 and y.ndim == 3
     ft_height, ft_width = y.shape[1:]
     im_height, im_width = x.shape[1:]
@@ -78,7 +77,7 @@ def computeMasks(x, y):
 
     # Determine the min/max BBox side length that can/should be learned
     # from the current feature map size.
-    min_len, max_len = computeBBoxLimits(im_height, ft_height)
+    min_len, max_len = computeBBoxLimits(im_height, ft_height, rpcn_filter_size)
 
     # Allocate the mask arrays.
     mask_cls = np.zeros(ft_height * ft_width, np.float16)
@@ -144,7 +143,7 @@ def main():
     # Pick one sample and show the masks for it.
     ds.reset()
     x, y, _ = ds.nextSingle('train')
-    plotMasks(x, y)
+    plotMasks(x, y, conf.rpcn_filter_size)
     plt.show()
 
 

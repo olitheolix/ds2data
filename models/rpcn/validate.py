@@ -128,7 +128,7 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys):
     return preds, bb_rects_out, pred_labels_out, true_labels_out
 
 
-def validateEpoch(log, sess, ds, x_in, dset='test'):
+def validateEpoch(log, sess, ds, x_in, rpcn_filter_size, dset='test'):
     # Predict the BBoxes for every image in the test data set and accumulate
     # error statistics.
     ds.reset()
@@ -177,7 +177,7 @@ def validateEpoch(log, sess, ds, x_in, dset='test'):
         for layer_dim in rpcn_dims:
             y = ys[layer_dim]
             pred = preds[layer_dim]
-            _, mask_bbox = feature_masks.computeMasks(img, y)
+            _, mask_bbox = feature_masks.computeMasks(img, y, rpcn_filter_size)
 
             # We want to predict the label at every location. However, we only want to
             # predict the BBox where there are actually objects, which is why we will
@@ -433,7 +433,7 @@ def main():
     sess.run(tf.global_variables_initializer())
 
     # Compute and print statistics from test data set.
-    validateEpoch(log, sess, ds, x_in, 'test')
+    validateEpoch(log, sess, ds, x_in, conf.rpcn_filter_size, 'test')
 
     # Plot the learning progress and other debug plots like masks and an image
     # with predicted BBoxes.
