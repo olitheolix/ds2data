@@ -338,12 +338,12 @@ def plotTrainingProgress(log):
         # BBox position error in x-dimension.
         plt.subplot(num_rows, num_cols, num_cols * idx + 3)
         x = np.array(layer_log['err_x']).T
-        x_med, x_max = x
+        x_med, x_90p, _ = x
         x_med_s = smoothSignal(x_med, 0.5)
-        x_max_s = smoothSignal(x_max, 0.5)
-        plt.plot(x_max, '-b', label='Maximum')
+        x_90p_s = smoothSignal(x_90p, 0.5)
+        plt.plot(x_90p, '-b', label='90%')
         plt.plot(x_med, '-g', label='Median')
-        plt.plot(x_max_s, '--r')
+        plt.plot(x_90p_s, '--r')
         plt.plot(x_med_s, '--r')
         plt.ylim(0, 20)
         plt.grid()
@@ -353,12 +353,12 @@ def plotTrainingProgress(log):
         # BBox width error.
         plt.subplot(num_rows, num_cols, num_cols * idx + 4)
         w = np.array(layer_log['err_w']).T
-        w_med, w_max = w
+        w_med, w_90p, _ = w
         w_med_s = smoothSignal(w_med, 0.5)
-        w_max_s = smoothSignal(w_max, 0.5)
-        plt.plot(w_max, '-b', label='Maximum')
+        w_90p_s = smoothSignal(w_90p, 0.5)
+        plt.plot(w_90p, '-b', label='90%')
         plt.plot(w_med, '-g', label='Median')
-        plt.plot(w_max_s, '--r')
+        plt.plot(w_90p_s, '--r')
         plt.plot(w_med_s, '--r')
         plt.ylim(0, 20)
         plt.grid()

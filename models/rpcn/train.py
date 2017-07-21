@@ -185,22 +185,27 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             acc = accuracy(ys[rpcn_dim], pred, mask_cls, mask_bbox)
             num_bb = acc.bbox_err.shape[1]
 
-            # Compute maximum/median BBox errors. If this features map did not
-            # have any BBoxes then report -1.
+            # Compute maximum/90%/median for the BBox errors. If this features
+            # map did not have any BBoxes then report -1. The `bbox_err` shape
+            # is (4, N) where N is the number of BBoxes.
             if num_bb == 0:
                 bb_max = bb_med = [-1] * 4
             else:
-                bb_max = np.max(acc.bbox_err, axis=1)
-                bb_med = np.median(acc.bbox_err, axis=1)
+                tmp = np.sort(acc.bbox_err, axis=1)
+                N = tmp.shape[1]
+                bb_max = tmp[:, -1]
+                bb_90p = tmp[:, int(0.9 * N)]
+                bb_med = tmp[:, int(0.5 * N)]
+                del tmp, N
 
             # Log training stats. The validations script will use these.
             rpcn_cost = all_costs[rpcn_dim]
             log['rpcn'][rpcn_dim]['cost'].append(rpcn_cost)
             log['rpcn'][rpcn_dim]['num_bb'].append(num_bb)
-            log['rpcn'][rpcn_dim]['err_x'].append([bb_med[0], bb_max[0]])
-            log['rpcn'][rpcn_dim]['err_y'].append([bb_med[1], bb_max[1]])
-            log['rpcn'][rpcn_dim]['err_w'].append([bb_med[2], bb_max[2]])
-            log['rpcn'][rpcn_dim]['err_h'].append([bb_med[3], bb_max[3]])
+            log['rpcn'][rpcn_dim]['err_x'].append([bb_med[0], bb_90p[0], bb_max[0]])
+            log['rpcn'][rpcn_dim]['err_y'].append([bb_med[1], bb_90p[1], bb_max[1]])
+            log['rpcn'][rpcn_dim]['err_w'].append([bb_med[2], bb_90p[2], bb_max[2]])
+            log['rpcn'][rpcn_dim]['err_h'].append([bb_med[3], bb_90p[3], bb_max[3]])
             log['rpcn'][rpcn_dim]['err_fg'].append(acc.fg_err)
             log['rpcn'][rpcn_dim]['fg_falsepos'].append(acc.pred_fg_falsepos)
             log['rpcn'][rpcn_dim]['bg_falsepos'].append(acc.pred_bg_falsepos)
@@ -212,8 +217,8 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             fp_fg = acc.pred_fg_falsepos
             fg_err_rat = 100 * acc.fg_err / acc.gt_fg_tot
             s1 = f'ClsErr={fg_err_rat:4.1f}%  '
-            s2 = f'X=({bb_med[0]:2.0f}, {bb_max[0]:2.0f})  '
-            s3 = f'W=({bb_med[2]:2.0f}, {bb_max[2]:2.0f})  '
+            s2 = f'X=({bb_med[0]:2.0f}, {bb_90p[0]:2.0f})  '
+            s3 = f'W=({bb_med[2]:2.0f}, {bb_90p[2]:2.0f})  '
             s4 = f'FalsePos: FG={fp_fg:2.0f} BG={fp_bg:2.0f}'
             print(f'  {batch:,}: Cost: {int(rpcn_cost):,}  ' + s1 + s2 + s3 + s4)
 
