@@ -303,10 +303,17 @@ def plotTrainingProgress(log):
     # Plot statistics for every RPCN.
     plt.figure()
     num_rows = len(log['conf'].rpcn_out_dims)
-    num_cols = 4
+    num_cols = 5
     for idx, layer_dim in enumerate(ft_dims):
         layer_log = log['rpcn'][layer_dim]
 
+        # Unpack for convenience.
+        gt_bg_tot = np.array(layer_log['gt_bg_tot'])
+        gt_fg_tot = np.array(layer_log['gt_fg_tot'])
+        bg_falsepos = np.array(layer_log['bg_falsepos'])
+        fg_falsepos = np.array(layer_log['fg_falsepos'])
+
+        # Cost of RPCN Layer.
         plt.subplot(num_rows, num_cols, num_cols * idx + 1)
         cost = layer_log['cost']
         cost_s = smoothSignal(cost, 0.5)
@@ -316,7 +323,20 @@ def plotTrainingProgress(log):
         plt.title(f'Cost (Feature Size: {layer_dim[0]}x{layer_dim[1]})')
         plt.ylim(min_cost, max_cost)
 
+        # Classification error rate.
         plt.subplot(num_rows, num_cols, num_cols * idx + 2)
+        fg_err = np.array(layer_log['err_fg'])
+        fg_err = 100 * fg_err / gt_fg_tot
+        fg_err_s = smoothSignal(fg_err, 0.5)
+        plt.plot(fg_err)
+        plt.plot(fg_err_s, '--r')
+        plt.grid()
+        plt.ylim(0, 100)
+        plt.ylabel('Percent')
+        plt.title(f'Class Error Rate')
+
+        # BBox position error in x-dimension.
+        plt.subplot(num_rows, num_cols, num_cols * idx + 3)
         x = np.array(layer_log['err_x']).T
         x_med, x_max = x
         x_med_s = smoothSignal(x_med, 0.5)
@@ -328,9 +348,10 @@ def plotTrainingProgress(log):
         plt.ylim(0, 20)
         plt.grid()
         plt.legend(loc='best')
-        plt.title('Error Position X')
+        plt.title('BBox Position Error in X-Dimension')
 
-        plt.subplot(num_rows, num_cols, num_cols * idx + 3)
+        # BBox width error.
+        plt.subplot(num_rows, num_cols, num_cols * idx + 4)
         w = np.array(layer_log['err_w']).T
         w_med, w_max = w
         w_med_s = smoothSignal(w_med, 0.5)
@@ -342,13 +363,10 @@ def plotTrainingProgress(log):
         plt.ylim(0, 20)
         plt.grid()
         plt.legend(loc='best')
-        plt.title('Error Width')
+        plt.title('BBox Width Error')
 
-        plt.subplot(num_rows, num_cols, num_cols * idx + 4)
-        bg_falsepos = np.array(layer_log['bg_falsepos'])
-        fg_falsepos = np.array(layer_log['fg_falsepos'])
-        gt_bg_tot = np.array(layer_log['gt_bg_tot'])
-        gt_fg_tot = np.array(layer_log['gt_fg_tot'])
+        # False positive for background and foreground.
+        plt.subplot(num_rows, num_cols, num_cols * idx + 5)
         bg_fp = 100 * bg_falsepos / gt_bg_tot
         fg_fp = 100 * fg_falsepos / gt_fg_tot
         bg_fp_s = smoothSignal(bg_fp, 0.5)
