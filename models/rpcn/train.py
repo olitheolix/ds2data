@@ -243,10 +243,10 @@ def main():
     else:
         log = collections.defaultdict(list)
         conf = config.NetConf(
-            seed=0, width=512, height=512, colour='rgb',
-            keep_prob=0.8, path=data_path, train_rat=0.8,
+            seed=0, width=512, height=512, colour='rgb', dtype='float32',
+            path=data_path, train_rat=0.8,
             num_pools_shared=2, rpcn_out_dims=[(64, 64), (32, 32)],
-            dtype='float32', num_epochs=0, num_samples=None
+            rpcn_filter_size=31, num_epochs=0, num_samples=None
         )
         print('\n----- New Configuration -----')
     print(conf)
@@ -268,7 +268,9 @@ def main():
     lrate_in = tf.placeholder(tf.float32, name='lrate')
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
     shared_out = shared_net.setup(None, x_in, conf.num_pools_shared, True)
-    rpcn_net.setup(None, shared_out, len(int2name), conf.rpcn_out_dims, True)
+    rpcn_net.setup(
+        None, shared_out, len(int2name),
+        conf.rpcn_filter_size, conf.rpcn_out_dims, True)
 
     # Select cost function and optimiser, then initialise the TF graph.
     cost = [rpcn_net.cost(rpcn_dim) for rpcn_dim in conf.rpcn_out_dims]
