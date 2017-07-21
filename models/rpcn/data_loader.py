@@ -1,4 +1,5 @@
 """ A uniform interface to request images."""
+import sys
 import glob
 import pickle
 import collections
@@ -251,8 +252,8 @@ class BBox(DataSet):
         # Find all training images. Abort if there are none.
         fnames = glob.glob(f'{self.conf.path}/*.jpg')
         if len(fnames) == 0:
-            print(f'\nError: No stamped background images in {self.conf.path}')
-            raise FileNotFoundError
+            print(f'\nError: No stamped background images in {self.conf.path}\n')
+            sys.exit(1)
 
         # Load each image, pre-process it (eg resize, RGB/Gray), and add it
         # to the data set.
