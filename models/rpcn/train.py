@@ -189,7 +189,7 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             # map did not have any BBoxes then report -1. The `bbox_err` shape
             # is (4, N) where N is the number of BBoxes.
             if num_bb == 0:
-                bb_max = bb_med = [-1] * 4
+                bb_max = bb_med = bb_90p = [-1] * 4
             else:
                 tmp = np.sort(acc.bbox_err, axis=1)
                 N = tmp.shape[1]
