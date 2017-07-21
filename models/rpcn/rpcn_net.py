@@ -141,7 +141,7 @@ def load(fname):
     return pickle.load(open(fname, 'rb'))
 
 
-def setup(fname, x_in, num_classes, ft_out_dims, trainable):
+def setup(fname, x_in, num_classes, filter_size, ft_out_dims, trainable):
     assert x_in.dtype in [tf.float16, tf.float32]
     dtype = np.float16 if x_in.dtype == tf.float16 else np.float32
     num_features_out = 64
@@ -162,7 +162,7 @@ def setup(fname, x_in, num_classes, ft_out_dims, trainable):
 
         W1_dim = (3, 3, num_features_in, num_features_out)
         b1_dim = (num_features_out, 1, 1)
-        W2_dim = (31, 31, num_features_out, 4 + num_classes)
+        W2_dim = (filter_size, filter_size, num_features_out, 4 + num_classes)
         b2_dim = (4 + num_classes, 1, 1)
 
         if fname is None:
