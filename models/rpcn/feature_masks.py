@@ -85,12 +85,12 @@ def computeMasks(x, y, rpcn_filter_size):
 
     # Activate the mask for all locations that have 1) an object and 2) both
     # BBox side lengths are within the limits for the current feature map size.
-    cond = (hot_labels[0] == 0)
-    cond &= (min_len <= bb_width) & (bb_width <= max_len)
-    cond &= (min_len <= bb_height) & (bb_height <= max_len)
-    idx = np.nonzero(cond)[0]
+    cond_fg = (hot_labels[0] == 0)
+    cond_width = (min_len <= bb_width) & (bb_width <= max_len)
+    cond_height = (min_len <= bb_height) & (bb_height <= max_len)
+    idx = np.nonzero(cond_fg & cond_width & cond_height)[0]
     mask_bbox[idx] = 1
-    del idx
+    del idx, cond_fg, cond_width, cond_height
 
     # Determine how many (non-)background locations we have.
     n_bg = int(np.sum(hot_labels[0]))
