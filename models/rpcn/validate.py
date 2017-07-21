@@ -281,11 +281,30 @@ def plotTrainingProgress(log):
     plt.grid()
     plt.title('Cost')
     plt.ylim(0, max(log['cost']))
+    del cost, cost_s
 
+    # Find the range of cost values. We will use it to ensure all cost plots
+    # have the same y-scale.
+    ft_dims = log['conf'].rpcn_out_dims
+    min_cost, max_cost = float('inf'), 0
+    for idx, layer_dim in enumerate(ft_dims):
+        cost = np.array(log['rpcn'][layer_dim]['cost'])
+        cost.sort()
+        start, stop = int(0.01 * len(cost)), int(0.99 * len(cost))
+        cost = cost[start:stop]
+        min_cost = min(min_cost, cost[0])
+        max_cost = max(max_cost, cost[-1])
+        del idx, layer_dim, cost, start, stop
+
+    # Round up/down to closes decade.
+    min_cost = 10 ** (np.floor(np.log10(min_cost)))
+    max_cost = 10 ** (np.ceil(np.log10(max_cost)))
+
+    # Plot statistics for every RPCN.
     plt.figure()
     num_rows = len(log['conf'].rpcn_out_dims)
     num_cols = 4
-    for idx, layer_dim in enumerate(log['conf'].rpcn_out_dims):
+    for idx, layer_dim in enumerate(ft_dims):
         layer_log = log['rpcn'][layer_dim]
 
         plt.subplot(num_rows, num_cols, num_cols * idx + 1)
@@ -295,7 +314,7 @@ def plotTrainingProgress(log):
         plt.semilogy(cost_s, '--r')
         plt.grid()
         plt.title(f'Cost (Feature Size: {layer_dim[0]}x{layer_dim[1]})')
-        plt.ylim(0, max(log['cost']))
+        plt.ylim(min_cost, max_cost)
 
         plt.subplot(num_rows, num_cols, num_cols * idx + 2)
         x = np.array(layer_log['err_x']).T
