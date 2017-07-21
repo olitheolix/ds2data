@@ -288,6 +288,10 @@ def main():
     if restore:
         print('\nRestored Tensorflow checkpoint file')
         saver.restore(sess, fnames['checkpt'])
+    else:
+        print('\nSave initial meta file')
+        meta = {'conf': conf, 'int2name': int2name, 'log': log}
+        pickle.dump(meta, open(fnames['meta'], 'wb'))
 
     print(f'\n----- Training for another {param.N} Epochs -----')
     try:
