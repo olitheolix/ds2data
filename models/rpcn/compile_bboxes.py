@@ -276,7 +276,7 @@ def compileBBoxData(args):
     while True:
         ft_dim = (np.array(im_dim) / 2 ** num_pools).astype(np.int32).tolist()
         num_pools += 1
-        if min(ft_dim) < 2:
+        if min(ft_dim) < 32:
             break
 
         y_bbox = genBBoxData(bb_rect, bb_labels, y_score, ft_dim, thresh)
