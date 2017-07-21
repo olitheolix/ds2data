@@ -3,8 +3,9 @@
 """
 Draw a bounding box around the visible cubes in every frame.
 
-This script serves mostly as an example for how to parse the pickled meta data
-for labelling purposes.
+This script shows how to parse the pickled meta data and extract the BBoxes and
+their labels. It takes the image paths as an argument and will *overwrite* all
+images with new ones that contain the BBoxes.
 """
 
 import os
