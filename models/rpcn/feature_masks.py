@@ -37,11 +37,11 @@ def plotMasks(img_chw, ys, rpcn_filter_size):
 
         plt.subplot(2, 2, 2)
         plt.imshow(mask_cls, cmap='gray', clim=[0, 1])
-        plt.title(f'Active Regions ({ft_dim})')
+        plt.title(f'Active Regions {ft_dim[0]}x{ft_dim[1]}')
 
         plt.subplot(2, 2, 3)
         plt.imshow(mask_bbox, cmap='gray', clim=[0, 1])
-        plt.title(f'Valid BBox in Active Regions ({ft_dim})')
+        plt.title(f'Valid BBox in Active Regions {ft_dim[0]}x{ft_dim[1]}')
 
 
 def computeBBoxLimits(im_height, ft_height, rpcn_filter_size):
@@ -64,7 +64,7 @@ def computeMasks(x, y, rpcn_filter_size):
     ft_height, ft_width = y.shape[1:]
     im_height, im_width = x.shape[1:]
 
-    # Unpack the tensor portion for the BBox data.
+    # Unpack the BBox portion of the tensor.
     hot_labels = y[4:, :, :]
     num_classes = len(hot_labels)
     hot_labels = np.reshape(hot_labels, [num_classes, -1])
