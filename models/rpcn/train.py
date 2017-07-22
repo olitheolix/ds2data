@@ -125,7 +125,7 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
     # for all of them.
     rpcn_dims = ds.getRpcnDimensions()
     if 'rpcn' not in log:
-        log['rpcn'] = {dim: collections.defaultdict(list) for dim in rpcn_dims}
+        log['rpcn'] = {ft_dim: {'acc': [], 'cost': []} for ft_dim in rpcn_dims}
 
     # Train on one image at a time.
     batch = -1
@@ -185,28 +185,17 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             # map did not have any BBoxes then report -1. The `bbox_err` shape
             # is (4, N) where N is the number of BBoxes.
             if num_bb == 0:
-                bb_max = bb_med = bb_90p = [-1] * 4
+                bb_med = bb_90p = [-1] * 4
             else:
                 tmp = np.sort(acc.bbox_err, axis=1)
-                N = tmp.shape[1]
-                bb_max = tmp[:, -1]
-                bb_90p = tmp[:, int(0.9 * N)]
-                bb_med = tmp[:, int(0.5 * N)]
-                del tmp, N
+                bb_90p = tmp[:, int(0.9 * num_bb)]
+                bb_med = tmp[:, int(0.5 * num_bb)]
+                del tmp
 
-            # Log training stats. The validations script will use these.
+            # Log training stats. The validation script will use these.
             rpcn_cost = all_costs[rpcn_dim]
+            log['rpcn'][rpcn_dim]['acc'].append(acc)
             log['rpcn'][rpcn_dim]['cost'].append(rpcn_cost)
-            log['rpcn'][rpcn_dim]['num_bb'].append(num_bb)
-            log['rpcn'][rpcn_dim]['err_x'].append([bb_med[0], bb_90p[0], bb_max[0]])
-            log['rpcn'][rpcn_dim]['err_y'].append([bb_med[1], bb_90p[1], bb_max[1]])
-            log['rpcn'][rpcn_dim]['err_w'].append([bb_med[2], bb_90p[2], bb_max[2]])
-            log['rpcn'][rpcn_dim]['err_h'].append([bb_med[3], bb_90p[3], bb_max[3]])
-            log['rpcn'][rpcn_dim]['err_fg'].append(acc.fg_err)
-            log['rpcn'][rpcn_dim]['fg_falsepos'].append(acc.pred_fg_falsepos)
-            log['rpcn'][rpcn_dim]['bg_falsepos'].append(acc.pred_bg_falsepos)
-            log['rpcn'][rpcn_dim]['gt_fg_tot'].append(acc.gt_fg_tot)
-            log['rpcn'][rpcn_dim]['gt_bg_tot'].append(acc.gt_bg_tot)
 
             # Print progress report to terminal.
             fp_bg = acc.pred_bg_falsepos
