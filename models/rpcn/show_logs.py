@@ -63,6 +63,7 @@ def plotTrainingProgress(log):
     for idx, layer_dim in enumerate(ft_dims):
         layer_log = log['rpcn'][layer_dim]
 
+        # fixme: remove hard coded numbers.
         num_epochs = 3
         samples_per_epoch = 8
 
@@ -79,6 +80,7 @@ def plotTrainingProgress(log):
                 'bg_falsepos': np.zeros(num_epochs, np.float32),
                 'bberr': np.zeros((4, num_epochs), np.float32),
             }
+            d = data[pstr]
 
             for epoch in range(num_epochs):
                 start = epoch * samples_per_epoch
@@ -96,25 +98,25 @@ def plotTrainingProgress(log):
                 assert cost.ndim == 1
                 cost = np.sort(cost)
                 cost = cost[int(len(cost) * (percentile / 100))]
-                data[pstr]['cost'][epoch] = cost
+                d['cost'][epoch] = cost
                 del cost
 
                 # Class accuracy for foreground shapes.
                 fg_err = np.sort(100 * fg_err / true_fg_tot)
                 fg_err = fg_err[int(len(fg_err) * (percentile / 100))]
-                data[pstr]['fgerr'][epoch] = fg_err
+                d['fgerr'][epoch] = fg_err
                 del fg_err
 
                 # False positive background predictions.
                 bg_falsepos = np.sort(100 * bg_falsepos / true_bg_tot)
                 bg_falsepos = bg_falsepos[int(len(bg_falsepos) * (percentile / 100))]
-                data[pstr]['bg_falsepos'][epoch] = bg_falsepos
+                d['bg_falsepos'][epoch] = bg_falsepos
                 del bg_falsepos
 
                 # False positive foreground predictions.
                 fg_falsepos = np.sort(100 * fg_falsepos / true_fg_tot)
                 fg_falsepos = fg_falsepos[int(len(fg_falsepos) * (percentile / 100))]
-                data[pstr]['fg_falsepos'][epoch] = fg_falsepos
+                d['fg_falsepos'][epoch] = fg_falsepos
                 del fg_falsepos
 
                 # BBox error.
@@ -123,20 +125,20 @@ def plotTrainingProgress(log):
                 if num_bb > 0:
                     tmp = np.sort(bb_err, axis=1)
                     tmp = tmp[:, int(num_bb * (percentile / 100))]
-                    data[pstr]['bberr'][:, epoch] = tmp
+                    d['bberr'][:, epoch] = tmp
                     del tmp
                 del bb_err, num_bb
 
-            data[pstr]['cost_smooth'] = smoothSignal(data[pstr]['cost'], 0.9)
-            data[pstr]['fgerr_smooth'] = smoothSignal(data[pstr]['fgerr'], 0.9)
-            data[pstr]['fg_falsepos_smooth'] = smoothSignal(data[pstr]['fg_falsepos'], 0.9)
-            data[pstr]['bg_falsepos_smooth'] = smoothSignal(data[pstr]['bg_falsepos'], 0.9)
+            d['cost_smooth'] = smoothSignal(d['cost'], 0.9)
+            d['fgerr_smooth'] = smoothSignal(d['fgerr'], 0.9)
+            d['fg_falsepos_smooth'] = smoothSignal(d['fg_falsepos'], 0.9)
+            d['bg_falsepos_smooth'] = smoothSignal(d['bg_falsepos'], 0.9)
 
             # Smooth BBox percentiles.
-            data[pstr]['bberr_smooth'] = np.zeros_like(data[pstr]['bberr'])
+            d['bberr_smooth'] = np.zeros_like(d['bberr'])
             for i in range(4):
-                f = smoothSignal(data[pstr]['bberr'][i, :], 0.9)
-                data[pstr]['bberr_smooth'][i, :] = f
+                f = smoothSignal(d['bberr'][i, :], 0.9)
+                d['bberr_smooth'][i, :] = f
         del layer_log
 
         # Cost of RPCN Layer.
