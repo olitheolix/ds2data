@@ -115,7 +115,9 @@ def main():
     print('\n----- Network Setup -----')
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
     sh_out = shared_net.setup(fn_shared_net, x_in, conf.num_pools_shared, True)
-    rpcn_net.setup(fn_rpcn_net, sh_out, num_cls, conf.rpcn_out_dims, True)
+    rpcn_net.setup(
+        fn_rpcn_net, sh_out, num_cls,
+        conf.rpcn_filter_size, conf.rpcn_out_dims, True)
     sess.run(tf.global_variables_initializer())
     del num_cls, im_dim, meta, conf, fn_meta, fn_rpcn_net, fn_shared_net, net_dir
 
