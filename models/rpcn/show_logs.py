@@ -63,51 +63,94 @@ def plotTrainingProgress(log):
     for idx, layer_dim in enumerate(ft_dims):
         layer_log = log['rpcn'][layer_dim]
 
-        bb_err = [_.bbox_err for _ in layer_log['acc']]
-        bb_50p = -np.ones((4, len(bb_err)), np.float32)
-        bb_90p = np.array(bb_50p)
-        for ft_dim_idx, bb_epoch in enumerate(bb_err):
-            num_bb = bb_epoch.shape[1]
-            if num_bb > 0:
-                tmp = np.sort(bb_epoch, axis=1)
-                bb_50p[:, ft_dim_idx] = tmp[:, int(0.5 * num_bb)]
-                bb_90p[:, ft_dim_idx] = tmp[:, int(0.9 * num_bb)]
-                del tmp
-            del ft_dim_idx
+        num_epochs = 3
+        samples_per_epoch = 8
 
-        bberr_50p_x = bb_50p[0]
-        bberr_50p_w = bb_50p[2]
-        bberr_90p_x = bb_90p[0]
-        bberr_90p_w = bb_90p[2]
-        bberr_50p_x_s = smoothSignal(bberr_50p_x, 0.5)
-        bberr_50p_w_s = smoothSignal(bberr_50p_w, 0.5)
-        bberr_90p_x_s = smoothSignal(bberr_90p_x, 0.5)
-        bberr_90p_w_s = smoothSignal(bberr_90p_w, 0.5)
+        bb_err_all = [_.bbox_err for _ in layer_log['acc']]
+        assert len(bb_err_all) == num_epochs * samples_per_epoch
 
-        # Unpack for convenience.
-        gt_bg_tot = np.array([_.gt_bg_tot for _ in layer_log['acc']])
-        gt_fg_tot = np.array([_.gt_fg_tot for _ in layer_log['acc']])
-        bg_falsepos = np.array([_.pred_bg_falsepos for _ in layer_log['acc']])
-        fg_falsepos = np.array([_.pred_fg_falsepos for _ in layer_log['acc']])
-        cost = layer_log['cost']
-        cost_s = smoothSignal(cost, 0.5)
-        fg_err = np.array([_.fg_err for _ in layer_log['acc']])
-        fg_err = 100 * fg_err / gt_fg_tot
-        fg_err_s = smoothSignal(fg_err, 0.5)
+        data = {}
+        for percentile in [50, 75, 90, 95, 99]:
+            pstr = f'{percentile}p'
+            data[pstr] = {
+                'cost': np.zeros(num_epochs, np.float32),
+                'fgerr': np.zeros(num_epochs, np.float32),
+                'fg_falsepos': np.zeros(num_epochs, np.float32),
+                'bg_falsepos': np.zeros(num_epochs, np.float32),
+                'bberr': np.zeros((4, num_epochs), np.float32),
+            }
+
+            for epoch in range(num_epochs):
+                start = epoch * samples_per_epoch
+                stop = start + samples_per_epoch
+                acc = layer_log['acc'][start:stop]
+                cost = np.array(layer_log['cost'][start:stop])
+                fg_err = np.array([_.fg_err for _ in acc])
+                true_fg_tot = np.array([_.gt_fg_tot for _ in acc])
+                true_bg_tot = np.array([_.gt_bg_tot for _ in acc])
+                bg_falsepos = np.array([_.pred_bg_falsepos for _ in acc])
+                fg_falsepos = np.array([_.pred_fg_falsepos for _ in acc])
+                del start, stop
+
+                # Cost.
+                assert cost.ndim == 1
+                cost = np.sort(cost)
+                cost = cost[int(len(cost) * (percentile / 100))]
+                data[pstr]['cost'][epoch] = cost
+                del cost
+
+                # Class accuracy for foreground shapes.
+                fg_err = np.sort(100 * fg_err / true_fg_tot)
+                fg_err = fg_err[int(len(fg_err) * (percentile / 100))]
+                data[pstr]['fgerr'][epoch] = fg_err
+                del fg_err
+
+                # False positive background predictions.
+                bg_falsepos = np.sort(100 * bg_falsepos / true_bg_tot)
+                bg_falsepos = bg_falsepos[int(len(bg_falsepos) * (percentile / 100))]
+                data[pstr]['bg_falsepos'][epoch] = bg_falsepos
+                del bg_falsepos
+
+                # False positive foreground predictions.
+                fg_falsepos = np.sort(100 * fg_falsepos / true_fg_tot)
+                fg_falsepos = fg_falsepos[int(len(fg_falsepos) * (percentile / 100))]
+                data[pstr]['fg_falsepos'][epoch] = fg_falsepos
+                del fg_falsepos
+
+                # BBox error.
+                bb_err = np.hstack([_.bbox_err for _ in acc])
+                num_bb = bb_err.shape[1]
+                if num_bb > 0:
+                    tmp = np.sort(bb_err, axis=1)
+                    tmp = tmp[:, int(num_bb * (percentile / 100))]
+                    data[pstr]['bberr'][:, epoch] = tmp
+                    del tmp
+                del bb_err, num_bb
+
+            data[pstr]['cost_smooth'] = smoothSignal(data[pstr]['cost'], 0.9)
+            data[pstr]['fgerr_smooth'] = smoothSignal(data[pstr]['fgerr'], 0.9)
+            data[pstr]['fg_falsepos_smooth'] = smoothSignal(data[pstr]['fg_falsepos'], 0.9)
+            data[pstr]['bg_falsepos_smooth'] = smoothSignal(data[pstr]['bg_falsepos'], 0.9)
+
+            # Smooth BBox percentiles.
+            data[pstr]['bberr_smooth'] = np.zeros_like(data[pstr]['bberr'])
+            for i in range(4):
+                f = smoothSignal(data[pstr]['bberr'][i, :], 0.9)
+                data[pstr]['bberr_smooth'][i, :] = f
         del layer_log
 
         # Cost of RPCN Layer.
         plt.subplot(num_rows, num_cols, num_cols * idx + 1)
-        plt.semilogy(cost)
-        plt.semilogy(cost_s, '--r')
+        plt.semilogy(data['90p']['cost'])
+        plt.semilogy(data['90p']['cost_smooth'], '--r')
         plt.grid()
         plt.title(f'Cost (Feature Size: {layer_dim[0]}x{layer_dim[1]})')
         plt.ylim(min_cost, max_cost)
 
         # Classification error rate.
         plt.subplot(num_rows, num_cols, num_cols * idx + 2)
-        plt.plot(fg_err)
-        plt.plot(fg_err_s, '--r')
+        plt.plot(data['50p']['fgerr'])
+        plt.plot(data['50p']['fgerr_smooth'], '--r')
         plt.grid()
         plt.ylim(0, 100)
         plt.ylabel('Percent')
@@ -116,21 +159,21 @@ def plotTrainingProgress(log):
         # BBox position error in x-dimension.
         plt.subplot(num_rows, num_cols, num_cols * idx + 3)
 
-        plt.plot(bberr_90p_x, '-b', label='90%')
-        plt.plot(bberr_50p_x, '-g', label='Median')
-        plt.plot(bberr_90p_x_s, '--r')
-        plt.plot(bberr_50p_x_s, '--r')
-        plt.ylim(0, 20)
+        plt.plot(data['90p']['bberr'][0], '-b', label='90%')
+        plt.plot(data['50p']['bberr'][0], '-g', label='Median')
+        plt.plot(data['90p']['bberr_smooth'][0], '--r')
+        plt.plot(data['50p']['bberr_smooth'][0], '--r')
+        plt.ylim(0, 200)
         plt.grid()
         plt.legend(loc='best')
         plt.title('BBox Position Error in X-Dimension')
 
         # BBox width error.
         plt.subplot(num_rows, num_cols, num_cols * idx + 4)
-        plt.plot(bberr_90p_w, '-b', label='90%')
-        plt.plot(bberr_50p_w, '-g', label='Median')
-        plt.plot(bberr_90p_w_s, '--r')
-        plt.plot(bberr_50p_w_s, '--r')
+        plt.plot(data['90p']['bberr'][2], '-b', label='90%')
+        plt.plot(data['50p']['bberr'][2], '-g', label='Median')
+        plt.plot(data['90p']['bberr_smooth'][2], '--r')
+        plt.plot(data['50p']['bberr_smooth'][2], '--r')
         plt.ylim(0, 20)
         plt.grid()
         plt.legend(loc='best')
@@ -138,15 +181,10 @@ def plotTrainingProgress(log):
 
         # False positive for background and foreground.
         plt.subplot(num_rows, num_cols, num_cols * idx + 5)
-        bg_fp = 100 * bg_falsepos / gt_bg_tot
-        fg_fp = 100 * fg_falsepos / gt_fg_tot
-        bg_fp_s = smoothSignal(bg_fp, 0.5)
-        fg_fp_s = smoothSignal(fg_fp, 0.5)
-
-        plt.plot(bg_fp, '-b', label='Background')
-        plt.plot(fg_fp, '-g', label='Foreground')
-        plt.plot(bg_fp_s, '--r')
-        plt.plot(fg_fp_s, '--r')
+        plt.plot(data['50p']['bg_falsepos'], '-b', label='Background')
+        plt.plot(data['50p']['fg_falsepos'], '-g', label='Foreground')
+        plt.plot(data['50p']['bg_falsepos_smooth'], '--r')
+        plt.plot(data['50p']['bg_falsepos_smooth'], '--r')
         plt.ylim(0, 100)
         plt.grid()
         plt.ylabel('Percent')
