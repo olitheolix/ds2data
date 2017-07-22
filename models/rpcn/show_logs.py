@@ -89,11 +89,15 @@ def plotTrainingProgress(log):
         gt_fg_tot = np.array([_.gt_fg_tot for _ in layer_log['acc']])
         bg_falsepos = np.array([_.pred_bg_falsepos for _ in layer_log['acc']])
         fg_falsepos = np.array([_.pred_fg_falsepos for _ in layer_log['acc']])
+        cost = layer_log['cost']
+        cost_s = smoothSignal(cost, 0.5)
+        fg_err = np.array([_.fg_err for _ in layer_log['acc']])
+        fg_err = 100 * fg_err / gt_fg_tot
+        fg_err_s = smoothSignal(fg_err, 0.5)
+        del layer_log
 
         # Cost of RPCN Layer.
         plt.subplot(num_rows, num_cols, num_cols * idx + 1)
-        cost = layer_log['cost']
-        cost_s = smoothSignal(cost, 0.5)
         plt.semilogy(cost)
         plt.semilogy(cost_s, '--r')
         plt.grid()
@@ -102,9 +106,6 @@ def plotTrainingProgress(log):
 
         # Classification error rate.
         plt.subplot(num_rows, num_cols, num_cols * idx + 2)
-        fg_err = np.array([_.fg_err for _ in layer_log['acc']])
-        fg_err = 100 * fg_err / gt_fg_tot
-        fg_err_s = smoothSignal(fg_err, 0.5)
         plt.plot(fg_err)
         plt.plot(fg_err_s, '--r')
         plt.grid()
