@@ -49,9 +49,9 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
             stop = start + samples_per_epoch
             acc = layer_log['acc'][start:stop]
             cost = np.array(layer_log['cost'][start:stop])
-            fg_err = np.array([_.fg_err for _ in acc])
-            true_fg_tot = np.array([_.gt_fg_tot for _ in acc])
-            true_bg_tot = np.array([_.gt_bg_tot for _ in acc])
+            fg_err = np.array([_.fgcls_err for _ in acc])
+            true_fg_tot = np.array([_.true_fg_tot for _ in acc])
+            true_bg_tot = np.array([_.true_bg_tot for _ in acc])
             bg_falsepos = np.array([_.pred_bg_falsepos for _ in acc])
             fg_falsepos = np.array([_.pred_fg_falsepos for _ in acc])
             del start, stop
@@ -133,7 +133,7 @@ def plotTrainingProgress(log):
     max_cost = 10 ** (np.ceil(np.log10(max_cost)))
 
     # fixme: remove hard coded numbers.
-    num_epochs = 3
+    num_epochs = 10
     samples_per_epoch = 8
 
     # Plot statistics for every RPCN.

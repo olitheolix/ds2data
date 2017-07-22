@@ -10,5 +10,5 @@ NetConf = collections.namedtuple(
 
 AccuracyMetrics = collections.namedtuple(
     'AccuracyMetrics',
-    'bbox_err pred_bg_falsepos pred_fg_falsepos fg_err gt_bg_tot gt_fg_tot'
+    'bbox_err pred_bg_falsepos pred_fg_falsepos fgcls_err true_bg_tot true_fg_tot'
 )

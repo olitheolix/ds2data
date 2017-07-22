@@ -188,11 +188,11 @@ def validateEpoch(sess, ds, x_in, rpcn_filter_size, dset='test'):
 
             # Store the ratio of correct/total labels, as well as median and max
             # stats for the BBox position/size error.
-            fg_correct[layer_dim].append(1 - acc.fg_err / acc.gt_fg_tot)
+            fg_correct[layer_dim].append(1 - acc.fgcls_err / acc.true_fg_tot)
             fg_fp[layer_dim].append(acc.pred_fg_falsepos)
             bg_fp[layer_dim].append(acc.pred_bg_falsepos)
-            fg_tot[layer_dim].append(acc.gt_fg_tot)
-            bg_tot[layer_dim].append(acc.gt_bg_tot)
+            fg_tot[layer_dim].append(acc.true_fg_tot)
+            bg_tot[layer_dim].append(acc.true_bg_tot)
             bb_max[layer_dim].append(np.max(acc.bbox_err, axis=1))
             bb_med[layer_dim].append(np.median(acc.bbox_err, axis=1))
 

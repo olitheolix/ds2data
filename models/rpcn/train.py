@@ -200,7 +200,7 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             # Print progress report to terminal.
             fp_bg = acc.pred_bg_falsepos
             fp_fg = acc.pred_fg_falsepos
-            fg_err_rat = 100 * acc.fg_err / acc.gt_fg_tot
+            fg_err_rat = 100 * acc.fgcls_err / acc.true_fg_tot
             s1 = f'ClsErr={fg_err_rat:4.1f}%  '
             s2 = f'X=({bb_med[0]:2.0f}, {bb_90p[0]:2.0f})  '
             s3 = f'W=({bb_med[2]:2.0f}, {bb_90p[2]:2.0f})  '
