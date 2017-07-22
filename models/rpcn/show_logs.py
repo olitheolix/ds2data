@@ -132,9 +132,13 @@ def plotTrainingProgress(log):
     min_cost = 10 ** (np.floor(np.log10(min_cost)))
     max_cost = 10 ** (np.ceil(np.log10(max_cost)))
 
-    # fixme: remove hard coded numbers.
-    num_epochs = 10
-    samples_per_epoch = 8
+    # Determine the number of epochs and number of samples per epoch. The
+    # first is directly available from the NetConfig structure and the second
+    # indirectly from the number of recorded costs since there is exactly one
+    # cost per sample.
+    num_epochs = log['conf'].num_epochs
+    assert len(log['acc']) % num_epochs == 0
+    samples_per_epoch = len(log['cost']) // num_epochs
 
     # Plot statistics for every RPCN.
     plt.figure()
