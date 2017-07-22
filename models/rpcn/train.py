@@ -8,13 +8,9 @@ import data_loader
 import collections
 import numpy as np
 import tensorflow as tf
+
+from config import AccuracyMetrics
 from feature_masks import computeMasks
-
-
-AccuracyMetrics = collections.namedtuple(
-    'AccuracyMetrics',
-    'bbox_err pred_bg_falsepos pred_fg_falsepos fg_err gt_bg_tot gt_fg_tot'
-)
 
 
 def parseCmdline():
