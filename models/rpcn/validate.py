@@ -307,11 +307,32 @@ def plotTrainingProgress(log):
     for idx, layer_dim in enumerate(ft_dims):
         layer_log = log['rpcn'][layer_dim]
 
+        bb_err = [_.bbox_err for _ in layer_log['acc']]
+        bb_50p = -np.ones((4, len(bb_err)), np.float32)
+        bb_90p = np.array(bb_50p)
+        for ft_dim_idx, bb_epoch in enumerate(bb_err):
+            num_bb = bb_epoch.shape[1]
+            if num_bb > 0:
+                tmp = np.sort(bb_epoch, axis=1)
+                bb_50p[:, ft_dim_idx] = tmp[:, int(0.5 * num_bb)]
+                bb_90p[:, ft_dim_idx] = tmp[:, int(0.9 * num_bb)]
+                del tmp
+            del ft_dim_idx
+
+        bberr_50p_x = bb_50p[0]
+        bberr_50p_w = bb_50p[2]
+        bberr_90p_x = bb_90p[0]
+        bberr_90p_w = bb_90p[2]
+        bberr_50p_x_s = smoothSignal(bberr_50p_x, 0.5)
+        bberr_50p_w_s = smoothSignal(bberr_50p_w, 0.5)
+        bberr_90p_x_s = smoothSignal(bberr_90p_x, 0.5)
+        bberr_90p_w_s = smoothSignal(bberr_90p_w, 0.5)
+
         # Unpack for convenience.
-        gt_bg_tot = np.array(layer_log['gt_bg_tot'])
-        gt_fg_tot = np.array(layer_log['gt_fg_tot'])
-        bg_falsepos = np.array(layer_log['bg_falsepos'])
-        fg_falsepos = np.array(layer_log['fg_falsepos'])
+        gt_bg_tot = np.array([_.gt_bg_tot for _ in layer_log['acc']])
+        gt_fg_tot = np.array([_.gt_fg_tot for _ in layer_log['acc']])
+        bg_falsepos = np.array([_.pred_bg_falsepos for _ in layer_log['acc']])
+        fg_falsepos = np.array([_.pred_fg_falsepos for _ in layer_log['acc']])
 
         # Cost of RPCN Layer.
         plt.subplot(num_rows, num_cols, num_cols * idx + 1)
@@ -325,7 +346,7 @@ def plotTrainingProgress(log):
 
         # Classification error rate.
         plt.subplot(num_rows, num_cols, num_cols * idx + 2)
-        fg_err = np.array(layer_log['err_fg'])
+        fg_err = np.array([_.fg_err for _ in layer_log['acc']])
         fg_err = 100 * fg_err / gt_fg_tot
         fg_err_s = smoothSignal(fg_err, 0.5)
         plt.plot(fg_err)
@@ -337,14 +358,11 @@ def plotTrainingProgress(log):
 
         # BBox position error in x-dimension.
         plt.subplot(num_rows, num_cols, num_cols * idx + 3)
-        x = np.array(layer_log['err_x']).T
-        x_med, x_90p, _ = x
-        x_med_s = smoothSignal(x_med, 0.5)
-        x_90p_s = smoothSignal(x_90p, 0.5)
-        plt.plot(x_90p, '-b', label='90%')
-        plt.plot(x_med, '-g', label='Median')
-        plt.plot(x_90p_s, '--r')
-        plt.plot(x_med_s, '--r')
+
+        plt.plot(bberr_90p_x, '-b', label='90%')
+        plt.plot(bberr_50p_x, '-g', label='Median')
+        plt.plot(bberr_90p_x_s, '--r')
+        plt.plot(bberr_50p_x_s, '--r')
         plt.ylim(0, 20)
         plt.grid()
         plt.legend(loc='best')
@@ -352,14 +370,10 @@ def plotTrainingProgress(log):
 
         # BBox width error.
         plt.subplot(num_rows, num_cols, num_cols * idx + 4)
-        w = np.array(layer_log['err_w']).T
-        w_med, w_90p, _ = w
-        w_med_s = smoothSignal(w_med, 0.5)
-        w_90p_s = smoothSignal(w_90p, 0.5)
-        plt.plot(w_90p, '-b', label='90%')
-        plt.plot(w_med, '-g', label='Median')
-        plt.plot(w_90p_s, '--r')
-        plt.plot(w_med_s, '--r')
+        plt.plot(bberr_90p_w, '-b', label='90%')
+        plt.plot(bberr_50p_w, '-g', label='Median')
+        plt.plot(bberr_90p_w_s, '--r')
+        plt.plot(bberr_50p_w_s, '--r')
         plt.ylim(0, 20)
         plt.grid()
         plt.legend(loc='best')
