@@ -1,4 +1,5 @@
 import os
+import config
 import random
 import pickle
 import data_loader
@@ -131,9 +132,12 @@ def main():
     try:
         conf = pickle.load(open(fname, 'rb'))['conf']
     except FileNotFoundError:
-        print(f'Error: could not open <{fname}>')
-        print('Please run at least one training epoch first to create it')
-        return 1
+        conf = config.NetConf(
+            seed=0, width=512, height=512, colour='rgb', dtype='float32',
+            path=os.path.join('data', 'stamped'), train_rat=0.8,
+            num_pools_shared=2, rpcn_out_dims=[(64, 64), (32, 32)],
+            rpcn_filter_size=31, num_epochs=0, num_samples=None
+        )
     conf = conf._replace(num_samples=10)
 
     # Load the data set.
