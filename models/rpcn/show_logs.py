@@ -33,6 +33,11 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
             fg_falsepos = np.array([_.pred_fg_falsepos for _ in acc])
             del start, stop
 
+            # These will be used to compute percentages and may lead to
+            # division-by-zero errors.
+            true_fg_tot = np.clip(true_fg_tot, 1, None)
+            true_bg_tot = np.clip(true_bg_tot, 1, None)
+
             # Cost.
             assert cost.ndim == 1
             cost = np.sort(cost)
@@ -41,19 +46,19 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
             del cost
 
             # Class accuracy for foreground shapes.
-            fg_err = np.sort(100 * fg_err / np.clip(true_fg_tot, 1, None))
+            fg_err = np.sort(100 * fg_err / true_fg_tot)
             fg_err = fg_err[int(len(fg_err) * (percentile / 100))]
             d['fgerr'][epoch] = fg_err
             del fg_err
 
             # False positive background predictions.
-            bg_falsepos = np.sort(100 * bg_falsepos / np.clip(true_bg_tot, 1, None))
+            bg_falsepos = np.sort(100 * bg_falsepos / true_bg_tot)
             bg_falsepos = bg_falsepos[int(len(bg_falsepos) * (percentile / 100))]
             d['bg_falsepos'][epoch] = bg_falsepos
             del bg_falsepos
 
             # False positive foreground predictions.
-            fg_falsepos = np.sort(100 * fg_falsepos / np.clip(true_fg_tot, 1, None))
+            fg_falsepos = np.sort(100 * fg_falsepos / true_fg_tot)
             fg_falsepos = fg_falsepos[int(len(fg_falsepos) * (percentile / 100))]
             d['fg_falsepos'][epoch] = fg_falsepos
             del fg_falsepos
@@ -71,32 +76,6 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
 
 
 def plotTrainingProgress(log):
-    # Find the range of cost values. We will use it to ensure all cost plots
-    # have the same y-scale.
-    ft_dims = log['conf'].rpcn_out_dims
-    min_cost, max_cost = float('inf'), 0
-    for idx, layer_dim in enumerate(ft_dims):
-        cost = np.array(log['rpcn'][layer_dim]['cost'])
-        cost.sort()
-        start, stop = int(0.01 * len(cost)), int(0.99 * len(cost))
-        cost = cost[start:stop]
-        min_cost = min(min_cost, cost[0])
-        max_cost = max(max_cost, cost[-1])
-        del idx, layer_dim, cost, start, stop
-
-    # Round up/down to closest decade.
-    min_cost = 10 ** (np.floor(np.log10(min_cost)))
-    max_cost = 10 ** (np.ceil(np.log10(max_cost)))
-    min_cost = max(1, min_cost)
-
-    plt.figure()
-    cost = log['cost']
-    plt.semilogy(cost)
-    plt.grid()
-    plt.title('Cost')
-    plt.ylim(min_cost, max_cost)
-    del cost
-
     # Determine the number of epochs and number of samples per epoch. The
     # first is directly available from the NetConfig structure and the second
     # indirectly from the number of recorded costs since there is exactly one
@@ -105,11 +84,34 @@ def plotTrainingProgress(log):
     assert len(log['acc']) % num_epochs == 0
     samples_per_epoch = len(log['cost']) // num_epochs
 
+    # Compute percentiles of cost based on values in each epoch.
+    cost = np.array(log['cost'])
+    assert cost.shape == (num_epochs * samples_per_epoch,)
+    cost = cost.reshape([num_epochs, samples_per_epoch])
+    cost = np.sort(cost, axis=1)
+    cost_50p = cost[:, int(0.5 * samples_per_epoch)]
+    cost_90p = cost[:, int(0.9 * samples_per_epoch)]
+
+    # Find a decent cost range for the plots and round it to closest decade.
+    min_cost = np.amin(cost_50p)
+    max_cost = np.amax(cost_90p)
+    min_cost = 10 ** np.floor(np.log10(max(1, min_cost)))
+    max_cost = 10 ** np.ceil(np.log10(max_cost))
+
+    # Plot overall cost.
+    plt.figure()
+    plt.semilogy(cost_90p)
+    plt.grid()
+    plt.title('Cost')
+    plt.ylim(min_cost, max_cost)
+    plt.xlabel('Epochs')
+    del cost
+
     # Plot statistics for every RPCN.
     plt.figure()
     num_cols = 5
     num_rows = len(log['conf'].rpcn_out_dims)
-    for idx, layer_dim in enumerate(ft_dims):
+    for idx, layer_dim in enumerate(log['conf'].rpcn_out_dims):
         data = compileStatistics(log['rpcn'][layer_dim], num_epochs, samples_per_epoch)
 
         # Cost of RPCN Layer.
