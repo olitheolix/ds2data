@@ -64,19 +64,19 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
             del cost
 
             # Class accuracy for foreground shapes.
-            fg_err = np.sort(100 * fg_err / true_fg_tot)
+            fg_err = np.sort(100 * fg_err / np.clip(true_fg_tot, 1, None))
             fg_err = fg_err[int(len(fg_err) * (percentile / 100))]
             d['fgerr'][epoch] = fg_err
             del fg_err
 
             # False positive background predictions.
-            bg_falsepos = np.sort(100 * bg_falsepos / true_bg_tot)
+            bg_falsepos = np.sort(100 * bg_falsepos / np.clip(true_bg_tot, 1, None))
             bg_falsepos = bg_falsepos[int(len(bg_falsepos) * (percentile / 100))]
             d['bg_falsepos'][epoch] = bg_falsepos
             del bg_falsepos
 
             # False positive foreground predictions.
-            fg_falsepos = np.sort(100 * fg_falsepos / true_fg_tot)
+            fg_falsepos = np.sort(100 * fg_falsepos / np.clip(true_fg_tot, 1, None))
             fg_falsepos = fg_falsepos[int(len(fg_falsepos) * (percentile / 100))]
             d['fg_falsepos'][epoch] = fg_falsepos
             del fg_falsepos
@@ -100,21 +100,11 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
         d['bberr_smooth'] = np.zeros_like(d['bberr'])
         for i in range(4):
             f = smoothSignal(d['bberr'][i, :], 0.9)
-            d['bberr_smooth'][i, :] = f
+            #d['bberr_smooth'][i, :] = f
     return data
 
 
 def plotTrainingProgress(log):
-    plt.figure()
-    cost = log['cost']
-    cost_s = smoothSignal(cost, 0.5)
-    plt.semilogy(cost)
-    plt.semilogy(cost_s, '--r')
-    plt.grid()
-    plt.title('Cost')
-    plt.ylim(0, max(log['cost']))
-    del cost, cost_s
-
     # Find the range of cost values. We will use it to ensure all cost plots
     # have the same y-scale.
     ft_dims = log['conf'].rpcn_out_dims
@@ -128,9 +118,20 @@ def plotTrainingProgress(log):
         max_cost = max(max_cost, cost[-1])
         del idx, layer_dim, cost, start, stop
 
-    # Round up/down to closes decade.
+    # Round up/down to closest decade.
     min_cost = 10 ** (np.floor(np.log10(min_cost)))
     max_cost = 10 ** (np.ceil(np.log10(max_cost)))
+    min_cost = max(1, min_cost)
+
+    plt.figure()
+    cost = log['cost']
+    cost_s = smoothSignal(cost, 0.5)
+    plt.semilogy(cost)
+    plt.semilogy(cost_s, '--r')
+    plt.grid()
+    plt.title('Cost')
+    plt.ylim(min_cost, max_cost)
+    del cost, cost_s
 
     # Determine the number of epochs and number of samples per epoch. The
     # first is directly available from the NetConfig structure and the second

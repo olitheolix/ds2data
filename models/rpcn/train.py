@@ -88,9 +88,10 @@ def accuracy(gt, pred, mask_cls, mask_bbox):
     bg_fp = len(pred_bg_idx - gt_bg_idx)
     fg_fp = len(pred_fg_idx - gt_fg_idx)
     gt_bg_tot, gt_fg_tot = len(gt_bg_idx), len(gt_fg_idx)
+    del gt_bg_idx, gt_fg_idx, pred_bg_idx, pred_fg_idx
 
     # Compute label error rate only for foreground shapes (ie ignore background).
-    gt_fg_idx = np.nonzero(gt_label != 0)[0]
+    gt_fg_idx = np.nonzero(gt_label[valid_idx] != 0)[0]
     fg_err = (gt_label[gt_fg_idx] != pred_label[gt_fg_idx])
     fg_err = np.count_nonzero(fg_err)
 
@@ -200,7 +201,10 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             # Print progress report to terminal.
             fp_bg = acc.pred_bg_falsepos
             fp_fg = acc.pred_fg_falsepos
-            fgcls_err = 100 * acc.fgcls_err / acc.true_fg_tot
+            if acc.true_fg_tot == 0:
+                fgcls_err = -1
+            else:
+                fgcls_err = 100 * acc.fgcls_err / acc.true_fg_tot
             s1 = f'ClsErr={fgcls_err:4.1f}%  '
             s2 = f'X=({bb_med[0]:2.0f}, {bb_90p[0]:2.0f})  '
             s3 = f'W=({bb_med[2]:2.0f}, {bb_90p[2]:2.0f})  '
@@ -234,7 +238,7 @@ def main():
         log = collections.defaultdict(list)
         conf = config.NetConf(
             seed=0, width=512, height=512, colour='rgb', dtype='float32',
-            path=os.path.join('data', 'stamped'), train_rat=0.8,
+            path=os.path.join('data', '3dflight'), train_rat=0.8,
             num_pools_shared=2, rpcn_out_dims=[(64, 64), (32, 32)],
             rpcn_filter_size=31, num_epochs=0, num_samples=None
         )
@@ -273,10 +277,6 @@ def main():
     if restore:
         print('\nRestored Tensorflow checkpoint file')
         saver.restore(sess, fnames['checkpt'])
-    else:
-        print('\nSave initial meta file')
-        meta = {'conf': conf, 'int2name': int2name, 'log': log}
-        pickle.dump(meta, open(fnames['meta'], 'wb'))
 
     print(f'\n----- Training for another {param.N} Epochs -----')
     try:

@@ -167,7 +167,7 @@ def validateEpoch(sess, ds, x_in, rpcn_filter_size, dset='test'):
         # for debug purposes at the end of the script. Similarly, create a
         # single plot with the predicted label map.
         if i == 0:
-            plotPredictedLabelMap(rpcn_dims, img, preds, ys)
+            plotPredictedLabelMap(rpcn_dims, img, preds, ys, int2name)
         else:
             plt.close(fig)
         del bb_rects, bb_labels, gt_labels
@@ -188,13 +188,14 @@ def validateEpoch(sess, ds, x_in, rpcn_filter_size, dset='test'):
 
             # Store the ratio of correct/total labels, as well as median and max
             # stats for the BBox position/size error.
-            fg_correct[layer_dim].append(1 - acc.fgcls_err / acc.true_fg_tot)
-            fg_fp[layer_dim].append(acc.pred_fg_falsepos)
-            bg_fp[layer_dim].append(acc.pred_bg_falsepos)
-            fg_tot[layer_dim].append(acc.true_fg_tot)
-            bg_tot[layer_dim].append(acc.true_bg_tot)
-            bb_max[layer_dim].append(np.max(acc.bbox_err, axis=1))
-            bb_med[layer_dim].append(np.median(acc.bbox_err, axis=1))
+            if acc.true_fg_tot > 0:
+                fg_correct[layer_dim].append(1 - acc.fgcls_err / acc.true_fg_tot)
+                fg_fp[layer_dim].append(acc.pred_fg_falsepos)
+                bg_fp[layer_dim].append(acc.pred_bg_falsepos)
+                fg_tot[layer_dim].append(acc.true_fg_tot)
+                bg_tot[layer_dim].append(acc.true_bg_tot)
+                bb_max[layer_dim].append(np.max(acc.bbox_err, axis=1))
+                bb_med[layer_dim].append(np.median(acc.bbox_err, axis=1))
 
     # Compute the average class prediction error.
     print(f'\nResults for <{dset}> data set ({N} samples)')
@@ -228,7 +229,8 @@ def validateEpoch(sess, ds, x_in, rpcn_filter_size, dset='test'):
     print(f'Prediction time per image: {1000 * etime:.0f}ms')
 
 
-def plotPredictedLabelMap(rpcn_dims, img, preds, ys):
+def plotPredictedLabelMap(rpcn_dims, img, preds, ys, int2name):
+    num_classes = len(int2name)
     plt.figure()
     num_cols = 3
     num_rows = len(rpcn_dims)
@@ -237,7 +239,7 @@ def plotPredictedLabelMap(rpcn_dims, img, preds, ys):
         pred_labels = preds[layer_dim][4:]
 
         plt.subplot(num_rows, 3, idx * num_cols + 1)
-        plt.imshow(np.argmax(true_labels, axis=0))
+        plt.imshow(np.argmax(true_labels, axis=0), clim=[0, num_classes])
         plt.title(f'True {layer_dim}')
 
         plt.subplot(num_rows, 3, idx * num_cols + 2)
@@ -245,7 +247,7 @@ def plotPredictedLabelMap(rpcn_dims, img, preds, ys):
         plt.title('Input Image')
 
         plt.subplot(num_rows, 3, idx * num_cols + 3)
-        plt.imshow(np.argmax(pred_labels, axis=0))
+        plt.imshow(np.argmax(pred_labels, axis=0), clim=[0, num_classes])
         plt.title(f'Pred {layer_dim}')
 
 

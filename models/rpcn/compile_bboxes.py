@@ -187,21 +187,23 @@ def bboxFromNetOutput(im_dim, bb_rects, bb_labels):
     anchor_y = ft2im(pick_yx[0], ft_height, im_height)
 
     # Pick the labels and BBox parameters from the valid locations.
-    x = bb_rects[0][pick_yx]
-    y = bb_rects[1][pick_yx]
-    w = bb_rects[2][pick_yx]
-    h = bb_rects[3][pick_yx]
+    x0 = bb_rects[0][pick_yx]
+    y0 = bb_rects[1][pick_yx]
+    x1 = bb_rects[2][pick_yx]
+    y1 = bb_rects[3][pick_yx]
 
     # Convert the BBox centre positions, which are still relative to the
     # anchor, to absolute positions in image coordinates.
-    x = x + anchor_x
-    y = y + anchor_y
+    x0 = x0 + anchor_x
+    y0 = y0 + anchor_y
+    x1 = x1 + anchor_x
+    y1 = y1 + anchor_y
 
-    # Compute BBox corners.
-    x0 = x - w / 2
-    x1 = x + w / 2
-    y0 = y - h / 2
-    y1 = y + h / 2
+    # # Compute BBox corners.
+    # x0 = x - w / 2
+    # x1 = x + w / 2
+    # y0 = y - h / 2
+    # y1 = y + h / 2
 
     # Ensure the BBoxes are confined to the image.
     x0 = np.clip(x0, 0, im_width - 1)
