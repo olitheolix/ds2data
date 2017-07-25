@@ -44,8 +44,6 @@ class DataSet:
         assert isinstance(conf, NetConf)
         self.conf = conf
 
-        # Define the MetaData container for this data set.
-
         # Set the random number generator.
         if conf.seed is not None:
             np.random.seed(conf.seed)
@@ -208,9 +206,12 @@ class BBox(DataSet):
     This class will not only produce the training images but also the target
     values for the RPCN. Specifically, it will provide the overlap of each BBox
     with the anchor and the precise dimensions of the BBox.
-
     """
+    # Define the MetaData container for this data set.
     MetaData = namedtuple('MetaData', 'filename')
+
+    def getRpcnDimensions(self):
+        return tuple(self.rpcn_dims)
 
     def nextSingle(self, dset):
         """Return next image and corresponding training vectors from `dset`.
@@ -330,6 +331,3 @@ class BBox(DataSet):
                 assert 0 <= label < num_classes
                 out[label, y, x] = 1
         return out
-
-    def getRpcnDimensions(self):
-        return tuple(self.rpcn_dims)
