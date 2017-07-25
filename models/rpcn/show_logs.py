@@ -1,31 +1,8 @@
 import os
-import pywt
 import pickle
 
 import numpy as np
 import matplotlib.pyplot as plt
-
-
-def smoothSignal(sig, keep_percentage):
-    wl_opts = dict(wavelet='coif5', mode='symmetric')
-
-    # The first few elements of our signals of interest tend to be excessively
-    # large (eg the cost during the first few batches). This will badly throw
-    # off the smoothing. To avoid this, we limit the signal amplitude to cover
-    # only the largest 99% of all amplitudes.
-    tmp = np.sort(sig)
-    sig = np.clip(sig, 0, tmp[int(0.99 * len(sig))])
-
-    # Decompose the signal and retain only `cutoff` percent of the detail
-    # coefficients.
-    coeff = pywt.wavedec(sig, **wl_opts)
-    if len(coeff) < 2:
-        return sig
-    cutoff = int(len(coeff) * keep_percentage)
-    coeff = coeff[:cutoff] + [None] * (len(coeff) - cutoff)
-
-    # Reconstruct the signal from the pruned coefficient set.
-    return pywt.waverec(coeff, **wl_opts)
 
 
 def compileStatistics(layer_log, num_epochs, samples_per_epoch):
@@ -90,17 +67,6 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
                 d['bberr'][:, epoch] = tmp
                 del tmp
             del bb_err, num_bb
-
-        d['cost_smooth'] = smoothSignal(d['cost'], 0.9)
-        d['fgerr_smooth'] = smoothSignal(d['fgerr'], 0.9)
-        d['fg_falsepos_smooth'] = smoothSignal(d['fg_falsepos'], 0.9)
-        d['bg_falsepos_smooth'] = smoothSignal(d['bg_falsepos'], 0.9)
-
-        # Smooth BBox percentiles.
-        d['bberr_smooth'] = np.zeros_like(d['bberr'])
-        for i in range(4):
-            f = smoothSignal(d['bberr'][i, :], 0.9)
-            #d['bberr_smooth'][i, :] = f
     return data
 
 
@@ -125,13 +91,11 @@ def plotTrainingProgress(log):
 
     plt.figure()
     cost = log['cost']
-    cost_s = smoothSignal(cost, 0.5)
     plt.semilogy(cost)
-    plt.semilogy(cost_s, '--r')
     plt.grid()
     plt.title('Cost')
     plt.ylim(min_cost, max_cost)
-    del cost, cost_s
+    del cost
 
     # Determine the number of epochs and number of samples per epoch. The
     # first is directly available from the NetConfig structure and the second
@@ -151,7 +115,6 @@ def plotTrainingProgress(log):
         # Cost of RPCN Layer.
         plt.subplot(num_rows, num_cols, num_cols * idx + 1)
         plt.semilogy(data['90p']['cost'])
-        plt.semilogy(data['90p']['cost_smooth'], '--r')
         plt.grid()
         plt.title(f'Cost (Feature Size: {layer_dim[0]}x{layer_dim[1]})')
         plt.ylim(min_cost, max_cost)
@@ -159,7 +122,6 @@ def plotTrainingProgress(log):
         # Classification error rate.
         plt.subplot(num_rows, num_cols, num_cols * idx + 2)
         plt.plot(data['50p']['fgerr'])
-        plt.plot(data['50p']['fgerr_smooth'], '--r')
         plt.grid()
         plt.ylim(0, 100)
         plt.ylabel('Percent')
@@ -170,8 +132,6 @@ def plotTrainingProgress(log):
 
         plt.plot(data['90p']['bberr'][0], '-b', label='90%')
         plt.plot(data['50p']['bberr'][0], '-g', label='Median')
-        plt.plot(data['90p']['bberr_smooth'][0], '--r')
-        plt.plot(data['50p']['bberr_smooth'][0], '--r')
         plt.ylim(0, 200)
         plt.grid()
         plt.legend(loc='best')
@@ -181,8 +141,6 @@ def plotTrainingProgress(log):
         plt.subplot(num_rows, num_cols, num_cols * idx + 4)
         plt.plot(data['90p']['bberr'][2], '-b', label='90%')
         plt.plot(data['50p']['bberr'][2], '-g', label='Median')
-        plt.plot(data['90p']['bberr_smooth'][2], '--r')
-        plt.plot(data['50p']['bberr_smooth'][2], '--r')
         plt.ylim(0, 20)
         plt.grid()
         plt.legend(loc='best')
@@ -192,8 +150,6 @@ def plotTrainingProgress(log):
         plt.subplot(num_rows, num_cols, num_cols * idx + 5)
         plt.plot(data['50p']['bg_falsepos'], '-b', label='Background')
         plt.plot(data['50p']['fg_falsepos'], '-g', label='Foreground')
-        plt.plot(data['50p']['bg_falsepos_smooth'], '--r')
-        plt.plot(data['50p']['bg_falsepos_smooth'], '--r')
         plt.ylim(0, 100)
         plt.grid()
         plt.ylabel('Percent')
