@@ -23,11 +23,11 @@ def parseCmdline():
     # Create a parser and program description.
     parser = argparse.ArgumentParser(description='Show training features')
     parser.add_argument(
-        'fname', metavar='File', nargs='?', type=str, default=None,
+        'fname', metavar='JPG-File', type=str,
         help='Display feature data for this file')
 
     param = parser.parse_args()
-    if param.fname and not os.path.isfile(param.fname):
+    if not os.path.isfile(param.fname):
         print(f'Error: cannot open <{param.fname}>')
         sys.exit(1)
     return param
