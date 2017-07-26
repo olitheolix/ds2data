@@ -224,6 +224,8 @@ def _maskFgLabel(img, objID_at_pixel_ft, obj_pixels_ft):
     mask = np.zeros(objID_at_pixel_ft.shape, np.uint8)
     for objID, pixels in obj_pixels_ft.items():
         idx_visible = np.nonzero(objID_at_pixel_ft == objID)
+        if len(idx_visible[0]) == 0:
+            continue
 
         # Is it bright enough.
         avg_brightness = np.mean(img[idx_visible])
