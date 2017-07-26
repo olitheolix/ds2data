@@ -17,7 +17,11 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
             'fg_err': np.zeros(num_epochs, np.float32),
             'fg_falsepos': np.zeros(num_epochs, np.float32),
             'bg_falsepos': np.zeros(num_epochs, np.float32),
-            'bb_err': np.zeros((4, num_epochs), np.float32),
+            'bb_err_x0': np.zeros(num_epochs, np.float32),
+            'bb_err_y0': np.zeros(num_epochs, np.float32),
+            'bb_err_x1': np.zeros(num_epochs, np.float32),
+            'bb_err_y1': np.zeros(num_epochs, np.float32),
+            'bb_err_all': np.zeros(num_epochs, np.float32),
         }
         d = data[pstr]
 
@@ -69,7 +73,13 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
             if num_bb > 0:
                 tmp = np.sort(bb_err, axis=1)
                 tmp = tmp[:, int(num_bb * (percentile / 100))]
-                d['bb_err'][:, epoch] = tmp
+                d['bb_err_x0'][epoch] = tmp[0]
+                d['bb_err_y0'][epoch] = tmp[1]
+                d['bb_err_x1'][epoch] = tmp[2]
+                d['bb_err_y1'][epoch] = tmp[3]
+
+                tmp = np.sort(tmp.flatten())
+                d['bb_err_all'][epoch] = tmp[int(len(tmp) * (percentile / 100))]
                 del tmp
             del bb_err, num_bb
     return data
@@ -111,7 +121,7 @@ def plotTrainingProgress(log):
 
     # Plot statistics for every RPCN.
     plt.figure()
-    num_cols = 5
+    num_cols = 4
     num_rows = len(log['conf'].rpcn_out_dims)
     for idx, layer_dim in enumerate(log['conf'].rpcn_out_dims):
         data = compileStatistics(log['rpcn'][layer_dim], num_epochs, samples_per_epoch)
@@ -138,24 +148,15 @@ def plotTrainingProgress(log):
         # BBox position error in x-dimension.
         plt.subplot(num_rows, num_cols, num_cols * idx + 3)
 
-        plt.plot(data['90p']['bb_err'][0], '-b', label='90%')
-        plt.plot(data['50p']['bb_err'][0], '-r', label='Median')
+        plt.plot(data['90p']['bb_err_all'], '-b', label='90%')
+        plt.plot(data['50p']['bb_err_all'], '-r', label='Median')
         plt.ylim(0, 200)
         plt.grid()
         plt.legend(loc='best')
-        plt.title('BBox Position Error in X-Dimension')
-
-        # BBox width error.
-        plt.subplot(num_rows, num_cols, num_cols * idx + 4)
-        plt.plot(data['90p']['bb_err'][2], '-b', label='90%')
-        plt.plot(data['50p']['bb_err'][2], '-r', label='Median')
-        plt.ylim(0, 20)
-        plt.grid()
-        plt.legend(loc='best')
-        plt.title('BBox Width Error')
+        plt.title('BBox Position Error')
 
         # False positive for background and foreground.
-        plt.subplot(num_rows, num_cols, num_cols * idx + 5)
+        plt.subplot(num_rows, num_cols, num_cols * idx + 4)
         plt.plot(data['50p']['bg_falsepos'], '-b', label='Background')
         plt.plot(data['50p']['fg_falsepos'], '-r', label='Foreground')
         plt.ylim(0, 100)
