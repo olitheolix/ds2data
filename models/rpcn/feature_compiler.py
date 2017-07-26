@@ -137,9 +137,11 @@ def _computeBBoxes(bb_data, objID_at_pixel_ft, ft_dim, im_dim):
     return bboxes
 
 
-def compileFeatures(fname, im_dim, rpcn_dims):
-    out = {}
+def compileFeatures(fname, img, rpcn_dims):
+    assert img.ndim == 3 and img.shape[2] == 3 and img.dtype == np.uint8
+    im_dim = img.shape[:2]
 
+    out = {}
     # Load the True output and verify that all files use the same
     # int->label mapping.
     img_meta = bz2.open(fname + '-meta.json.bz2', 'rb').read()
@@ -251,9 +253,8 @@ def computeMasks(x, y, rpcn_filter_size):
 
 def compileSingle(args):
     fname, rpcn_out_dims = args
-    img = Image.open(fname + '.jpg')
-    width, height = img.size
-    features = compileFeatures(fname, (height, width), rpcn_out_dims)
+    img = np.array(Image.open(fname + '.jpg').convert('RGB'))
+    features = compileFeatures(fname, img, rpcn_out_dims)
     pickle.dump(features, open(fname + '-compiled.pickle', 'wb'))
 
 
