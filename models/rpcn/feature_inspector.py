@@ -72,6 +72,33 @@ def plotTrainingSample(img_hwc, ys, rpcn_filter_size, int2name):
         plt.suptitle(f'Feature Map Size: {ft_dim[0]}x{ft_dim[1]}')
 
 
+def plotMasks(img, metas):
+    for ft_dim, meta in sorted(metas.items()):
+        # Original image.
+        plt.figure()
+        plt.subplot(2, 3, 1)
+        plt.imshow(img)
+        plt.title('Input Image')
+
+        plt.subplot(2, 3, 2)
+        plt.imshow(meta.mask_fgbg, cmap='gray', clim=[0, 1])
+        plt.title('Foreground')
+
+        plt.subplot(2, 3, 3)
+        plt.imshow(meta.mask_bbox, cmap='gray', clim=[0, 1])
+        plt.title('BBox Estimation Possible')
+
+        plt.subplot(2, 3, 4)
+        plt.imshow(meta.mask_fg_label, cmap='gray', clim=[0, 1])
+        plt.title('Label Estimation Possible')
+
+        plt.subplot(2, 3, 5)
+        plt.imshow(meta.mask_valid, cmap='gray', clim=[0, 1])
+        plt.title('Valid')
+
+        plt.suptitle(f'Feature Map Size: {ft_dim[0]}x{ft_dim[1]}')
+
+
 def main(data_path=None):
     data_path = data_path or parseCmdline().fname
 
@@ -95,6 +122,9 @@ def main(data_path=None):
     img = np.transpose(x, [1, 2, 0])
 
     plotTrainingSample(img, y, conf.rpcn_filter_size, ds.int2name())
+
+    meta = ds.getMeta([uuid])[uuid]
+    plotMasks(img, meta)
 
     plt.show()
 
