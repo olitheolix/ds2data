@@ -78,6 +78,8 @@ def ft2im(val, ft_dim: int, im_dim: int):
 
 
 def downsampleMatrix(mat, ft_dim):
+    if not isinstance(mat, np.ndarray):
+        mat = np.array(mat)
     x = np.linspace(0, mat.shape[1] - 1, ft_dim[1])
     y = np.linspace(0, mat.shape[0] - 1, ft_dim[0])
     x = np.round(x).astype(np.int64)
