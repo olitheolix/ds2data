@@ -242,7 +242,7 @@ class BBox(DataSet):
         height = self.conf.height or 128
         colour_format = self.conf.colour.upper()
 
-        # Verify colour format is valid.
+        # Ensure the colour format is valid.
         assert colour_format in {'RGB', 'L'}
         chan = 1 if colour_format == 'L' else 3
 
