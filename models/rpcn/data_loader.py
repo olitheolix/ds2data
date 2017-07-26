@@ -307,19 +307,36 @@ class BBox(DataSet):
 
             # Open the pre-compiled training output and ensure it uses the same
             # label map.
-            tmp = pickle.load(open(fname + '-compiled.pickle', 'rb'))
+            data = pickle.load(open(fname + '-compiled.pickle', 'rb'))
             if num_classes is None:
-                int2name = tmp['int2name']
+                int2name = data['int2name']
                 num_classes = len(int2name)
-            assert int2name == tmp['int2name']
+            assert int2name == data['int2name']
 
-            # Unpack the training output for all selected RPCN sizes.
-            y = {}
-            for ft_dim in self.rpcn_dims:
-                y[ft_dim] = tmp[ft_dim]['y']
-                assert y[ft_dim].shape == (4 + num_classes, *ft_dim)
+            y = self.compileTrainingOutput(data, self.rpcn_dims, num_classes)
             all_y.append(y)
 
         # Return image, network output, label mapping, and meta data.
         meta = [self.MetaData(_) for _ in fnames]
         return all_x, all_y, int2name, meta
+
+    def compileTrainingOutput(self, training_data, ft_dims, num_classes):
+        # Allocate the array for the expected network outputs (one for each
+        # feature dimension size).
+        y = {_: np.zeros((4 + num_classes, *_)) for _ in ft_dims}
+
+        # Populate the training output with the BBox data and one-hot-label.
+        for ft_dim in ft_dims:
+            # Unpack pixel labels.
+            lap = training_data[ft_dim]['label_at_pixel']
+            assert lap.dtype == np.int32 and lap.shape == ft_dim
+            assert 0 <= np.amin(lap) <= np.amax(lap) < num_classes
+
+            # Copy BBox data into expected network output.
+            y[ft_dim][:4] = training_data[ft_dim]['bboxes']
+
+            # Convert integer label to one-hot-label.
+            for fy in range(ft_dim[0]):
+                for fx in range(ft_dim[1]):
+                    y[ft_dim][4 + lap[fy, fx], fy, fx] = 1
+        return y

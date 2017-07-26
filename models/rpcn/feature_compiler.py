@@ -83,9 +83,7 @@ def compileFeatures(fname, im_dim, rpcn_dims):
     # int->label mapping.
     img_meta = bz2.open(fname + '-meta.json.bz2', 'rb').read()
     img_meta = json.loads(img_meta.decode('utf8'))
-    int2name = {int(k): v for k, v in img_meta['int2name'].items()}
-    num_classes = len(int2name)
-    out['int2name'] = int2name
+    out['int2name'] = {int(k): v for k, v in img_meta['int2name'].items()}
 
     # Undo JSON's int->str conversion for dict keys.
     bb_data = {int(k): v for k, v in img_meta['bb_data'].items()}
@@ -101,7 +99,7 @@ def compileFeatures(fname, im_dim, rpcn_dims):
         p_labels[idx] = objID2label[objID_at_pixel[idx]]
 
     for ft_dim in rpcn_dims:
-        bboxes = np.zeros((4 + num_classes, *ft_dim), np.float32)
+        bboxes = np.zeros((4, *ft_dim), np.float32)
         ix = np.linspace(0, p_labels.shape[1] - 1, ft_dim[1])
         iy = np.linspace(0, p_labels.shape[0] - 1, ft_dim[0])
         ix = np.round(ix).astype(np.int64)
@@ -120,11 +118,10 @@ def compileFeatures(fname, im_dim, rpcn_dims):
                     x1 = x1 - anchor_x
                     y0 = y0 - anchor_y
                     y1 = y1 - anchor_y
-                    bboxes[:4, y, x] = (x0, y0, x1, y1)
-                bboxes[4 + label_at_pixel_ft[y, x], y, x] = 1
+                    bboxes[:, y, x] = (x0, y0, x1, y1)
 
         out[ft_dim] = {
-            'y': np.array(bboxes, np.float32),
+            'bboxes': np.array(bboxes, np.float32),
             'objID_at_pixel': objID_at_pixel_ft,
             'label_at_pixel': label_at_pixel_ft,
         }
