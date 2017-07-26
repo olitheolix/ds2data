@@ -7,16 +7,31 @@ The label values, ie the entries in y[0, :, :], are non-negative integers. A
 label of zero always means background.
 """
 import os
+import sys
 import time
 import pickle
 import config
+import argparse
 import data_loader
 import feature_compiler
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-from feature_compiler import unpackBBoxes
+
+def parseCmdline():
+    """Parse the command line arguments."""
+    # Create a parser and program description.
+    parser = argparse.ArgumentParser(description='Show training features')
+    parser.add_argument(
+        'fname', metavar='File', nargs='?', type=str, default=None,
+        help='Display feature data for this file')
+
+    param = parser.parse_args()
+    if param.fname and not os.path.isfile(param.fname):
+        print(f'Error: cannot open <{param.fname}>')
+        sys.exit(1)
+    return param
 
 
 def plotTrainingSample(img_chw, ys, rpcn_filter_size, int2name):
@@ -58,12 +73,14 @@ def plotTrainingSample(img_chw, ys, rpcn_filter_size, int2name):
         plt.suptitle(f'Feature Map Size: {ft_dim[0]}x{ft_dim[1]}')
 
 
-def main():
+def main(data_path=None):
+    data_path = data_path or parseCmdline().fname
+
     # Load the configuration from meta file.
     cur_dir = os.path.dirname(os.path.abspath(__file__))
-    fname = os.path.join(cur_dir, 'netstate', 'rpcn-meta.pickle')
+    fname_meta = os.path.join(cur_dir, 'netstate', 'rpcn-meta.pickle')
     try:
-        conf = pickle.load(open(fname, 'rb'))['conf']
+        conf = pickle.load(open(fname_meta, 'rb'))['conf']
     except FileNotFoundError:
         conf = config.NetConf(
             seed=0, width=512, height=512, colour='rgb', dtype='float32',
@@ -71,6 +88,8 @@ def main():
             num_pools_shared=2, rpcn_out_dims=[(64, 64), (32, 32)],
             rpcn_filter_size=31, num_epochs=0, num_samples=None
         )
+    if data_path:
+        conf = conf._replace(path=data_path)
 
     # Load the data set and pick one sample.
     t0 = time.time()
