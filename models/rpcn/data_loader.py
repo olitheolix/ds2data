@@ -267,15 +267,15 @@ class BBox(DataSet):
             fnames = [_[:-4] for _ in sorted(fnames)][:N]
             if len(fnames) == 0:
                 print(f'\nError: No images in {self.conf.path}\n')
-                sys.exit(1)
+                raise FileNotFoundError(self.conf.path)
         elif os.path.isfile(self.conf.path):
             if self.conf.path[-4:].lower() != '.jpg':
-                print(f'Error: <{self.conf.path}> must be JPG file')
-                sys.exit(1)
+                print(f'\nError: <{self.conf.path}> must be JPG file\n')
+                raise FileNotFoundError(self.conf.path)
             fnames = [self.conf.path[:-4]]
         else:
-            print(f'Error: <{self.conf.path}> is not a valid file or path')
-            sys.exit(1)
+            print(f'\nError: <{self.conf.path}> is not a valid file or path\n')
+            raise FileNotFoundError(self.conf.path)
 
         # Find out which images have no training output yet.
         missing = []
