@@ -9,7 +9,7 @@ import shared_net
 import data_loader
 import collections
 import feature_masks
-import compile_training_data
+import feature_compiler
 
 import numpy as np
 import tensorflow as tf
@@ -77,7 +77,7 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys):
 
         # Compile BBox data from network output.
         hard = np.argmax(pred_labels, axis=0)
-        bb_rects, pick_yx = compile_training_data.decompileFeatures(im_dim, bboxes, hard)
+        bb_rects, pick_yx = feature_compiler.decompileFeatures(im_dim, bboxes, hard)
         del hard, bboxes, pred
 
         # Compute a score for each BBox for non-maximum-suppression. In this

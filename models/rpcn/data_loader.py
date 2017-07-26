@@ -3,12 +3,12 @@ import sys
 import glob
 import tqdm
 import pickle
+import feature_compiler
 import numpy as np
 
 from PIL import Image
 from config import NetConf
 from collections import namedtuple
-import compile_training_data as ctd
 
 
 class DataSet:
@@ -270,7 +270,7 @@ class BBox(DataSet):
         if len(missing) > 0:
             print('Compiling training data...')
             for fn in tqdm.tqdm(missing):
-                ctd.compileFeatures(fn, (height, width), self.rpcn_dims)
+                feature_compiler.compileFeatures(fn, (height, width), self.rpcn_dims)
         else:
             print('Using pre-compiled training data')
 
