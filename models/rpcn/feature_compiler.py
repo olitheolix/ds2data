@@ -77,6 +77,14 @@ def unpackBBoxes(im_dim, bb_rects, bb_labels):
     return bboxes, pick_yx
 
 
+def downsampleMatrix(mat, ft_dim):
+    x = np.linspace(0, mat.shape[1] - 1, ft_dim[1])
+    y = np.linspace(0, mat.shape[0] - 1, ft_dim[0])
+    x = np.round(x).astype(np.int64)
+    y = np.round(y).astype(np.int64)
+    return mat[y][:, x]
+
+
 def compileFeatures(fname, im_dim, rpcn_dims):
     out = {}
     # Load the True output and verify that all files use the same
@@ -100,12 +108,8 @@ def compileFeatures(fname, im_dim, rpcn_dims):
 
     for ft_dim in rpcn_dims:
         bboxes = np.zeros((4, *ft_dim), np.float32)
-        ix = np.linspace(0, p_labels.shape[1] - 1, ft_dim[1])
-        iy = np.linspace(0, p_labels.shape[0] - 1, ft_dim[0])
-        ix = np.round(ix).astype(np.int64)
-        iy = np.round(iy).astype(np.int64)
-        label_at_pixel_ft = p_labels[iy][:, ix]
-        objID_at_pixel_ft = objID_at_pixel[iy][:, ix]
+        label_at_pixel_ft = downsampleMatrix(p_labels, ft_dim)
+        objID_at_pixel_ft = downsampleMatrix(objID_at_pixel, ft_dim)
 
         for y in range(ft_dim[0]):
             for x in range(ft_dim[1]):
