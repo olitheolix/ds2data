@@ -1,4 +1,5 @@
 """ A uniform interface to request images."""
+import os
 import sys
 import glob
 import tqdm
@@ -90,8 +91,18 @@ class DataSet:
         self.labels = y
         self.label2name = label2name
         p = np.random.permutation(len(y))
-        N = int(self.train * len(y))
-        self.handles = {'train': p[:N], 'test': p[N:]}
+
+        # Case 1: no data -> print warning, Case 2: only single file -> add
+        # it to training and test set irrespective of training ratio, Case 3:
+        # partition the data into test/training sets.
+        if len(y) == 0:
+            print('Warning: data set is empty')
+            self.handles = {'train': p, 'test': p}
+        elif len(y) == 1:
+            self.handles = {'train': p, 'test': p}
+        else:
+            N = int(self.train * len(y))
+            self.handles = {'train': p[:N], 'test': p[N:]}
         del p, N
 
         # Initialise the ofs in the current epoch for training/test data.
@@ -251,10 +262,19 @@ class BBox(DataSet):
 
         # Find all training images and strip off the '.jpg' extension. Abort if
         # there are no files.
-        fnames = glob.glob(f'{self.conf.path}/*.jpg')
-        fnames = [_[:-4] for _ in sorted(fnames)][:N]
-        if len(fnames) == 0:
-            print(f'\nError: No images in {self.conf.path}\n')
+        if os.path.isdir(self.conf.path):
+            fnames = glob.glob(f'{self.conf.path}/*.jpg')
+            fnames = [_[:-4] for _ in sorted(fnames)][:N]
+            if len(fnames) == 0:
+                print(f'\nError: No images in {self.conf.path}\n')
+                sys.exit(1)
+        elif os.path.isfile(self.conf.path):
+            if self.conf.path[-4:].lower() != '.jpg':
+                print(f'Error: <{self.conf.path}> must be JPG file')
+                sys.exit(1)
+            fnames = [self.conf.path[:-4]]
+        else:
+            print(f'Error: <{self.conf.path}> is not a valid file or path')
             sys.exit(1)
 
         # Find out which images have no training output yet.
