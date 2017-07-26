@@ -9,7 +9,6 @@ label of zero always means background.
 import os
 import sys
 import time
-import pickle
 import config
 import argparse
 import data_loader
@@ -34,8 +33,12 @@ def parseCmdline():
     return param
 
 
-def plotTrainingSample(img_chw, ys, rpcn_filter_size, int2name):
-    assert img_chw.ndim == 3
+def plotTrainingSample(img_hwc, ys, rpcn_filter_size, int2name):
+    assert img_hwc.ndim == 3 and img_hwc.shape[2] == 3
+
+    # Convert to HWC format for Matplotlib.
+    img = np.array(img_hwc).astype(np.float32)
+    im_dim = img.shape[:2]
 
     # Matplotlib options for pretty visuals.
     rect_opts = dict(linewidth=1, facecolor='none', edgecolor='g')
@@ -48,19 +51,15 @@ def plotTrainingSample(img_chw, ys, rpcn_filter_size, int2name):
     for ft_dim, y in sorted(ys.items()):
         assert y.ndim == 3
 
-        # Convert to HWC format for Matplotlib.
-        img = np.transpose(img_chw, [1, 2, 0]).astype(np.float32)
-        im_dim = img.shape[:2]
-
         # Original image.
         plt.figure()
         plt.subplot(1, 2, 1)
-        plt.imshow(img, cmap='gray')
+        plt.imshow(img)
         plt.title('Input Image')
 
         # BBoxes over original image.
         ax = plt.subplot(1, 2, 2)
-        plt.imshow(img, cmap='gray')
+        plt.imshow(img)
         hard = np.argmax(y[4:], axis=0)
         bb_rects, pick_yx = feature_compiler.unpackBBoxes(im_dim, y[:4], hard)
         label = hard[pick_yx]
@@ -91,8 +90,12 @@ def main(data_path=None):
     print(f'Loaded dataset in {etime:,.1f}s')
     ds.printSummary()
 
-    x, y, _ = ds.nextSingle('train')
-    plotTrainingSample(x, y, conf.rpcn_filter_size, ds.int2name())
+    x, y, uuid = ds.nextSingle('train')
+    assert x.ndim == 3 and x.shape[0] == 3
+    img = np.transpose(x, [1, 2, 0])
+
+    plotTrainingSample(img, y, conf.rpcn_filter_size, ds.int2name())
+
     plt.show()
 
 
