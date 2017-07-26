@@ -77,7 +77,7 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys):
 
         # Compile BBox data from network output.
         hard = np.argmax(pred_labels, axis=0)
-        bb_rects, pick_yx = feature_compiler.decompileFeatures(im_dim, bboxes, hard)
+        bb_rects, pick_yx = feature_compiler.unpackBBoxes(im_dim, bboxes, hard)
         del hard, bboxes, pred
 
         # Compute a score for each BBox for non-maximum-suppression. In this

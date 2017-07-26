@@ -47,7 +47,7 @@ def ft2im(val, ft_dim: int, im_dim: int):
     return np.interp(val, [0, ft_dim - 1], [ofs, im_dim - ofs - 1])
 
 
-def decompileFeatures(im_dim, bb_rects, bb_labels):
+def unpackBBoxes(im_dim, bb_rects, bb_labels):
     ft_dim = bb_labels.shape[:2]
 
     # Find all locations that are *not* background, ie every location where the
@@ -159,7 +159,7 @@ def plotTrainingSample(img_chw, ys, rpcn_filter_size, int2name):
         ax = plt.subplot(1, 2, 2)
         plt.imshow(img, cmap='gray')
         hard = np.argmax(y[4:], axis=0)
-        bb_rects, pick_yx = decompileFeatures(im_dim, y[:4], hard)
+        bb_rects, pick_yx = unpackBBoxes(im_dim, y[:4], hard)
         label = hard[pick_yx]
         for label, (x0, y0, x1, y1) in zip(label, bb_rects):
             w = x1 - x0
