@@ -1,4 +1,5 @@
 import os
+import random
 import pickle
 import config
 import rpcn_net
@@ -10,7 +11,6 @@ import numpy as np
 import tensorflow as tf
 
 from config import AccuracyMetrics
-from feature_masks import computeMasks
 
 
 def parseCmdline():
@@ -103,6 +103,51 @@ def accuracy(gt, pred, mask_cls, mask_bbox):
     return AccuracyMetrics(bbox_err, bg_fp, fg_fp, fg_err, gt_bg_tot, gt_fg_tot)
 
 
+def sampleMasks(is_fg, valid):
+    assert is_fg.shape == valid.shape
+    assert is_fg.ndim == 2
+    assert is_fg.dtype == valid.dtype == np.uint8
+    assert set(np.unique(is_fg)).issubset({0, 1})
+    assert set(np.unique(valid)).issubset({0, 1})
+
+    # Backup the matrix dimension, then flatten the array (more convenient to
+    # work with here).
+    dim = is_fg.shape
+    is_fg = is_fg.flatten()
+    valid = valid.flatten()
+
+    # Background is everything that is not foreground.
+    is_bg = 1 - is_fg
+
+    # Find all fg/bg locations that are valid.
+    is_fg = is_fg * valid
+    is_bg = is_bg * valid
+    idx_fg = np.nonzero(is_fg)[0].tolist()
+    idx_bg = np.nonzero(is_bg)[0].tolist()
+
+    # Sample up to 100 FG and BG locations.
+    if len(idx_bg) > 100:
+        idx_bg = random.sample(idx_bg, 100)
+    if len(idx_fg) > 100:
+        idx_fg = random.sample(idx_fg, 100)
+
+    # Allocate output arrays.
+    mask_cls = np.zeros(is_fg.shape, np.float16)
+    mask_bbox = np.zeros_like(mask_cls)
+
+    # The `mask_cls` denotes all locations for which we want to estimate the
+    # label. As such, it must contain foreground- and background regions. The
+    # BBox mask, on the other hand, must only contain the foreground region
+    # because there would be nothing to estimate otherwise.
+    mask_cls[idx_fg] = 1
+    mask_cls[idx_bg] = 1
+    mask_bbox[idx_fg] = 1
+
+    mask_cls = mask_cls.reshape(dim)
+    mask_bbox = mask_bbox.reshape(dim)
+    return mask_cls, mask_bbox
+
+
 def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
     """Train network for one full epoch of data in `ds`.
 
@@ -135,19 +180,18 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
 
         # Get the next image or reset the data store if we have reached the
         # end of an epoch.
-        img, ys, _ = ds.nextSingle('train')
+        img, ys, uuid = ds.nextSingle('train')
         if img is None:
             return
         assert img.ndim == 3 and isinstance(ys, dict)
+        meta = ds.getMeta([uuid])[uuid]
 
         # Compile the feed dictionary so that we can train all RPCNs.
         fd = {x_in: np.expand_dims(img, 0), lrate_in: lrate}
         for rpcn_dim in rpcn_dims:
-            # Determine the mask for the cost function because we only want to
-            # learn BBoxes where there are objects. Similarly, we also do not
-            # want to learn the class label at every location since most
-            # correspond to the 'background' class and bias the training.
-            mask_cls, mask_bbox = computeMasks(img, ys[rpcn_dim], rpcn_filter_size)
+            mask_isfg = meta[rpcn_dim].mask_fgbg
+            mask_valid = meta[rpcn_dim].mask_valid
+            mask_cls, mask_bbox = sampleMasks(mask_isfg, mask_valid)
 
             # Fetch the variables and assign them the current values. We need
             # to add the batch dimensions for Tensorflow.
@@ -177,8 +221,13 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             pred = pred[0]
             assert not np.any(np.isnan(pred))
 
-            # Compute training statistics.
-            mask_cls, mask_bbox = computeMasks(img, ys[rpcn_dim], rpcn_filter_size)
+            # Randomly sample another set of masks. This ensures that will
+            # predict on (mostly) different positions than during the
+            # optimisation step.
+            mask_isfg = meta[rpcn_dim].mask_fgbg
+            mask_valid = meta[rpcn_dim].mask_valid
+            mask_cls, mask_bbox = sampleMasks(mask_isfg, mask_valid)
+
             acc = accuracy(ys[rpcn_dim], pred, mask_cls, mask_bbox)
             num_bb = acc.bbox_err.shape[1]
 
