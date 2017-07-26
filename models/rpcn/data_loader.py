@@ -1,6 +1,5 @@
 """ A uniform interface to request images."""
 import os
-import sys
 import glob
 import tqdm
 import pickle
@@ -220,7 +219,8 @@ class BBox(DataSet):
     the object ID of each pixel to distinguish them as well.
     """
     # Define the MetaData container for this data set.
-    MetaData = namedtuple('MetaData', 'filename')
+    MetaData = namedtuple(
+        'MetaData', 'filename mask_fgbg mask_bbox mask_fg_label mask_valid')
 
     def getRpcnDimensions(self):
         return tuple(self.rpcn_dims)
@@ -350,7 +350,7 @@ class BBox(DataSet):
         # Allocate the array for the expected network outputs (one for each
         # feature dimension size).
         y = {_: np.zeros((4 + num_classes, *_)) for _ in ft_dims}
-        meta = {_: self.MetaData(None) for _ in ft_dims}
+        meta = {}
 
         # Populate the training output with the BBox data and one-hot-label.
         for ft_dim in ft_dims:
@@ -366,4 +366,20 @@ class BBox(DataSet):
             for fy in range(ft_dim[0]):
                 for fx in range(ft_dim[1]):
                     y[ft_dim][4 + lap[fy, fx], fy, fx] = 1
+
+            meta[ft_dim] = self.MetaData(
+                filename=None,
+                mask_fgbg=training_data[ft_dim]['mask_fgbg'],
+                mask_bbox=training_data[ft_dim]['mask_bbox'],
+                mask_fg_label=training_data[ft_dim]['mask_fg_label'],
+                mask_valid=training_data[ft_dim]['mask_valid'],
+            )
+
+            # Sanity check: masks must be binary with correct shape.
+            for field in ['fgbg', 'bbox', 'fg_label', 'valid']:
+                tmp = getattr(meta[ft_dim], 'mask_' + field)
+                assert tmp.dtype == np.uint8, field
+                assert tmp.shape == ft_dim, field
+                assert set(np.unique(tmp)).issubset({0, 1}), field
+
         return y, meta
