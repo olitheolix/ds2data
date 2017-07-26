@@ -76,22 +76,15 @@ def plotTrainingSample(img_chw, ys, rpcn_filter_size, int2name):
 def main(data_path=None):
     data_path = data_path or parseCmdline().fname
 
-    # Load the configuration from meta file.
-    cur_dir = os.path.dirname(os.path.abspath(__file__))
-    fname_meta = os.path.join(cur_dir, 'netstate', 'rpcn-meta.pickle')
-    try:
-        conf = pickle.load(open(fname_meta, 'rb'))['conf']
-    except FileNotFoundError:
-        conf = config.NetConf(
-            seed=0, width=512, height=512, colour='rgb', dtype='float32',
-            path=os.path.join('data', '3dflight'), train_rat=0.8,
-            num_pools_shared=2, rpcn_out_dims=[(64, 64), (32, 32)],
-            rpcn_filter_size=31, num_epochs=0, num_samples=None
-        )
-    if data_path:
-        conf = conf._replace(path=data_path)
+    # Dummy Net configuration. We only fill in the values for the Loader.
+    conf = config.NetConf(
+        seed=0, width=512, height=512, colour='rgb', dtype='float32',
+        path=data_path, train_rat=0.8,
+        num_pools_shared=None, rpcn_out_dims=[(64, 64), (32, 32)],
+        rpcn_filter_size=None, num_epochs=None, num_samples=None
+    )
 
-    # Load the data set and pick one sample.
+    # Load the data set and request a sample.
     t0 = time.time()
     ds = data_loader.BBox(conf)
     etime = time.time() - t0
