@@ -8,14 +8,44 @@ label of zero always means background.
 """
 import os
 import bz2
+import sys
 import glob
 import tqdm
 import json
 import pickle
+import random
+import argparse
+import scipy.signal
 import multiprocessing
 
 import numpy as np
 import PIL.Image as Image
+
+
+def parseCmdline():
+    """Parse the command line arguments."""
+    # Create a parser and program description.
+    parser = argparse.ArgumentParser(description='Compile training data')
+    parser.add_argument(
+        'path', metavar='', nargs='?', type=str,
+        help='Single file or directory with training images and *-meta.json.bz2')
+
+    param = parser.parse_args()
+    if param.path is None:
+        cur_dir = os.path.dirname(os.path.abspath(__file__))
+        param.path = os.path.join(cur_dir, 'data', '3dflight')
+
+    if not os.path.exists(param.path):
+        print(f'Error: cannot open <{param.path}>')
+        sys.exit(1)
+
+    if os.path.isdir(param.path):
+        fnames = glob.glob(os.path.join(param.path, '*.jpg'))
+    else:
+        fnames = [param.path]
+
+    param.fnames = [_[:-4] for _ in sorted(fnames)]
+    return param
 
 
 def ft2im(val, ft_dim: int, im_dim: int):
@@ -135,6 +165,78 @@ def compileFeatures(fname, im_dim, rpcn_dims):
     return out
 
 
+def computeExclusionZones(mask, ft_dim):
+    assert mask.ndim == 1
+    mask = mask.reshape(ft_dim)
+
+    border_width = int(1 + np.max(mask.shape) * 0.05)
+    border_width = 2
+
+    box = np.ones((border_width, border_width), np.float32)
+    out = scipy.signal.fftconvolve(mask, box, mode='same')
+    out = np.round(out).astype(np.int32)
+
+    max_val = border_width ** 2
+    idx = np.nonzero((out == max_val) | (out == 0))
+    out = np.zeros(out.shape, np.float16)
+    out[idx] = 1
+
+    return out.flatten()
+
+
+def computeMasks(x, y, rpcn_filter_size):
+    assert x.ndim == 3 and y.ndim == 3
+    ft_dim = y.shape[1:]
+    assert len(ft_dim) == 2
+
+    # Unpack the BBox portion of the tensor.
+    hot_labels = y[4:, :, :]
+    num_classes = len(hot_labels)
+    hot_labels = np.reshape(hot_labels, [num_classes, -1])
+    del y
+
+    # Allocate the mask arrays.
+    mask_fg = np.zeros(np.prod(ft_dim), np.float16)
+    mask_bg = np.zeros(np.prod(ft_dim), np.float16)
+
+    # Activate the mask for all locations that have 1) an object and 2) both
+    # BBox side lengths are within the limits for the current feature map size.
+    mask_fg[np.nonzero(hot_labels[0] == 0)[0]] = 1
+    mask_bg[np.nonzero(hot_labels[0] != 0)[0]] = 1
+
+    mask_valid = computeExclusionZones(mask_fg, ft_dim)
+
+    mask_fg = mask_fg * mask_valid
+    mask_bg = mask_bg * mask_valid
+
+    idx_bg = np.nonzero(mask_bg)[0].tolist()
+    idx_fg = np.nonzero(mask_fg)[0].tolist()
+
+    # Determine how many (non-)background locations we have.
+    n_bg = len(idx_bg)
+    n_fg = len(idx_fg)
+
+    if n_bg > 100:
+        idx_bg = random.sample(idx_bg, 100)
+    if n_fg > 100:
+        idx_fg = random.sample(idx_fg, 100)
+
+    mask_cls = np.zeros_like(mask_fg)
+    mask_bbox = np.zeros_like(mask_fg)
+    mask_cls[idx_bg] = 1
+    mask_cls[idx_fg] = 1
+
+    # Set the mask for all locations with an object.
+    mask_bbox[idx_fg] = 1
+
+    # Convert the mask to the desired 2D format, then expand the batch
+    # dimension. This will result in (batch, height, width) tensors.
+    mask_cls = np.reshape(mask_cls, ft_dim)
+    mask_bbox = np.reshape(mask_bbox, ft_dim)
+
+    return mask_cls, mask_bbox
+
+
 def compileSingle(args):
     fname, rpcn_out_dims = args
     img = Image.open(fname + '.jpg')
@@ -144,15 +246,10 @@ def compileSingle(args):
 
 
 def main():
+    param = parseCmdline()
     rpcn_out_dims = [(64, 64), (32, 32)]
 
-    cur_dir = os.path.dirname(os.path.abspath(__file__))
-    data_path = os.path.join(cur_dir, 'data', '3dflight', '*.jpg')
-
-    fnames = glob.glob(data_path)
-    fnames = [_[:-4] for _ in sorted(fnames)]
-
-    args = [(_, rpcn_out_dims) for _ in fnames]
+    args = [(_, rpcn_out_dims) for _ in param.fnames]
 
     with multiprocessing.Pool() as pool:
         # Setup parallel execution and wrap it into a TQDM progress bar.
