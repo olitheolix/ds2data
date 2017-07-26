@@ -12,12 +12,7 @@ import glob
 import tqdm
 import json
 import pickle
-import config
-import data_loader
-import scipy.signal
 import multiprocessing
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 
 import numpy as np
 import PIL.Image as Image
@@ -45,6 +40,14 @@ def ft2im(val, ft_dim: int, im_dim: int):
     # that area.
     ofs = (im_dim / ft_dim) / 2
     return np.interp(val, [0, ft_dim - 1], [ofs, im_dim - ofs - 1])
+
+
+def downsampleMatrix(mat, ft_dim):
+    x = np.linspace(0, mat.shape[1] - 1, ft_dim[1])
+    y = np.linspace(0, mat.shape[0] - 1, ft_dim[0])
+    x = np.round(x).astype(np.int64)
+    y = np.round(y).astype(np.int64)
+    return mat[y][:, x]
 
 
 def unpackBBoxes(im_dim, bb_rects, bb_labels):
@@ -77,16 +80,9 @@ def unpackBBoxes(im_dim, bb_rects, bb_labels):
     return bboxes, pick_yx
 
 
-def downsampleMatrix(mat, ft_dim):
-    x = np.linspace(0, mat.shape[1] - 1, ft_dim[1])
-    y = np.linspace(0, mat.shape[0] - 1, ft_dim[0])
-    x = np.round(x).astype(np.int64)
-    y = np.round(y).astype(np.int64)
-    return mat[y][:, x]
-
-
 def compileFeatures(fname, im_dim, rpcn_dims):
     out = {}
+
     # Load the True output and verify that all files use the same
     # int->label mapping.
     img_meta = bz2.open(fname + '-meta.json.bz2', 'rb').read()
@@ -136,72 +132,38 @@ def compileFeatures(fname, im_dim, rpcn_dims):
             'objID_at_pixel': objID_at_pixel_ft,
             'label_at_pixel': label_at_pixel_ft,
         }
-    pickle.dump(out, open(fname + '-compiled.pickle', 'wb'))
+    return out
 
 
-def plotTrainingSample(img_chw, ys, rpcn_filter_size, int2name):
-    assert img_chw.ndim == 3
-
-    # Matplotlib options for pretty visuals.
-    rect_opts = dict(linewidth=1, facecolor='none', edgecolor='g')
-    txt_opts = dict(
-        bbox={'facecolor': 'black', 'pad': 0},
-        fontdict=dict(color='white', size=12, weight='normal'),
-        horizontalalignment='center', verticalalignment='center'
-    )
-
-    for ft_dim, y in sorted(ys.items()):
-        assert y.ndim == 3
-
-        # Convert to HWC format for Matplotlib.
-        img = np.transpose(img_chw, [1, 2, 0]).astype(np.float32)
-        im_dim = img.shape[:2]
-
-        # Original image.
-        plt.figure()
-        plt.subplot(1, 2, 1)
-        plt.imshow(img, cmap='gray')
-        plt.title('Input Image')
-
-        # BBoxes over original image.
-        ax = plt.subplot(1, 2, 2)
-        plt.imshow(img, cmap='gray')
-        hard = np.argmax(y[4:], axis=0)
-        bb_rects, pick_yx = unpackBBoxes(im_dim, y[:4], hard)
-        label = hard[pick_yx]
-        for label, (x0, y0, x1, y1) in zip(label, bb_rects):
-            w = x1 - x0
-            h = y1 - y0
-            ax.add_patch(patches.Rectangle((x0, y0), w, h, **rect_opts))
-            ax.text(x0 + w / 2, y0, f' {int2name[label]} ', **txt_opts)
-
-        plt.suptitle(f'Feature Map Size: {ft_dim[0]}x{ft_dim[1]}')
+def compileSingle(args):
+    fname, rpcn_out_dims = args
+    img = Image.open(fname + '.jpg')
+    width, height = img.size
+    features = compileFeatures(fname, (height, width), rpcn_out_dims)
+    pickle.dump(features, open(fname + '-compiled.pickle', 'wb'))
 
 
 def main():
-    # Load the configuration from meta file.
+    rpcn_out_dims = [(64, 64), (32, 32)]
+
     cur_dir = os.path.dirname(os.path.abspath(__file__))
-    fname = os.path.join(cur_dir, 'netstate', 'rpcn-meta.pickle')
-    try:
-        conf = pickle.load(open(fname, 'rb'))['conf']
-    except FileNotFoundError:
-        conf = config.NetConf(
-            seed=0, width=512, height=512, colour='rgb', dtype='float32',
-            path=os.path.join('data', '3dflight'), train_rat=0.8,
-            num_pools_shared=2, rpcn_out_dims=[(64, 64), (32, 32)],
-            rpcn_filter_size=31, num_epochs=0, num_samples=None
+    data_path = os.path.join(cur_dir, 'data', '3dflight', '*.jpg')
+
+    fnames = glob.glob(data_path)
+    fnames = [_[:-4] for _ in sorted(fnames)]
+
+    args = [(_, rpcn_out_dims) for _ in fnames]
+
+    with multiprocessing.Pool() as pool:
+        # Setup parallel execution and wrap it into a TQDM progress bar.
+        progbar = tqdm.tqdm(
+            pool.imap_unordered(compileSingle, args),
+            total=len(args), desc='Compiling Features', leave=False
         )
-    conf = conf._replace(num_samples=10)
 
-    # Load the data set.
-    ds = data_loader.BBox(conf)
-    ds.printSummary()
-
-    # Pick one sample and show the masks for it.
-    ds.reset()
-    x, y, _ = ds.nextSingle('train')
-    plotTrainingSample(x, y, conf.rpcn_filter_size, ds.int2name())
-    plt.show()
+        # Consume the iterator.
+        for _ in progbar:
+            pass
 
 
 if __name__ == '__main__':
