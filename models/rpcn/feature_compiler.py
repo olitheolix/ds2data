@@ -21,6 +21,7 @@ import feature_inspector
 
 import numpy as np
 import PIL.Image as Image
+import PIL.ImageFilter as ImageFilter
 
 
 def parseCmdline():
@@ -137,6 +138,106 @@ def _computeBBoxes(bb_data, objID_at_pixel_ft, ft_dim, im_dim):
     return bboxes
 
 
+def _maskFgBg(objID_at_pixel_ft):
+    """Return the "this-is-not-a-background-pixel" mask.
+    """
+    mask = np.zeros(objID_at_pixel_ft.shape, np.uint8)
+
+    # Activate all feature map locations that show anything but background.
+    fg_idx = np.nonzero(objID_at_pixel_ft)
+    mask[fg_idx] = 1
+    return mask
+
+
+def _maskBBox(objID_at_pixel_ft, obj_pixels_ft):
+    """Return the "you-can-estimate-bbox-size-at-this-anchor" mask.
+
+    To estimating the BBox it often suffices to see only a small portion of the
+    object. In this case, all objects that have more than 10% of its pixels
+    visible are considered "visible enough for BBox estimation". NOTE: just
+    because it is possible to estimate the BBox size does *not* mean it is also
+    possible to estimate its label (ie the number on the cube), as considerably
+    more pixels may have to be visible for that (see `_maskFgLabel`).
+    """
+    # Iterate over each object and determine (mostly guess) if it is possible
+    # to recognise the object.
+    mask = np.zeros(objID_at_pixel_ft.shape, np.uint8)
+    for objID, pixels in obj_pixels_ft.items():
+        idx_visible = np.nonzero(objID_at_pixel_ft == objID)
+
+        # Are enough pixels visible in the scene.
+        num_visible = len(idx_visible[0])
+        num_tot = np.count_nonzero(pixels)
+        if num_visible >= 9 and num_visible >= 0.1 * num_tot:
+            mask[idx_visible] = 1
+    return mask
+
+
+def _maskValid(objID_at_pixels_ft):
+    """Return the "only-train-on-these-pixels" mask.
+
+    The main purpose of this mask is to remove all pixels close to
+    foreground/background boundaries. This will avoid anchor positions where
+    the foreground/background label is ambiguous.
+    """
+    src = np.array(objID_at_pixels_ft, np.uint8)
+    out = np.array(Image.fromarray(src).filter(ImageFilter.FIND_EDGES))
+
+    mask = np.zeros(src.shape, np.uint8)
+    mask[np.nonzero(out == 0)] = 1
+    return mask
+
+
+def _maskFgLabel(img, objID_at_pixel_ft, obj_pixels_ft):
+    """Return the "it is possible to estimate the label at that pixel" mask.
+
+    To estimate the label the object must be
+      1. large enough to see the number
+      2. bright enough to see the number
+      3. unobstructed enough to see the number
+      4. not too so close to the screen edge that the number is clipped
+
+    For Condition 1, objects are large enough if it occupies least 9 pixels in
+    feature space. 9 pixels (ie a 3x3 patch) corresponds to a 24x24 receptive
+    field for our default feature and image sizes of 64x64 and 512x512,
+    respectively.
+
+    Objects are bright enough if their average pixel value is at least 40. I
+    determine this threshold with an empirical study of one image :)
+
+    We consider the object unobstructed if at least 50% of its pixels are
+    actually visible in the scene (Condition 3).
+
+    I do not know how to recognise Condition 4 with the given data.
+
+    This is not foolproof but works well enough for now. A notable case where
+    this fails is a cube close to the camera but clipped by the image boundary.
+    These cubes may occupy a lot of screen real estate, yet its only visible
+    portion is the red frame and parts of the white surface.
+    """
+    # Compute the average pixel intensity.
+    img = np.mean(np.array(img, np.int64), axis=2)
+    assert img.shape == objID_at_pixel_ft.shape
+
+    # Iterate over each object and determine (mostly guess) if it is possible
+    # to recognise the object.
+    mask = np.zeros(objID_at_pixel_ft.shape, np.uint8)
+    for objID, pixels in obj_pixels_ft.items():
+        idx_visible = np.nonzero(objID_at_pixel_ft == objID)
+
+        # Is it bright enough.
+        avg_brightness = np.mean(img[idx_visible])
+        if avg_brightness < 40:
+            continue
+
+        # Are enough pixels visible in the scene.
+        num_visible = len(idx_visible[0])
+        num_tot = np.count_nonzero(pixels)
+        if num_visible >= 9 and num_visible >= 0.5 * num_tot:
+            mask[idx_visible] = 1
+    return mask
+
+
 def compileFeatures(fname, img, rpcn_dims):
     assert img.ndim == 3 and img.shape[2] == 3 and img.dtype == np.uint8
     im_dim = img.shape[:2]
@@ -150,6 +251,7 @@ def compileFeatures(fname, img, rpcn_dims):
 
     # Undo JSON's int->str conversion for dict keys.
     bb_data = {int(k): v for k, v in img_meta['bb_data'].items()}
+    obj_pixels = {int(k): v for k, v in img_meta['obj-pixels'].items()}
     objID2label = {int(k): v for k, v in img_meta['objID2label'].items()}
     objID_at_pixel = np.array(img_meta['objID-at-pixel'], np.int32)
     del img_meta
@@ -164,17 +266,29 @@ def compileFeatures(fname, img, rpcn_dims):
     # Compile dictionary with feature size specific data. This includes the
     # BBox data relative to the anchor point.
     for ft_dim in rpcn_dims:
+        img_ft = Image.fromarray(img).resize((ft_dim[1], ft_dim[0]))
+        img_ft = np.array(img_ft)
+
         # Downsample the label/objID maps to the feature size.
         label_at_pixel_ft = downsampleMatrix(label_at_pixel, ft_dim)
         objID_at_pixel_ft = downsampleMatrix(objID_at_pixel, ft_dim)
+        obj_pixels_ft = {k: downsampleMatrix(v, ft_dim) for k, v in obj_pixels.items()}
 
         bboxes = _computeBBoxes(bb_data, objID_at_pixel_ft, ft_dim, im_dim)
+        mask_fgbg = _maskFgBg(objID_at_pixel_ft)
+        mask_bbox = _maskBBox(objID_at_pixel_ft, obj_pixels_ft)
+        mask_valid = _maskValid(objID_at_pixel_ft)
+        mask_fg_label = _maskFgLabel(img_ft, objID_at_pixel_ft, obj_pixels_ft)
 
         # Compile all the information into the output dictionary.
         out[ft_dim] = {
             'bboxes': np.array(bboxes, np.float32),
             'objID_at_pixel': objID_at_pixel_ft,
             'label_at_pixel': label_at_pixel_ft,
+            'mask_fgbg': mask_fgbg,
+            'mask_bbox': mask_bbox,
+            'mask_fg_label': mask_fg_label,
+            'mask_valid': mask_valid,
         }
     return out
 
