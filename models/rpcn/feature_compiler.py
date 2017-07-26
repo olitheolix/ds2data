@@ -263,14 +263,17 @@ def main():
 
     args = [(_, rpcn_out_dims) for _ in param.fnames]
 
-    with multiprocessing.Pool() as pool:
-        # Setup parallel execution and wrap it into a TQDM progress bar. Then
-        # consume the iterator.
-        progbar = tqdm.tqdm(
-            pool.imap_unordered(compileSingle, args),
-            total=len(args), desc='Compiling Features', leave=False
-        )
-        [_ for _ in progbar]
+    if len(args) == 1:
+        compileSingle(args[0])
+    else:
+        with multiprocessing.Pool() as pool:
+            # Setup parallel execution and wrap it into a TQDM progress bar. Then
+            # consume the iterator.
+            progbar = tqdm.tqdm(
+                pool.imap_unordered(compileSingle, args),
+                total=len(args), desc='Compiling Features', leave=False
+            )
+            [_ for _ in progbar]
 
     # Show debug plots for the first file in the list.
     if param.debug:
