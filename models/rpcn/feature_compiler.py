@@ -17,6 +17,7 @@ import random
 import argparse
 import scipy.signal
 import multiprocessing
+import feature_inspector
 
 import numpy as np
 import PIL.Image as Image
@@ -27,8 +28,12 @@ def parseCmdline():
     # Create a parser and program description.
     parser = argparse.ArgumentParser(description='Compile training data')
     parser.add_argument(
-        'path', metavar='', nargs='?', type=str,
-        help='Single file or directory with training images and *-meta.json.bz2')
+        'path', nargs='?', type=str,
+        metavar='File or Path with training images and *-meta.json.bz2',
+        help='')
+    parser.add_argument(
+        '--debug', action='store_true', default=False,
+        help='Create debug plots for instant inspection')
 
     param = parser.parse_args()
     if param.path is None:
@@ -259,6 +264,10 @@ def main():
             total=len(args), desc='Compiling Features', leave=False
         )
         [_ for _ in progbar]
+
+    # Show debug plots for the first file in the list.
+    if param.debug:
+        feature_inspector.main(param.fnames[0] + '.jpg')
 
 
 if __name__ == '__main__':
