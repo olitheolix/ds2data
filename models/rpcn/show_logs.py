@@ -108,10 +108,13 @@ def plotTrainingProgress(log):
     min_cost = 10 ** np.floor(np.log10(max(1, min_cost)))
     max_cost = 10 ** np.ceil(np.log10(max_cost))
 
+    vec_x = np.arange(num_epochs)
     # Plot overall cost.
-    plt.figure()
-    plt.semilogy(cost_90p, '-b', label='90%')
-    plt.semilogy(cost_50p, '-r', label='Median')
+    plt.semilogy(vec_x, cost_90p, '-b', label='90%')
+    plt.fill_between(vec_x, 1, cost_90p, facecolor='b', alpha=0.2)
+    plt.semilogy(vec_x, cost_50p, '-r', label='Median')
+    plt.fill_between(vec_x, 1, cost_50p, facecolor='r', alpha=0.2)
+    plt.xlim(min(vec_x), max(vec_x))
     plt.ylim(min_cost, max_cost)
     plt.grid()
     plt.legend(loc='best')
@@ -123,13 +126,18 @@ def plotTrainingProgress(log):
     plt.figure()
     num_cols = 4
     num_rows = len(log['conf'].rpcn_out_dims)
+    pfill = plt.fill_between
     for idx, layer_dim in enumerate(log['conf'].rpcn_out_dims):
         data = compileStatistics(log['rpcn'][layer_dim], num_epochs, samples_per_epoch)
 
         # Cost of RPCN Layer.
         plt.subplot(num_rows, num_cols, num_cols * idx + 1)
-        plt.semilogy(data['90p']['cost'], '-b', label='90%')
-        plt.semilogy(data['50p']['cost'], '-r', label='Median')
+        plt.semilogy(vec_x, data['90p']['cost'], '-b', label='90%')
+        plt.semilogy(vec_x, data['50p']['cost'], '-r', label='Median')
+        pfill(vec_x, 1, data['90p']['cost'], facecolor='b', alpha=0.2)
+        pfill(vec_x, 1, data['50p']['cost'], facecolor='r', alpha=0.2)
+
+        plt.xlim(min(vec_x), max(vec_x))
         plt.ylim(min_cost, max_cost)
         plt.grid()
         plt.legend(loc='best')
@@ -137,9 +145,13 @@ def plotTrainingProgress(log):
 
         # Classification error rate.
         plt.subplot(num_rows, num_cols, num_cols * idx + 2)
-        plt.plot(data['90p']['fg_err'], '-b', label='90%')
-        plt.plot(data['50p']['fg_err'], '-r', label='Median')
+        plt.plot(vec_x, data['90p']['fg_err'], '-b', label='90%')
+        plt.plot(vec_x, data['50p']['fg_err'], '-r', label='Median')
+        pfill(vec_x, 1, data['90p']['fg_err'], facecolor='b', alpha=0.2)
+        pfill(vec_x, 1, data['50p']['fg_err'], facecolor='r', alpha=0.2)
+
         plt.grid()
+        plt.xlim(min(vec_x), max(vec_x))
         plt.ylim(0, 100)
         plt.ylabel('Percent')
         plt.legend(loc='best')
@@ -147,9 +159,12 @@ def plotTrainingProgress(log):
 
         # BBox position error in x-dimension.
         plt.subplot(num_rows, num_cols, num_cols * idx + 3)
+        plt.plot(vec_x, data['90p']['bb_err_all'], '-b', label='90%')
+        plt.plot(vec_x, data['50p']['bb_err_all'], '-r', label='Median')
+        pfill(vec_x, 1, data['90p']['bb_err_all'], facecolor='b', alpha=0.2)
+        pfill(vec_x, 1, data['50p']['bb_err_all'], facecolor='r', alpha=0.2)
 
-        plt.plot(data['90p']['bb_err_all'], '-b', label='90%')
-        plt.plot(data['50p']['bb_err_all'], '-r', label='Median')
+        plt.xlim(min(vec_x), max(vec_x))
         plt.ylim(0, 200)
         plt.grid()
         plt.legend(loc='best')
@@ -157,8 +172,10 @@ def plotTrainingProgress(log):
 
         # False positive for background and foreground.
         plt.subplot(num_rows, num_cols, num_cols * idx + 4)
-        plt.plot(data['50p']['bg_falsepos'], '-b', label='Background')
-        plt.plot(data['50p']['fg_falsepos'], '-r', label='Foreground')
+        plt.plot(vec_x, data['50p']['bg_falsepos'], '-b', label='Background')
+        plt.plot(vec_x, data['50p']['fg_falsepos'], '-r', label='Foreground')
+
+        plt.xlim(min(vec_x), max(vec_x))
         plt.ylim(0, 100)
         plt.grid()
         plt.ylabel('Percent')
