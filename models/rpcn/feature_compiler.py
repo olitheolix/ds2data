@@ -102,15 +102,20 @@ def compileFeatures(fname, im_dim, rpcn_dims):
     # For each non-zero pixel, map the object ID to its label. This
     # will produce an image where each pixel corresponds to a label
     # that can be looked up with `int2name`.
-    p_labels = np.zeros_like(objID_at_pixel)
+    label_at_pixel = np.zeros_like(objID_at_pixel)
     for idx in zip(*np.nonzero(objID_at_pixel)):
-        p_labels[idx] = objID2label[objID_at_pixel[idx]]
+        label_at_pixel[idx] = objID2label[objID_at_pixel[idx]]
 
+    # Compile dictionary with feature size specific data. This includes the
+    # BBox data relative to the anchor point.
     for ft_dim in rpcn_dims:
-        bboxes = np.zeros((4, *ft_dim), np.float32)
-        label_at_pixel_ft = downsampleMatrix(p_labels, ft_dim)
+        # Downsample the label/objID maps to the feature size.
+        label_at_pixel_ft = downsampleMatrix(label_at_pixel, ft_dim)
         objID_at_pixel_ft = downsampleMatrix(objID_at_pixel, ft_dim)
 
+        # Convert the absolute BBox corners to relative values with respect to
+        # the anchor point (all in image coordinates).
+        bboxes = np.zeros((4, *ft_dim), np.float32)
         for y in range(ft_dim[0]):
             for x in range(ft_dim[1]):
                 objID = objID_at_pixel_ft[y, x]
@@ -124,6 +129,7 @@ def compileFeatures(fname, im_dim, rpcn_dims):
                     y1 = y1 - anchor_y
                     bboxes[:, y, x] = (x0, y0, x1, y1)
 
+        # Compile all the information into the output dictionary.
         out[ft_dim] = {
             'bboxes': np.array(bboxes, np.float32),
             'objID_at_pixel': objID_at_pixel_ft,
