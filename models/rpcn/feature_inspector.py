@@ -11,6 +11,7 @@ import time
 import pickle
 import config
 import data_loader
+import feature_compiler
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -46,7 +47,7 @@ def plotTrainingSample(img_chw, ys, rpcn_filter_size, int2name):
         ax = plt.subplot(1, 2, 2)
         plt.imshow(img, cmap='gray')
         hard = np.argmax(y[4:], axis=0)
-        bb_rects, pick_yx = unpackBBoxes(im_dim, y[:4], hard)
+        bb_rects, pick_yx = feature_compiler.unpackBBoxes(im_dim, y[:4], hard)
         label = hard[pick_yx]
         for label, (x0, y0, x1, y1) in zip(label, bb_rects):
             w = x1 - x0
