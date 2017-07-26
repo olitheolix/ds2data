@@ -324,7 +324,7 @@ def main():
     # Restore the network from Tensorflow's checkpoint file.
     saver = tf.train.Saver()
     if restore:
-        print('\nRestored Tensorflow checkpoint file')
+        print('\nRestored Tensorflow graph from checkpoint file')
         saver.restore(sess, fnames['checkpt'])
 
     print(f'\n----- Training for another {param.N} Epochs -----')
