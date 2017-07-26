@@ -304,7 +304,7 @@ class BBox(DataSet):
     def loadTrainingData(self, fnames, im_dim, colour_format):
         chan, height, width = im_dim
 
-        all_y = []
+        all_y, all_meta = [], []
         all_x = np.zeros((len(fnames), *im_dim), np.uint8)
 
         # Load each image, pre-process it (eg resize, RGB/Gray), and add it
@@ -333,17 +333,24 @@ class BBox(DataSet):
                 num_classes = len(int2name)
             assert int2name == data['int2name']
 
-            y = self.compileTrainingOutput(data, self.rpcn_dims, num_classes)
+            # Crate the training output for different feature sizes.
+            y, m = self.compileTrainingOutput(data, self.rpcn_dims, num_classes)
+
+            # Replace the file name in all MetaData instances.
+            m = {k: v._replace(filename=fname) for k, v in m.items()}
+
+            # Collect the training data.
             all_y.append(y)
+            all_meta.append(m)
 
         # Return image, network output, label mapping, and meta data.
-        meta = [self.MetaData(_) for _ in fnames]
-        return all_x, all_y, int2name, meta
+        return all_x, all_y, int2name, all_meta
 
     def compileTrainingOutput(self, training_data, ft_dims, num_classes):
         # Allocate the array for the expected network outputs (one for each
         # feature dimension size).
         y = {_: np.zeros((4 + num_classes, *_)) for _ in ft_dims}
+        meta = {_: self.MetaData(None) for _ in ft_dims}
 
         # Populate the training output with the BBox data and one-hot-label.
         for ft_dim in ft_dims:
@@ -359,4 +366,4 @@ class BBox(DataSet):
             for fy in range(ft_dim[0]):
                 for fx in range(ft_dim[1]):
                     y[ft_dim][4 + lap[fy, fx], fy, fx] = 1
-        return y
+        return y, meta
