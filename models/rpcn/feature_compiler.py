@@ -113,21 +113,22 @@ def compileFeatures(fname, im_dim, rpcn_dims):
         label_at_pixel_ft = downsampleMatrix(label_at_pixel, ft_dim)
         objID_at_pixel_ft = downsampleMatrix(objID_at_pixel, ft_dim)
 
+        # Find all feature map locations that show anything but background.
+        fg_idx = np.nonzero(objID_at_pixel_ft)
+
         # Convert the absolute BBox corners to relative values with respect to
         # the anchor point (all in image coordinates).
         bboxes = np.zeros((4, *ft_dim), np.float32)
-        for y in range(ft_dim[0]):
-            for x in range(ft_dim[1]):
-                objID = objID_at_pixel_ft[y, x]
-                if objID != 0:
-                    (x0, y0, x1, y1) = bb_data[objID]['bbox']
-                    anchor_x = ft2im(x, ft_dim[1], im_dim[1])
-                    anchor_y = ft2im(y, ft_dim[0], im_dim[0])
-                    x0 = x0 - anchor_x
-                    x1 = x1 - anchor_x
-                    y0 = y0 - anchor_y
-                    y1 = y1 - anchor_y
-                    bboxes[:, y, x] = (x0, y0, x1, y1)
+        for y, x in zip(*fg_idx):
+            objID = objID_at_pixel_ft[y, x]
+            anchor_x = ft2im(x, ft_dim[1], im_dim[1])
+            anchor_y = ft2im(y, ft_dim[0], im_dim[0])
+            x0, y0, x1, y1 = bb_data[objID]['bbox']
+            x0 = x0 - anchor_x
+            x1 = x1 - anchor_x
+            y0 = y0 - anchor_y
+            y1 = y1 - anchor_y
+            bboxes[:, y, x] = (x0, y0, x1, y1)
 
         # Compile all the information into the output dictionary.
         out[ft_dim] = {
