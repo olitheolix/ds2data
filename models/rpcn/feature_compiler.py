@@ -252,15 +252,13 @@ def main():
     args = [(_, rpcn_out_dims) for _ in param.fnames]
 
     with multiprocessing.Pool() as pool:
-        # Setup parallel execution and wrap it into a TQDM progress bar.
+        # Setup parallel execution and wrap it into a TQDM progress bar. Then
+        # consume the iterator.
         progbar = tqdm.tqdm(
             pool.imap_unordered(compileSingle, args),
             total=len(args), desc='Compiling Features', leave=False
         )
-
-        # Consume the iterator.
-        for _ in progbar:
-            pass
+        [_ for _ in progbar]
 
 
 if __name__ == '__main__':
