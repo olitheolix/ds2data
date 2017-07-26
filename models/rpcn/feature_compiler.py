@@ -13,9 +13,7 @@ import glob
 import tqdm
 import json
 import pickle
-import random
 import argparse
-import scipy.signal
 import multiprocessing
 import feature_inspector
 
