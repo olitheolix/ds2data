@@ -76,6 +76,50 @@ def ft2im(val, ft_dim: int, im_dim: int):
     return np.interp(val, [0, ft_dim - 1], [ofs, im_dim - ofs - 1])
 
 
+def oneHotEncoder(labels, num_classes):
+    """Return one-hot-label encoding for `labels`.
+
+    The hot-labels will be the first dimension. For instance, if the shape of
+    `labels` is (3, 4) then the output shape will be (`num_classes`, 3, 4).
+
+    Inputs:
+        labels: Array
+            Array can have any data type but its entries *must* be integers and
+            in the interval [0, num_classes - 1].
+        num_classes: int
+            Must be positive.
+
+    Returns:
+        Array: (num_classes, *labels.shape)
+    """
+    # Labels must be an array with at least one element.
+    assert np.prod(np.array(labels).shape) > 0
+
+    # Must be non-negative 16 Bit integer.
+    assert isinstance(num_classes, int)
+    assert 0 < num_classes < 2 ** 16
+
+    # All labels must be integers in [0, num_labels - 1]
+    labels_f64 = np.array(labels, np.float64)
+    labels_i64 = np.array(labels_f64, np.int64)
+    assert np.sum(np.abs(labels_i64 - labels_f64)) == 0, 'Labels must be integers'
+    assert 0 <= np.min(labels_i64) <= np.max(labels_i64) < num_classes
+    del labels, labels_f64
+
+    # Backup the input dimension and flatten the label array. This is necessary
+    # for some NumPy tricks below to avoid loops.
+    dim = labels_i64.shape
+    labels = labels_i64.flatten()
+    out = np.zeros((num_classes, len(labels)), np.uint16)
+
+    # Compute the positions of the non-zero entries in the array and set them.
+    ix = (labels, np.arange(len(labels)))
+    out[ix] = 1
+
+    # Reshape the hot-label data and return it.
+    return out.reshape((num_classes, *dim))
+
+
 def setBBoxRects(y, val):
     y = np.array(y)
     assert y.ndim == 4 and y.shape[0] == 1

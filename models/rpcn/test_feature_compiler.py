@@ -112,3 +112,63 @@ class TestFeatureCompiler:
         for false_dim in false_dims:
             with pytest.raises(AssertionError):
                 setClassLabel(np.zeros(false_dim), class_labels)
+
+    def test_oneHotEncoder(self):
+        """Create valid label arrays and verify the one-hot-encoder."""
+        # Create random labels in [0, 9].
+        num_labels = 10
+
+        # Test various array shapes and data types.
+        dims = [(3,), (2, 3), (64, 64)]
+        dtypes = (np.uint8, np.int8, np.int16, np.float16, np.float32, None)
+        for dim in dims:
+            for dtype in dtypes:
+                # Compute random labels and convert the array to the test type.
+                labels = np.random.randint(0, num_labels, dim)
+                labels = labels.astype(dtype) if dtype else labels.tolist()
+
+                # Encode the labels and verify shape and data type.
+                hot = feature_compiler.oneHotEncoder(labels, num_labels)
+                assert hot.dtype == np.uint16
+                assert np.array(hot).shape == (num_labels, *dim)
+
+                # The encoding is along the first axis and each column must
+                # therefore contain exactly one non-zero entry, and that entry
+                # must be 1.
+                assert np.array_equal(np.count_nonzero(hot, axis=0), np.ones(dim))
+                assert np.array_equal(np.sum(hot, axis=0), np.ones(dim))
+
+                # Convert the hot-label to normal label and ensure it is correct.
+                assert np.array_equal(np.argmax(hot, axis=0), labels)
+
+    def test_oneHotEncoder_err(self):
+        """Degenerate inputs to one-hot-encoder."""
+        enc = feature_compiler.oneHotEncoder
+
+        # Must not raise any errors.
+        enc([0, 2], 3)
+
+        # Degenerate input array.
+        with pytest.raises(AssertionError):
+            feature_compiler.oneHotEncoder([], 10)
+
+        # Invalid number of labels.
+        for num_classes in [-1, 0, 0.5, 1.5]:
+            with pytest.raises(AssertionError):
+                enc([0, 2], num_classes)
+
+        # Label ID is larger than the number of labels.
+        with pytest.raises(AssertionError):
+            enc([1, 2], 2)
+
+        # Label ID is negative.
+        with pytest.raises(AssertionError):
+            enc([-1, 2], 10)
+
+        # Label ID is a float.
+        with pytest.raises(AssertionError):
+            enc([0, 1.5], 10)
+
+        # Number of classes is larger than 16 Bit number.
+        with pytest.raises(AssertionError):
+            enc([0, 1.5], 2 ** 16)
