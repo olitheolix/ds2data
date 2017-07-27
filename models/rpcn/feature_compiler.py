@@ -76,6 +76,42 @@ def ft2im(val, ft_dim: int, im_dim: int):
     return np.interp(val, [0, ft_dim - 1], [ofs, im_dim - ofs - 1])
 
 
+def setBBoxRects(y, val):
+    y = np.array(y)
+    assert y.ndim == 4 and y.shape[0] == 1
+    assert np.array(val).shape == y[0, :4].shape
+    y[0, :4] = val
+    return y
+
+
+def getBBoxRects(y):
+    return y[0, :4]
+
+
+def setIsFg(y, val):
+    y = np.array(y)
+    assert y.ndim == 4 and y.shape[0] == 1
+    assert np.array(val).shape == y[0, 4:6].shape, np.array(val).shape
+    y[0, 4:6] = val
+    return y
+
+
+def getIsFg(y):
+    return y[0, 4:6]
+
+
+def setClassLabel(y, val):
+    y = np.array(y)
+    assert y.ndim == 4 and y.shape[0] == 1
+    assert np.array(val).shape == y[0, 6:].shape
+    y[0, 6:] = val
+    return y
+
+
+def getClassLabel(y):
+    return y[0, 6:]
+
+
 def downsampleMatrix(mat, ft_dim):
     if not isinstance(mat, np.ndarray):
         mat = np.array(mat)
