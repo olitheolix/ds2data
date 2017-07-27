@@ -237,13 +237,12 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             # Compute maximum/90%/median for the BBox errors. If this features
             # map did not have any BBoxes then report -1. The `bbox_err` shape
             # is (4, N) where N is the number of BBoxes.
-            if np.prod(err.bbox.shape) == 0:
+            err_bbox_flat = err.bbox.flatten()
+            if len(err_bbox_flat) == 0:
                 bb_50p = bb_90p = -1
             else:
-                tmp = np.sort(err.bbox.flatten())
-                bb_90p = tmp[int(0.9 * len(tmp))]
-                bb_50p = tmp[int(0.5 * len(tmp))]
-                del tmp
+                bb_90p = err_bbox_flat[int(0.9 * len(err_bbox_flat))]
+                bb_50p = err_bbox_flat[int(0.5 * len(err_bbox_flat))]
 
             # Log training stats. The validation script will use these.
             rpcn_cost = all_costs[rpcn_dim]
