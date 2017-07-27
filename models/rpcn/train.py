@@ -59,20 +59,22 @@ def accuracy(gt, pred, mask_cls, mask_bbox):
 
     # First 4 dimensions are BBox parameters (x, y, w, h), the remaining ones
     # are one-hot class labels. Use this to determine how many classes we have.
-    num_classes = pred.shape[0] - 4
+    num_classes = pred.shape[0] - (4 + 2)
 
-    # Flatten the prediction tensor into (4 + num_classes, height * width).
+    # Flatten the prediction tensor into (4 + 2 + num_classes, height * width).
     # Then unpack the 4 BBox parameters and one-hot labels.
-    pred = pred.reshape([4 + num_classes, -1])
-    pred_bbox, pred_label = pred[:4], pred[4:]
+    pred = pred.reshape([4 + 2 + num_classes, -1])
+    pred_bbox, pred_isFg, pred_label = pred[:4], pred[4:6], pred[6:]
 
-    # Repeat with the GT tensor.
-    gt = gt.reshape([4 + num_classes, -1])
-    gt_bbox, gt_label = gt[:4], gt[4:]
+    # Repeat with the ground truth tensor.
+    gt = gt.reshape([4 + 2 + num_classes, -1])
+    gt_bbox, gt_isFg, gt_label = gt[:4], gt[4:6], gt[6:]
 
-    # Determine the GT and predicted label at each location.
+    # Determine the true and predicted label at each location.
     gt_label = np.argmax(gt_label, axis=0)
     pred_label = np.argmax(pred_label, axis=0)
+    gt_isFg = np.argmax(gt_isFg, axis=0)
+    pred_isFg = np.argmax(pred_isFg, axis=0)
 
     # Count the correct label predictions at all valid mask positions.
     valid_idx = np.nonzero(mask_cls)[0]
