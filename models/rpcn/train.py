@@ -96,6 +96,7 @@ def accuracy(gt, pred, mask_bbox, mask_isFg, mask_cls):
     # object because the BBox predictions there are meaningless.
     bbox_err = np.abs(true_bbox - pred_bbox)
     bbox_err = bbox_err[:, mask_bbox_idx]
+    bbox_err = bbox_err.astype(np.float16)
 
     return ErrorMetrics(
         bbox_err, wrong_BgFg, wrong_cls,
