@@ -310,12 +310,12 @@ def main():
     lrate_in = tf.placeholder(tf.float32, name='lrate')
     x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
     shared_out = shared_net.setup(None, x_in, conf.num_pools_shared, True)
-    rpcn_net.setup(
+    rpcn_out = rpcn_net.setup(
         None, shared_out, len(int2name),
         conf.rpcn_filter_size, conf.rpcn_out_dims, True)
 
     # Select cost function and optimiser, then initialise the TF graph.
-    cost = [rpcn_net.cost(rpcn_dim) for rpcn_dim in conf.rpcn_out_dims]
+    cost = [rpcn_net.cost(_) for _ in rpcn_out]
     cost = tf.add_n(cost, name='cost')
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
     sess.run(tf.global_variables_initializer())
