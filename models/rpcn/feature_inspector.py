@@ -60,7 +60,7 @@ def plotTrainingSample(img_hwc, ys, rpcn_filter_size, int2name):
         # BBoxes over original image.
         ax = plt.subplot(1, 2, 2)
         plt.imshow(img)
-        hard = np.argmax(y[4:], axis=0)
+        hard = np.argmax(y[6:], axis=0)
         bb_rects, pick_yx = feature_compiler.unpackBBoxes(im_dim, y[:4], hard)
         label = hard[pick_yx]
         for label, (x0, y0, x1, y1) in zip(label, bb_rects):
