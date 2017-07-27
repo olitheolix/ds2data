@@ -93,7 +93,7 @@ def cost(y_pred):
         cost_cls = tf.reduce_mean(cost_cls, name='cls')
 
         # Compute final scalar cost.
-        tf.add_n([cost_bbox, cost_isFg, cost_cls], name='total')
+        return tf.add_n([cost_bbox, cost_isFg, cost_cls], name='total')
 
 
 def save(fname, sess, ft_out_dims):

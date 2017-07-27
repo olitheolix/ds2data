@@ -24,7 +24,7 @@ class TestCost:
         cls.y_pred_in = tf.placeholder(tf.float32, out_dim, name='y_pred')
 
         # Setup cost computation. This will create a node for `y_true`.
-        rpcn_net.cost(cls.y_pred_in)
+        cls.total_cost = rpcn_net.cost(cls.y_pred_in)
 
         # Get the placeholder for the true input (see above).
         g = tf.get_default_graph().get_tensor_by_name
@@ -304,9 +304,13 @@ class TestCost:
             # Compute the total cost with NumPy.
             np_cost = c0 + c1 + c2
 
-            # Compute the total cost via Tensorflow.
+            # Get the cost node and verify that the one fetched by name matches
+            # the one returned by the cost creation function.
             g = tf.get_default_graph().get_tensor_by_name
             cost = g('rpcn-2x2-cost/total:0')
+            assert cost is self.total_cost
+
+            # Compute the total cost via Tensorflow.
             fd = {
                 self.y_pred_in: y_pred, self.y_true_in: y_true,
                 g('rpcn-2x2-cost/mask_isFg:0'): mask_isFg,
