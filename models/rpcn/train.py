@@ -196,16 +196,17 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             # Fetch the variables and assign them the current values. We need
             # to add the batch dimensions for Tensorflow.
             layer_name = f'{rpcn_dim[0]}x{rpcn_dim[1]}'
-            fd[g(f'rpcn-{layer_name}-cost/y:0')] = np.expand_dims(ys[rpcn_dim], 0)
-            fd[g(f'rpcn-{layer_name}-cost/mask_cls:0')] = np.expand_dims(mask_cls, 0)
-            fd[g(f'rpcn-{layer_name}-cost/mask_bbox:0')] = np.expand_dims(mask_bbox, 0)
+            fd[g(f'rpcn-{layer_name}-cost/y_true:0')] = np.expand_dims(ys[rpcn_dim], 0)
+            fd[g(f'rpcn-{layer_name}-cost/mask_cls:0')] = mask_cls
+            fd[g(f'rpcn-{layer_name}-cost/mask_bbox:0')] = mask_bbox
+            fd[g(f'rpcn-{layer_name}-cost/mask_isFg:0')] = mask_isfg
             del rpcn_dim, mask_cls, mask_bbox, layer_name
 
         # Run one optimisation step and record all costs.
         cost_nodes = {'tot': g('cost:0')}
         for rpcn_dim in rpcn_dims:
             layer_name = f'{rpcn_dim[0]}x{rpcn_dim[1]}'
-            cost_nodes[rpcn_dim] = g(f'rpcn-{layer_name}-cost/cost:0')
+            cost_nodes[rpcn_dim] = g(f'rpcn-{layer_name}-cost/total:0')
         all_costs, _ = sess.run([cost_nodes, opt], feed_dict=fd)
         log['cost'].append(all_costs['tot'])
         del fd
