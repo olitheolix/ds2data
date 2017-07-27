@@ -10,7 +10,7 @@ import collections
 import numpy as np
 import tensorflow as tf
 
-from config import AccuracyMetrics
+from config import ErrorMetrics
 
 
 def parseCmdline():
@@ -23,7 +23,7 @@ def parseCmdline():
     return parser.parse_args()
 
 
-def accuracy(gt, pred, mask_cls, mask_bbox):
+def accuracy(gt, pred, mask_bbox, mask_isFg, mask_cls):
     """Return accuracy metrics in a named tuple.
 
     NOTE: the accuracy is always with respect to `mask_cls` and `mask_bbox`.
@@ -35,31 +35,34 @@ def accuracy(gt, pred, mask_cls, mask_bbox):
             Ground truth values.
         pred: Array [:, height, width]
             Contains the network predictions. Must be same size as `gt`
-        mask_cls: Array [height, width]
-            Only non-zero locations will be considered in the tally for
-            correctly predicted labels.
         mask_bbox: Array [height, width]
-            Only non-zero locations will be considered in the error statistics
-            for the 4 BBox parameters (x, y, w, h).
+            The locations that contribute to the BBox error statistics.
+        mask_isFg: Array [height, width]
+            The locations that enter the fg/bg error statistics.
+        mask_cls: Array [height, width]
+            The locations that enter the class label error statistics.
 
     Returns:
         NamedTuple
     """
     # Mask must be 2D and have the same shape. Pred/GT must be 3D and also have
     # the same shape.
-    assert mask_cls.shape == mask_bbox.shape
-    assert mask_cls.ndim == mask_bbox.ndim == 2
+    assert mask_cls.shape == mask_bbox.shape == mask_isFg.shape
+    assert mask_cls.ndim == mask_bbox.ndim == mask_isFg.ndim == 2
     assert pred.ndim == gt.ndim == 3
     assert pred.shape == gt.shape
     assert pred.shape[1:] == mask_cls.shape
 
-    # Flattened vectors will be more convenient.
-    mask_cls = mask_cls.flatten()
-    mask_bbox = mask_bbox.flatten()
-
-    # First 4 dimensions are BBox parameters (x, y, w, h), the remaining ones
-    # are one-hot class labels. Use this to determine how many classes we have.
+    # First 4 dimensions are BBox parameters (x, y, w, h), next 2 are bg/fg
+    # label, and the remaining ones are one-hot class labels. Find out how many
+    # of those there are.
     num_classes = pred.shape[0] - (4 + 2)
+
+    # Flattened vectors will be more convenient.
+    mask_isFg_idx = np.nonzero(mask_isFg.flatten())
+    mask_bbox_idx = np.nonzero(mask_bbox.flatten())
+    mask_cls_idx = np.nonzero(mask_cls.flatten())
+    del mask_bbox, mask_isFg, mask_cls
 
     # Flatten the prediction tensor into (4 + 2 + num_classes, height * width).
     # Then unpack the 4 BBox parameters and one-hot labels.
@@ -68,41 +71,37 @@ def accuracy(gt, pred, mask_cls, mask_bbox):
 
     # Repeat with the ground truth tensor.
     gt = gt.reshape([4 + 2 + num_classes, -1])
-    gt_bbox, gt_isFg, gt_label = gt[:4], gt[4:6], gt[6:]
+    true_bbox, true_isFg, true_label = gt[:4], gt[4:6], gt[6:]
 
-    # Determine the true and predicted label at each location.
-    gt_label = np.argmax(gt_label, axis=0)
-    pred_label = np.argmax(pred_label, axis=0)
-    gt_isFg = np.argmax(gt_isFg, axis=0)
-    pred_isFg = np.argmax(pred_isFg, axis=0)
+    # Determine the background/foreground flag at each location. Only retain
+    # locations permitted by the mask.
+    true_isFg = np.argmax(true_isFg, axis=0)[mask_isFg_idx]
+    pred_isFg = np.argmax(pred_isFg, axis=0)[mask_isFg_idx]
 
-    # Count the correct label predictions at all valid mask positions.
-    valid_idx = np.nonzero(mask_cls)[0]
-    wrong_cls = (gt_label != pred_label)
-    wrong_cls = wrong_cls[valid_idx]
+    # Determine the true and predicted label at each location. Only retain
+    # locations permitted by the mask.
+    true_label = np.argmax(true_label, axis=0)[mask_cls_idx]
+    pred_label = np.argmax(pred_label, axis=0)[mask_cls_idx]
+
+    # Count the wrong foreground class predictions.
+    wrong_cls = np.count_nonzero(true_label == pred_label)
+    wrong_BgFg = np.count_nonzero(true_isFg == pred_isFg)
 
     # False-positive for background: net predicted background but is actually
     # foreground. Similarly for false-positive foreground.
-    gt_bg_idx = set(np.nonzero(gt_label[valid_idx] == 0)[0].tolist())
-    gt_fg_idx = set(np.nonzero(gt_label[valid_idx] != 0)[0].tolist())
-    pred_bg_idx = set(np.nonzero(pred_label[valid_idx] == 0)[0].tolist())
-    pred_fg_idx = set(np.nonzero(pred_label[valid_idx] != 0)[0].tolist())
-    bg_fp = len(pred_bg_idx - gt_bg_idx)
-    fg_fp = len(pred_fg_idx - gt_fg_idx)
-    gt_bg_tot, gt_fg_tot = len(gt_bg_idx), len(gt_fg_idx)
-    del gt_bg_idx, gt_fg_idx, pred_bg_idx, pred_fg_idx
-
-    # Compute label error rate only for foreground shapes (ie ignore background).
-    gt_fg_idx = np.nonzero(gt_label[valid_idx] != 0)[0]
-    fg_err = (gt_label[gt_fg_idx] != pred_label[gt_fg_idx])
-    fg_err = np.count_nonzero(fg_err)
+    falsepos_fg = np.count_nonzero((true_isFg != pred_isFg) & (pred_isFg == 1))
+    falsepos_bg = np.count_nonzero((true_isFg != pred_isFg) & (pred_isFg == 0))
 
     # Compute the L1 error for x, y, w, h of BBoxes. Skip locations without an
     # object because the BBox predictions there are meaningless.
-    idx = np.nonzero(mask_bbox)[0]
-    bbox_err = np.abs(gt_bbox - pred_bbox)
-    bbox_err = bbox_err[:, idx]
-    return AccuracyMetrics(bbox_err, bg_fp, fg_fp, fg_err, gt_bg_tot, gt_fg_tot)
+    bbox_err = np.abs(true_bbox - pred_bbox)
+    bbox_err = bbox_err[:, mask_bbox_idx]
+
+    return ErrorMetrics(
+        bbox_err, wrong_BgFg, wrong_cls,
+        len(mask_isFg_idx[0]), len(mask_cls_idx[0]),
+        falsepos_bg, falsepos_fg
+    )
 
 
 def sampleMasks(is_fg, valid):
@@ -202,7 +201,7 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             fd[g(f'rpcn-{layer_name}-cost/mask_cls:0')] = mask_cls
             fd[g(f'rpcn-{layer_name}-cost/mask_bbox:0')] = mask_bbox
             fd[g(f'rpcn-{layer_name}-cost/mask_isFg:0')] = mask_isfg
-            del rpcn_dim, mask_cls, mask_bbox, layer_name
+            del rpcn_dim, mask_cls, mask_bbox, mask_isfg, layer_name
 
         # Run one optimisation step and record all costs.
         cost_nodes = {'tot': g('cost:0')}
@@ -229,39 +228,34 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             # optimisation step.
             mask_isfg = meta[rpcn_dim].mask_fgbg
             mask_valid = meta[rpcn_dim].mask_valid
-            mask_cls, mask_bbox = sampleMasks(mask_isfg, mask_valid)
+            mask_isfg, mask_bbox = sampleMasks(mask_isfg, mask_valid)
+            mask_cls = mask_bbox
 
-            acc = accuracy(ys[rpcn_dim], pred, mask_cls, mask_bbox)
-            num_bb = acc.bbox_err.shape[1]
+            err = accuracy(ys[rpcn_dim], pred, mask_bbox, mask_isfg, mask_cls)
 
             # Compute maximum/90%/median for the BBox errors. If this features
             # map did not have any BBoxes then report -1. The `bbox_err` shape
             # is (4, N) where N is the number of BBoxes.
-            if num_bb == 0:
-                bb_med = bb_90p = [-1] * 4
+            if np.prod(err.bbox.shape) == 0:
+                bb_50p = bb_90p = -1
             else:
-                tmp = np.sort(acc.bbox_err, axis=1)
-                bb_90p = tmp[:, int(0.9 * num_bb)]
-                bb_med = tmp[:, int(0.5 * num_bb)]
+                tmp = np.sort(err.bbox.flatten())
+                bb_90p = tmp[int(0.9 * len(tmp))]
+                bb_50p = tmp[int(0.5 * len(tmp))]
                 del tmp
 
             # Log training stats. The validation script will use these.
             rpcn_cost = all_costs[rpcn_dim]
-            log['rpcn'][rpcn_dim]['acc'].append(acc)
+            log['rpcn'][rpcn_dim]['acc'].append(err)
             log['rpcn'][rpcn_dim]['cost'].append(rpcn_cost)
 
             # Print progress report to terminal.
-            fp_bg = acc.pred_bg_falsepos
-            fp_fg = acc.pred_fg_falsepos
-            if acc.true_fg_tot == 0:
-                fgcls_err = -1
-            else:
-                fgcls_err = 100 * acc.fgcls_err / acc.true_fg_tot
-            s1 = f'ClsErr={fgcls_err:4.1f}%  '
-            s2 = f'X=({bb_med[0]:2.0f}, {bb_90p[0]:2.0f})  '
-            s3 = f'W=({bb_med[2]:2.0f}, {bb_90p[2]:2.0f})  '
-            s4 = f'FalsePos: FG={fp_fg:2.0f} BG={fp_bg:2.0f}'
-            print(f'  {batch:,}: Cost: {int(rpcn_cost):,}  ' + s1 + s2 + s3 + s4)
+            cls_err = 100 * err.label / err.num_label
+            bgFg_err = 100 * err.BgFg / err.num_BgFg
+            s1 = f'BgFgErr={bgFg_err:4.1f}%  '
+            s2 = f'ClsErr={cls_err:4.1f}%  '
+            s3 = f'X=({bb_50p:2.0f}, {bb_90p:2.0f})  '
+            print(f'  {batch:,}: Cost: {int(rpcn_cost):,}  ' + s1 + s2 + s3)
 
 
 def main():

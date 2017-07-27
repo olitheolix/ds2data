@@ -8,7 +8,7 @@ NetConf = collections.namedtuple(
     ' train_rat num_epochs num_samples path'
 )
 
-AccuracyMetrics = collections.namedtuple(
-    'AccuracyMetrics',
-    'bbox_err pred_bg_falsepos pred_fg_falsepos fgcls_err true_bg_tot true_fg_tot'
+ErrorMetrics = collections.namedtuple(
+    'ErrorMetrics',
+    'bbox BgFg label num_BgFg num_label falsepos_bg falsepos_fg'
 )
