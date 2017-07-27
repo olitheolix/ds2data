@@ -26,7 +26,7 @@ def model(x_in, name, bwt1, bwt2):
         net_out = tf.nn.relu(net_out + b1)
 
         # Convolution layer to learn the BBoxes and class labels.
-        # Shape: [-1, 64, 32, 32] ---> [-1, 4 + num_classes, 64, 64]
+        # Shape: [-1, 64, 32, 32] ---> [-1, 4 + 2 + num_classes, 64, 64]
         # Kernel: 5x5
         b2 = tf.Variable(bwt2[0], trainable=bwt2[2], name='b2')
         W2 = tf.Variable(bwt2[1], trainable=bwt2[2], name='W2')
