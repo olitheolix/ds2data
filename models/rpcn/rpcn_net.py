@@ -142,8 +142,8 @@ def setup(fname, x_in, num_classes, filter_size, ft_out_dims, trainable):
 
         W1_dim = (3, 3, num_features_in, num_features_out)
         b1_dim = (num_features_out, 1, 1)
-        W2_dim = (filter_size, filter_size, num_features_out, 4 + num_classes)
-        b2_dim = (4 + num_classes, 1, 1)
+        W2_dim = (filter_size, filter_size, num_features_out, 4 + 2 + num_classes)
+        b2_dim = (4 + 2 + num_classes, 1, 1)
 
         if fname is None:
             b1 = 0.5 + np.zeros(b1_dim).astype(dtype)
