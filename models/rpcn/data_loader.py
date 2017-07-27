@@ -349,30 +349,40 @@ class BBox(DataSet):
     def compileTrainingOutput(self, training_data, ft_dims, num_classes):
         # Allocate the array for the expected network outputs (one for each
         # feature dimension size).
-        y = {_: np.zeros((4 + num_classes, *_)) for _ in ft_dims}
+        y_out = {_: np.zeros((1, 4 + 2 + num_classes, *_)) for _ in ft_dims}
         meta = {}
 
         # Populate the training output with the BBox data and one-hot-label.
         for ft_dim in ft_dims:
+            y = y_out[ft_dim]
+
             # Unpack pixel labels.
             lap = training_data[ft_dim]['label_at_pixel']
+            bbox_rects = training_data[ft_dim]['bboxes']
             assert lap.dtype == np.int32 and lap.shape == ft_dim
             assert 0 <= np.amin(lap) <= np.amax(lap) < num_classes
 
-            # Copy BBox data into expected network output.
-            y[ft_dim][:4] = training_data[ft_dim]['bboxes']
-
             # Convert integer label to one-hot-label.
+            isFg_hot = np.zeros((2, *ft_dim))
+            cls_label_hot = np.zeros((num_classes, *ft_dim))
             for fy in range(ft_dim[0]):
                 for fx in range(ft_dim[1]):
-                    y[ft_dim][4 + lap[fy, fx], fy, fx] = 1
+                    if lap[fy, fx] == 0:
+                        isFg_hot[0, fy, fx] = 1
+                    else:
+                        isFg_hot[1, fy, fx] = 1
+                    cls_label_hot[lap[fy, fx], fy, fx] = 1
+
+            y = feature_compiler.setBBoxRects(y, bbox_rects)
+            y = feature_compiler.setIsFg(y, isFg_hot)
+            y = feature_compiler.setClassLabel(y, cls_label_hot)
 
             meta[ft_dim] = self.MetaData(
                 filename=None,
                 mask_fgbg=training_data[ft_dim]['mask_fgbg'],
                 mask_bbox=training_data[ft_dim]['mask_bbox'],
-                mask_fg_label=training_data[ft_dim]['mask_fg_label'],
                 mask_valid=training_data[ft_dim]['mask_valid'],
+                mask_fg_label=training_data[ft_dim]['mask_fg_label'],
             )
 
             # Sanity check: masks must be binary with correct shape.
@@ -381,5 +391,5 @@ class BBox(DataSet):
                 assert tmp.dtype == np.uint8, field
                 assert tmp.shape == ft_dim, field
                 assert set(np.unique(tmp)).issubset({0, 1}), field
-
-        return y, meta
+            y_out[ft_dim] = y[0]
+        return y_out, meta
