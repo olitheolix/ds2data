@@ -320,7 +320,7 @@ def main():
             # Save the network state and log data.
             rpcn_net.save(fnames['rpcn_net'], sess, conf.rpcn_out_dims)
             shared_net.save(fnames['shared_net'], sess)
-            conf = conf._replace(num_epochs=epoch + 1)
+            conf = conf._replace(num_epochs=epoch + epoch_ofs)
             log['conf'] = conf
             meta = {'conf': conf, 'int2name': int2name, 'log': log}
             pickle.dump(meta, open(fnames['meta'], 'wb'))
