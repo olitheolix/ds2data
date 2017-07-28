@@ -224,6 +224,7 @@ def setBBoxRects(y, val):
 
 
 def getBBoxRects(y):
+    assert y.ndim == 3
     return y[:4]
 
 
@@ -236,6 +237,7 @@ def setIsFg(y, val):
 
 
 def getIsFg(y):
+    assert y.ndim == 3
     return y[4:6]
 
 
@@ -248,6 +250,7 @@ def setClassLabel(y, val):
 
 
 def getClassLabel(y):
+    assert y.ndim == 3
     return y[6:]
 
 
@@ -263,6 +266,7 @@ def downsampleMatrix(mat, ft_dim):
 
 def unpackBBoxes(im_dim, bb_rects, bb_labels):
     ft_dim = bb_labels.shape[:2]
+    assert np.array(bb_labels).ndim == 2
     assert bb_rects.shape == (4, *ft_dim)
 
     # Find all locations that are *not* background, ie every location where the
