@@ -45,14 +45,14 @@ def _crossEnt(logits, labels, name=None):
 def cost(y_pred):
     dtype = y_pred.dtype
     y_dim = y_pred.shape.as_list()
-    ft_height, ft_width = y_dim[2:]
-    mask_dim = (ft_height, ft_width)
+    mask_dim = y_dim[2:]
+    ft_height, ft_width = mask_dim
     name = f'{ft_height}x{ft_width}'
-    del ft_height, ft_width
 
     num_cls = feature_compiler.getNumClassesFromY(y_dim)
-    scale_isFg, scale_cls = np.log(np.array([2, num_cls], np.float32))
-    scale_bbox = 1.0
+    scale_isFg, scale_cls = 1 / np.log(np.array([2, num_cls], np.float32))
+    scale_bbox = 1 / ft_height
+    del ft_height, ft_width, y_dim
 
     with tf.variable_scope(f'rpcn-{name}-cost'):
         # Placeholder for ground truth data.
@@ -99,9 +99,9 @@ def cost(y_pred):
         cost_cls = tf.reduce_mean(cost_cls)
 
         # Normalise the costs.
-        cost_bbox = tf.divide(cost_bbox, scale_bbox, name='bbox')
-        cost_isFg = tf.divide(cost_isFg, scale_isFg, name='isFg')
-        cost_cls = tf.divide(cost_cls, scale_cls, name='cls')
+        cost_bbox = tf.multiply(cost_bbox, scale_bbox, name='bbox')
+        cost_isFg = tf.multiply(cost_isFg, scale_isFg, name='isFg')
+        cost_cls = tf.multiply(cost_cls, scale_cls, name='cls')
 
         # Compute final scalar cost.
         return tf.add_n([cost_bbox, cost_isFg, cost_cls], name='total')

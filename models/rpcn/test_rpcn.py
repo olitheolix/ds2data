@@ -229,6 +229,8 @@ class TestCost:
         it over the 4 BBox coordinates. In other words, the input BBox
         tensor has shape [4, height, width] and the output [height, width].
         """
+        ft_height = y_pred.shape[2]
+
         g = tf.get_default_graph().get_tensor_by_name
         cost = g('rpcn-2x2-cost/bbox:0')
         cost_full = g('rpcn-2x2-cost/bbox_full:0')
@@ -245,7 +247,10 @@ class TestCost:
         ref = np.abs(getBBoxRects(y_pred) - getBBoxRects(y_true))
         ref = np.sum(ref, axis=0)
         assert np.allclose(out_full, ref, 0, 1E-4)
-        assert np.allclose(np.mean(ref * mask), out)
+
+        # Average and scale all active costs.
+        ref = np.mean(ref * mask) / ft_height
+        assert np.abs(ref - out) < 1E-4
         return out
 
     def test_cost_BBox(self):
