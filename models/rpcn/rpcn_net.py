@@ -9,6 +9,7 @@ correspond to a larger receptive field (the filter sizes are identical in all
 RPCN layers)
 """
 import pickle
+import feature_compiler
 import numpy as np
 import tensorflow as tf
 
@@ -43,10 +44,15 @@ def _crossEnt(logits, labels, name=None):
 
 def cost(y_pred):
     dtype = y_pred.dtype
-    chan, ft_height, ft_width = y_pred.shape.as_list()[1:]
+    y_dim = y_pred.shape.as_list()
+    ft_height, ft_width = y_dim[2:]
     mask_dim = (ft_height, ft_width)
     name = f'{ft_height}x{ft_width}'
-    del chan, ft_height, ft_width
+    del ft_height, ft_width
+
+    num_cls = feature_compiler.getNumClassesFromY(y_dim)
+    scale_isFg, scale_cls = np.log(np.array([2, num_cls], np.float32))
+    scale_bbox = 1.0
 
     with tf.variable_scope(f'rpcn-{name}-cost'):
         # Placeholder for ground truth data.
@@ -88,9 +94,14 @@ def cost(y_pred):
         # Reduce all cost tensors to cost scalars.
         # In:  [1, 128, 128]
         # Out: [1]
-        cost_bbox = tf.reduce_mean(cost_bbox, name='bbox')
-        cost_isFg = tf.reduce_mean(cost_isFg, name='isFg')
-        cost_cls = tf.reduce_mean(cost_cls, name='cls')
+        cost_bbox = tf.reduce_mean(cost_bbox)
+        cost_isFg = tf.reduce_mean(cost_isFg)
+        cost_cls = tf.reduce_mean(cost_cls)
+
+        # Normalise the costs.
+        cost_bbox = tf.divide(cost_bbox, scale_bbox, name='bbox')
+        cost_isFg = tf.divide(cost_isFg, scale_isFg, name='isFg')
+        cost_cls = tf.divide(cost_cls, scale_cls, name='cls')
 
         # Compute final scalar cost.
         return tf.add_n([cost_bbox, cost_isFg, cost_cls], name='total')

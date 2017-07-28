@@ -143,7 +143,10 @@ class TestCost:
         # Compute expected cost value with NumPy and compare.
         ref = self.crossEnt(getIsFg(y_pred), getIsFg(y_true))
         assert np.allclose(out_full, ref, 0, 1E-4)
-        assert np.allclose(np.mean(ref * mask), out)
+
+        # Average and scale all active costs.
+        ref = np.mean(ref * mask) / np.log(2)
+        assert np.abs(ref - out) < 1E-4
         return out
 
     def test_cost_isForeground(self):
@@ -191,7 +194,10 @@ class TestCost:
         # Compute expected cost value with NumPy and compare.
         ref = self.crossEnt(getClassLabel(y_pred), getClassLabel(y_true))
         assert np.allclose(out_full, ref, 0, 1E-4)
-        assert np.allclose(np.mean(ref * mask), out)
+
+        # Average and scale all active costs.
+        ref = np.mean(ref * mask) / np.log(self.num_classes)
+        assert np.abs(ref - out) < 1E-4
         return out
 
     def test_cost_classLabels(self):
