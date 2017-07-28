@@ -293,9 +293,9 @@ class TestCost:
             cls_fg = np.random.randint(0, 2, (2, *self.ft_dim))
             cls_labels = np.random.randint(0, num_cls, (num_cls, *self.ft_dim))
             bbox_rects = np.random.uniform(0, 512, (4, *self.ft_dim))
-            y_true = setIsFg(y_pred, cls_fg)
-            y_true = setClassLabel(y_pred, cls_labels)
-            y_true = setBBoxRects(y_pred, bbox_rects)
+            y_true = setIsFg(y_true, cls_fg)
+            y_true = setClassLabel(y_true, cls_labels)
+            y_true = setBBoxRects(y_true, bbox_rects)
 
             # Verify the constituent costs.
             c0 = self._checkBBoxCost(y_pred, y_true, mask_bbox)
