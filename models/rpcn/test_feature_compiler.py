@@ -32,10 +32,10 @@ class TestFeatureCompiler:
         num_classes = 10
 
         # Allocate empty feature tensor and random BBox tensor.
-        y = np.zeros((1, 4 + 2 + num_classes, *ft_dim))
+        y = np.zeros((4 + 2 + num_classes, *ft_dim))
         bbox = np.random.random((4, *ft_dim))
 
-        # Assign the BBox data and ensure the original array was not modified.
+        # Assign BBox data. Ensure the original array was not modified.
         y2 = setBBoxRects(y, bbox)
         assert np.array_equal(y, np.zeros_like(y))
 
@@ -49,7 +49,7 @@ class TestFeatureCompiler:
         num_classes = 10
 
         # Allocate empty feature tensor and random BBox tensor.
-        y = np.zeros((1, 4 + 2 + num_classes, *ft_dim))
+        y = np.zeros((4 + 2 + num_classes, *ft_dim))
         isFg = np.random.random((2, *ft_dim))
 
         # Assign the BBox data and ensure the original array was not modified.
@@ -66,7 +66,7 @@ class TestFeatureCompiler:
         num_classes = 10
 
         # Allocate empty feature tensor and random BBox tensor.
-        y = np.zeros((1, 4 + 2 + num_classes, *ft_dim))
+        y = np.zeros((4 + 2 + num_classes, *ft_dim))
         class_labels = np.random.random((num_classes, *ft_dim))
 
         # Assign the BBox data and ensure the original array was not modified.
@@ -85,7 +85,7 @@ class TestFeatureCompiler:
         num_classes = 10
 
         # Allocate empty feature tensor and random BBox tensor.
-        y = np.zeros((1, 4 + 2 + num_classes, *ft_dim))
+        y = np.zeros((4 + 2 + num_classes, *ft_dim))
 
         # Wrong shape: too few classes.
         with pytest.raises(AssertionError):
@@ -107,7 +107,7 @@ class TestFeatureCompiler:
         false_dims = [
             (0, 4 + 2 + num_classes, *ft_dim),
             (2, 4 + 2 + num_classes, *ft_dim),
-            (4 + 2 + num_classes, *ft_dim),
+            (4 + 2 + num_classes, 10),
         ]
         class_labels = np.random.random((num_classes, *ft_dim))
         for false_dim in false_dims:

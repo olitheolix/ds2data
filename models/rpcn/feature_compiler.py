@@ -217,38 +217,38 @@ def sampleMasks(m_valid, m_isFg, m_bbox, m_cls, N):
 
 def setBBoxRects(y, val):
     y = np.array(y)
-    assert y.ndim == 4 and y.shape[0] == 1
-    assert np.array(val).shape == y[0, :4].shape
-    y[0, :4] = val
+    assert y.ndim == 3
+    assert np.array(val).shape == y[:4].shape
+    y[:4] = val
     return y
 
 
 def getBBoxRects(y):
-    return y[0, :4]
+    return y[:4]
 
 
 def setIsFg(y, val):
     y = np.array(y)
-    assert y.ndim == 4 and y.shape[0] == 1
-    assert np.array(val).shape == y[0, 4:6].shape, np.array(val).shape
-    y[0, 4:6] = val
+    assert y.ndim == 3
+    assert np.array(val).shape == y[4:6].shape
+    y[4:6] = val
     return y
 
 
 def getIsFg(y):
-    return y[0, 4:6]
+    return y[4:6]
 
 
 def setClassLabel(y, val):
     y = np.array(y)
-    assert y.ndim == 4 and y.shape[0] == 1
-    assert np.array(val).shape == y[0, 6:].shape
-    y[0, 6:] = val
+    assert y.ndim == 3
+    assert np.array(val).shape == y[6:].shape
+    y[6:] = val
     return y
 
 
 def getClassLabel(y):
-    return y[0, 6:]
+    return y[6:]
 
 
 def downsampleMatrix(mat, ft_dim):
