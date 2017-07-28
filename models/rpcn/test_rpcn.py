@@ -301,14 +301,14 @@ class TestCost:
 
             # Verify the constituent costs.
             c0 = self._checkBBoxCost(y_pred, y_true, mask_bbox)
-            c1 = self._checkIsClassCost(y_pred, y_true, mask_cls)
-            c2 = self._checkIsForegroundCost(y_pred, y_true, mask_isFg)
+            c1 = self._checkIsForegroundCost(y_pred, y_true, mask_isFg)
+            c2 = self._checkIsClassCost(y_pred, y_true, mask_cls)
 
             # Compute the total cost with NumPy.
             np_cost = c0 + c1 + c2
 
-            # Get the cost node and verify that the one fetched by name matches
-            # the one returned by the cost creation function.
+            # Fetch the cost node by name and verify that it is, in fact, the
+            # one returned by the cost creation function.
             g = tf.get_default_graph().get_tensor_by_name
             cost = g('rpcn-2x2-cost/total:0')
             assert cost is self.total_cost
