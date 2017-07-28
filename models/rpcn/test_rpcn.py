@@ -272,6 +272,7 @@ class TestCost:
 
         # Convenience
         num_cls = self.num_classes
+        np.random.seed(0)
 
         # Test several random inputs.
         for i in range(10):
