@@ -141,7 +141,7 @@ class TestCost:
         out_full = out_full[0]
 
         # Compute expected cost value with NumPy and compare.
-        ref = self.crossEnt(getIsFg(y_pred), getIsFg(y_true))
+        ref = self.crossEnt(getIsFg(y_pred[0]), getIsFg(y_true[0]))
         assert np.allclose(out_full, ref, 0, 1E-4)
 
         # Average and scale all active costs.
@@ -165,13 +165,13 @@ class TestCost:
         assert cls_fg.shape == (2, *self.ft_dim)
 
         # Perfect estimate: the true and predicted labels match.
-        y_pred = setIsFg(y_pred, cls_fg)
+        y_pred[0] = setIsFg(y_pred[0], cls_fg)
         y_true = np.array(y_pred)
         self._checkIsForegroundCost(y_pred, y_true, mask)
 
         # Imperfect estimate: the predicted labels are random.
         dim = (2, *self.ft_dim)
-        y_pred = setIsFg(y_pred, np.random.uniform(-1, 2, dim))
+        y_pred[0] = setIsFg(y_pred[0], np.random.uniform(-1, 2, dim))
         self._checkIsForegroundCost(y_pred, y_true, mask)
 
     def _checkIsClassCost(self, y_pred, y_true, mask):
@@ -192,7 +192,7 @@ class TestCost:
         out_full = out_full[0]
 
         # Compute expected cost value with NumPy and compare.
-        ref = self.crossEnt(getClassLabel(y_pred), getClassLabel(y_true))
+        ref = self.crossEnt(getClassLabel(y_pred[0]), getClassLabel(y_true[0]))
         assert np.allclose(out_full, ref, 0, 1E-4)
 
         # Average and scale all active costs.
@@ -214,12 +214,12 @@ class TestCost:
         cls_labels = np.random.randint(0, self.num_classes, dim)
 
         # Perfect estimate: the true and predicted labels match.
-        y_pred = setClassLabel(y_pred, cls_labels)
+        y_pred[0] = setClassLabel(y_pred[0], cls_labels)
         y_true = np.array(y_pred)
         self._checkIsClassCost(y_pred, y_true, mask)
 
         # Imperfect estimate: the predicted labels are random.
-        y_pred = setClassLabel(y_pred, np.random.uniform(-1, 2, dim))
+        y_pred[0] = setClassLabel(y_pred[0], np.random.uniform(-1, 2, dim))
         self._checkIsClassCost(y_pred, y_true, mask)
 
     def _checkBBoxCost(self, y_pred, y_true, mask):
@@ -244,7 +244,7 @@ class TestCost:
         out_full = out_full[0]
 
         # Compute expected cost value with NumPy and compare.
-        ref = np.abs(getBBoxRects(y_pred) - getBBoxRects(y_true))
+        ref = np.abs(getBBoxRects(y_pred[0]) - getBBoxRects(y_true[0]))
         ref = np.sum(ref, axis=0)
         assert np.allclose(out_full, ref, 0, 1E-4)
 
@@ -267,12 +267,12 @@ class TestCost:
         bbox_rects = np.random.uniform(0, 512, dim)
 
         # Perfect estimate: the true and predicted labels match.
-        y_pred = setBBoxRects(y_pred, bbox_rects)
+        y_pred[0] = setBBoxRects(y_pred[0], bbox_rects)
         y_true = np.array(y_pred)
         self._checkBBoxCost(y_pred, y_true, mask)
 
         # Imperfect estimate: the predicted BBox corners are random.
-        y_pred = setBBoxRects(y_pred, np.random.uniform(0, 512, dim))
+        y_pred[0] = setBBoxRects(y_pred[0], np.random.uniform(0, 512, dim))
         self._checkBBoxCost(y_pred, y_true, mask)
 
     def test_total_cost(self):
@@ -296,9 +296,9 @@ class TestCost:
             cls_fg = np.random.uniform(-10, 10, (2, *self.ft_dim))
             cls_labels = np.random.uniform(-10, 10, (num_cls, *self.ft_dim))
             bbox_rects = np.random.uniform(0, 512, (4, *self.ft_dim))
-            y_pred = setIsFg(y_pred, cls_fg)
-            y_pred = setClassLabel(y_pred, cls_labels)
-            y_pred = setBBoxRects(y_pred, bbox_rects)
+            y_pred[0] = setIsFg(y_pred[0], cls_fg)
+            y_pred[0] = setClassLabel(y_pred[0], cls_labels)
+            y_pred[0] = setBBoxRects(y_pred[0], bbox_rects)
 
             # Create random ground truth.
             cls_fg = np.random.randint(0, 2, self.ft_dim)
@@ -306,9 +306,9 @@ class TestCost:
             cls_fg = feature_compiler.oneHotEncoder(cls_fg, 2)
             cls_labels = feature_compiler.oneHotEncoder(cls_labels, num_cls)
             bbox_rects = np.random.uniform(0, 512, (4, *self.ft_dim))
-            y_true = setIsFg(y_true, cls_fg)
-            y_true = setClassLabel(y_true, cls_labels)
-            y_true = setBBoxRects(y_true, bbox_rects)
+            y_true[0] = setIsFg(y_true[0], cls_fg)
+            y_true[0] = setClassLabel(y_true[0], cls_labels)
+            y_true[0] = setBBoxRects(y_true[0], bbox_rects)
 
             # Verify the constituent costs.
             c0 = self._checkBBoxCost(y_pred, y_true, mask_bbox)
