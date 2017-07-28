@@ -290,8 +290,10 @@ class TestCost:
             y_pred = setBBoxRects(y_pred, bbox_rects)
 
             # Create random ground truth.
-            cls_fg = np.random.randint(0, 2, (2, *self.ft_dim))
-            cls_labels = np.random.randint(0, num_cls, (num_cls, *self.ft_dim))
+            cls_fg = np.random.randint(0, 2, self.ft_dim)
+            cls_labels = np.random.randint(0, num_cls, self.ft_dim)
+            cls_fg = feature_compiler.oneHotEncoder(cls_fg, 2)
+            cls_labels = feature_compiler.oneHotEncoder(cls_labels, num_cls)
             bbox_rects = np.random.uniform(0, 512, (4, *self.ft_dim))
             y_true = setIsFg(y_true, cls_fg)
             y_true = setClassLabel(y_true, cls_labels)
