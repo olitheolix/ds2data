@@ -1,5 +1,4 @@
 import os
-import random
 import pickle
 import config
 import rpcn_net
@@ -7,6 +6,7 @@ import argparse
 import shared_net
 import data_loader
 import collections
+import feature_compiler
 import numpy as np
 import tensorflow as tf
 
@@ -105,51 +105,6 @@ def accuracy(gt, pred, mask_bbox, mask_isFg, mask_cls):
     )
 
 
-def sampleMasks(is_fg, valid):
-    assert is_fg.shape == valid.shape
-    assert is_fg.ndim == 2
-    assert is_fg.dtype == valid.dtype == np.uint8
-    assert set(np.unique(is_fg)).issubset({0, 1})
-    assert set(np.unique(valid)).issubset({0, 1})
-
-    # Backup the matrix dimension, then flatten the array (more convenient to
-    # work with here).
-    dim = is_fg.shape
-    is_fg = is_fg.flatten()
-    valid = valid.flatten()
-
-    # Background is everything that is not foreground.
-    is_bg = 1 - is_fg
-
-    # Find all fg/bg locations that are valid.
-    is_fg = is_fg * valid
-    is_bg = is_bg * valid
-    idx_fg = np.nonzero(is_fg)[0].tolist()
-    idx_bg = np.nonzero(is_bg)[0].tolist()
-
-    # Sample up to 100 FG and BG locations.
-    if len(idx_bg) > 100:
-        idx_bg = random.sample(idx_bg, 100)
-    if len(idx_fg) > 100:
-        idx_fg = random.sample(idx_fg, 100)
-
-    # Allocate output arrays.
-    mask_cls = np.zeros(is_fg.shape, np.float16)
-    mask_bbox = np.zeros_like(mask_cls)
-
-    # The `mask_cls` denotes all locations for which we want to estimate the
-    # label. As such, it must contain foreground- and background regions. The
-    # BBox mask, on the other hand, must only contain the foreground region
-    # because there would be nothing to estimate otherwise.
-    mask_cls[idx_fg] = 1
-    mask_cls[idx_bg] = 1
-    mask_bbox[idx_fg] = 1
-
-    mask_cls = mask_cls.reshape(dim)
-    mask_bbox = mask_bbox.reshape(dim)
-    return mask_cls, mask_bbox
-
-
 def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
     """Train network for one full epoch of data in `ds`.
 
@@ -163,6 +118,7 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
         lrate: float
             Learning rate for this epoch.
     """
+    sampleMasks = feature_compiler.sampleMasks
     g = tf.get_default_graph().get_tensor_by_name
 
     # Get missing placeholder variables.
@@ -191,18 +147,22 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
         # Compile the feed dictionary so that we can train all RPCNs.
         fd = {x_in: np.expand_dims(img, 0), lrate_in: lrate}
         for rpcn_dim in rpcn_dims:
-            mask_isfg = meta[rpcn_dim].mask_fgbg
-            mask_valid = meta[rpcn_dim].mask_valid
-            mask_cls, mask_bbox = sampleMasks(mask_isfg, mask_valid)
+            m_bbox, m_isFg, m_cls = sampleMasks(
+                meta[rpcn_dim].mask_valid,
+                meta[rpcn_dim].mask_fgbg,
+                meta[rpcn_dim].mask_bbox,
+                meta[rpcn_dim].mask_fg_label,
+                500
+            )
 
             # Fetch the variables and assign them the current values. We need
             # to add the batch dimensions for Tensorflow.
             layer_name = f'{rpcn_dim[0]}x{rpcn_dim[1]}'
             fd[g(f'rpcn-{layer_name}-cost/y_true:0')] = np.expand_dims(ys[rpcn_dim], 0)
-            fd[g(f'rpcn-{layer_name}-cost/mask_cls:0')] = mask_cls
-            fd[g(f'rpcn-{layer_name}-cost/mask_bbox:0')] = mask_bbox
-            fd[g(f'rpcn-{layer_name}-cost/mask_isFg:0')] = mask_isfg
-            del rpcn_dim, mask_cls, mask_bbox, mask_isfg, layer_name
+            fd[g(f'rpcn-{layer_name}-cost/mask_cls:0')] = m_cls
+            fd[g(f'rpcn-{layer_name}-cost/mask_bbox:0')] = m_bbox
+            fd[g(f'rpcn-{layer_name}-cost/mask_isFg:0')] = m_isFg
+            del rpcn_dim, m_cls, m_bbox, m_isFg, layer_name
 
         # Run one optimisation step and record all costs.
         cost_nodes = {'tot': g('cost:0')}
@@ -231,12 +191,15 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             # Randomly sample another set of masks. This ensures that will
             # predict on (mostly) different positions than during the
             # optimisation step.
-            mask_isfg = meta[rpcn_dim].mask_fgbg
-            mask_valid = meta[rpcn_dim].mask_valid
-            mask_isfg, mask_bbox = sampleMasks(mask_isfg, mask_valid)
-            mask_cls = mask_bbox
+            mask_bbox, mask_isFg, mask_cls = sampleMasks(
+                meta[rpcn_dim].mask_valid,
+                meta[rpcn_dim].mask_fgbg,
+                meta[rpcn_dim].mask_bbox,
+                meta[rpcn_dim].mask_fg_label,
+                500
+            )
 
-            err = accuracy(ys[rpcn_dim], pred, mask_bbox, mask_isfg, mask_cls)
+            err = accuracy(ys[rpcn_dim], pred, mask_bbox, mask_isFg, mask_cls)
 
             # Compute maximum/90%/median for the BBox errors. If this features
             # map did not have any BBoxes then report -1. The `bbox_err` shape
@@ -259,7 +222,7 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             cost_bbox = rpcn_cost['bbox']
             cost_isFg = rpcn_cost['isFg']
             cost_cls = rpcn_cost['cls']
-            s0 = f'BgFg={cost_isFg:5.2e}  Cls={cost_cls:5.2e}  BBox={cost_bbox:5.2f}  '
+            s0 = f'BgFg={cost_isFg:5.2f}  Cls={cost_cls:5.2f}  BBox={cost_bbox:5.2f}  '
             s1 = f'BgFg={bgFg_err:4.1f}%  '
             s2 = f'Cls={cls_err:4.1f}%  '
             s3 = f'BBox=({bb_50p:2.0f}, {bb_90p:2.0f})  '
