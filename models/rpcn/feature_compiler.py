@@ -12,6 +12,7 @@ import sys
 import glob
 import tqdm
 import json
+import random
 import pickle
 import argparse
 import multiprocessing
@@ -136,6 +137,82 @@ def getNumClassesFromY(y_dim):
     """
     assert len(y_dim) == 4 and y_dim[0] == 1 and y_dim[1] > 4 + 2
     return y_dim[1] - 6
+
+
+def sampleMasks(m_valid, m_isFg, m_bbox, m_cls, N):
+    """ Return binary valued masks with valid locations for each type.
+
+    All returned masks except the one for foreground/background estimation will
+    have N active pixels (fewer if there were less than N to begin with).
+    The FGBG will have up to 2N activate pixels, namely at most N pixels that
+    are active over foreground and background, respectively.
+
+    NOTE: all input masks must have the same 2D shape.
+
+    Inputs:
+        m_valid: 2D Array
+            Indicate the locations to consider for the masks.
+        m_isFg: 2D Array
+            Indicate the locations with foreground objects.
+        m_bbox: 2D Array
+            Indicate the locations where BBox estimation is possible.
+        m_cls: 2D Array
+            Indicate the locations were class label estimation is possible.
+        N: int
+            Number of locations to sample for each mask.
+
+    Returns:
+        mask_bbox: 2D Array
+            BBox mask with up to N active pixels.
+        mask_fgbg: 2D Array
+            Fg/Bg mask with up to 2N active pixels. Of these 2N pixels, up to N
+            will mark a foreground location, and up to another N a background
+            location.
+        mask_cls: 2D Array
+            Mask with up to N active pixels where estimating the foreground
+            class (eg cube number) is possible.
+    """
+    assert N > 0
+    assert m_valid.ndim == 2
+    assert m_valid.shape == m_isFg.shape == m_bbox.shape == m_cls.shape
+
+    # Backup the input dimension because we will flatten the arrays afterwards
+    # since it is easier to work with vectors.
+    dim = m_valid.shape
+    out_fgbg = np.zeros_like(m_isFg).flatten()
+    out_bbox = np.zeros_like(m_bbox).flatten()
+    out_cls = np.zeros_like(m_cls).flatten()
+
+    # Remove all the locations prohibited by the 'valid' mask.
+    bbox = ((m_valid * m_bbox).flatten())
+    labl = ((m_valid * m_cls).flatten())
+    isFg = ((m_valid * m_isFg).flatten())
+    isBg = ((m_valid * (1 - m_isFg)).flatten())
+
+    # BBox: sample subset of the valid positions.
+    ix_bbox = np.nonzero(bbox)[0].tolist()
+    ix_bbox = ix_bbox if len(ix_bbox) <= N else random.sample(ix_bbox, N)
+    out_bbox[ix_bbox] = 1
+
+    # Class: sample subset of the valid positions.
+    ix_cls = np.nonzero(labl)[0].tolist()
+    ix_cls = ix_cls if len(ix_cls) <= N else random.sample(ix_cls, N)
+    out_cls[ix_cls] = 1
+
+    # Foreground, background: need to find N valid foreground locations, and
+    # another N valid background locations.
+    ix_fg = np.nonzero(isFg)[0].tolist()
+    ix_bg = np.nonzero(isBg)[0].tolist()
+    ix_fg = ix_fg if len(ix_fg) <= N else random.sample(ix_fg, N)
+    ix_bg = ix_bg if len(ix_bg) <= N else random.sample(ix_bg, N)
+    out_fgbg[ix_fg] = 1
+    out_fgbg[ix_bg] = 1
+
+    # Restore the original matrix shapes and return them.
+    out_bbox = out_bbox.reshape(dim)
+    out_fgbg = out_fgbg.reshape(dim)
+    out_cls = out_cls.reshape(dim)
+    return out_bbox, out_fgbg, out_cls
 
 
 def setBBoxRects(y, val):

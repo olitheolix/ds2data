@@ -1,3 +1,4 @@
+import random
 import pytest
 import numpy as np
 import feature_compiler
@@ -180,3 +181,33 @@ class TestFeatureCompiler:
 
         with pytest.raises(AssertionError):
             fun((1, 4 + 2, 64, 64))
+
+    def test_sampleMasks(self):
+        """Use a tiny test matrix that is easy to verify manually."""
+        random.seed(0)
+        np.random.seed(0)
+        sampleMasks = feature_compiler.sampleMasks
+
+        mask_valid = np.zeros((1, 4), np.uint8)
+        mask_fgbg = np.zeros_like(mask_valid)
+        mask_bbox = np.zeros_like(mask_valid)
+        mask_cls = np.zeros_like(mask_valid)
+
+        # Rows 0-3 are valid, rows 0-1 & 4-5 are suitable for FG/BG estimation,
+        # rows 0 & 4 are suitable for BBox estimation and, finally, rows 1 & 5
+        # are suitable for class estimation (eg the cube number).
+        mask_valid[0] = [1, 1, 0, 0]
+        mask_fgbg[0] = [1, 0, 1, 0]
+        mask_bbox[0] = [1, 0, 1, 0]
+        mask_cls[0] = [0, 1, 1, 0]
+
+        for N in [1, 20]:
+            ret = sampleMasks(mask_valid, mask_fgbg, mask_bbox, mask_cls, N)
+            sm_bbox, sm_isFg, sm_cls = ret
+            assert sm_bbox.shape == sm_isFg.shape == sm_cls.shape == mask_valid.shape
+            assert sm_bbox.dtype == sm_isFg.dtype == sm_cls.dtype == mask_valid.dtype
+
+            # FGBG mask must be a subset of valid m_fgbg.
+            assert sm_bbox[0].tolist() == [1, 0, 0, 0]
+            assert sm_cls[0].tolist() == [0, 1, 0, 0]
+            assert sm_isFg[0].tolist() == [1, 1, 0, 0]
