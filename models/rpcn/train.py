@@ -305,7 +305,7 @@ def main():
 
     # Create the input variable, the shared network and the RPCN.
     lrate_in = tf.placeholder(tf.float32, name='lrate')
-    x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
+    x_in = tf.placeholder(tf_dtype, [1, *im_dim], name='x_in')
     shared_out = shared_net.setup(None, x_in, conf.num_pools_shared, True)
     rpcn_out = rpcn_net.setup(
         None, shared_out, len(int2name),
