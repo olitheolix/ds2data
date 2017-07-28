@@ -219,14 +219,21 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             # Print progress report to terminal.
             cls_err = 100 * err.label / err.num_label
             bgFg_err = 100 * err.BgFg / err.num_BgFg
-            cost_bbox = rpcn_cost['bbox']
-            cost_isFg = rpcn_cost['isFg']
-            cost_cls = rpcn_cost['cls']
-            s0 = f'BgFg={cost_isFg:5.2f}  Cls={cost_cls:5.2f}  BBox={cost_bbox:5.2f}  '
-            s1 = f'BgFg={bgFg_err:4.1f}%  '
-            s2 = f'Cls={cls_err:4.1f}%  '
-            s3 = f'BBox=({bb_50p:2.0f}, {bb_90p:2.0f})  '
-            print(f'  {batch:,}: Cost: ' + s0 + ' Err: ' + s1 + s2 + s3)
+            cost_bbox = int(rpcn_cost["bbox"])
+            cost_isFg = int(rpcn_cost["isFg"])
+            cost_cls = int(rpcn_cost["cls"])
+            s1 = f'BgFg={cost_isFg:6,}'
+            s2 = f'Cls={cost_cls:6,}'
+            s3 = f'BBox={cost_bbox:6,}'
+            s_cost = str.join('  ', [s1, s2, s3])
+
+            s1 = f'BgFg={bgFg_err:4.1f}%'
+            s2 = f'Cls={cls_err:4.1f}%'
+            s3 = f'BBox=({bb_50p:2.0f}, {bb_90p:2.0f})'
+            s_err = str.join('  ', [s1, s2, s3])
+
+            fname = os.path.split(meta[rpcn_dim].filename)[-1]
+            print(f'  {batch:,} | {fname} | ' + s_cost + ' | ' + s_err)
 
 
 def main():
