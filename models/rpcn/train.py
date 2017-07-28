@@ -64,8 +64,8 @@ def accuracy(gt, pred, mask_bbox, mask_isFg, mask_cls):
     mask_cls_idx = np.nonzero(mask_cls.flatten())
     del mask_bbox, mask_isFg, mask_cls
 
-    # Flatten the prediction tensor into (4 + 2 + num_classes, height * width).
-    # Then unpack the 4 BBox parameters and one-hot labels.
+    # Flatten the predicted tensor into (4 + 2 + num_classes, height * width).
+    # Then unpack the BBox parameters and one-hot labels.
     pred = pred.reshape([4 + 2 + num_classes, -1])
     pred_bbox, pred_isFg, pred_label = pred[:4], pred[4:6], pred[6:]
 
@@ -95,13 +95,17 @@ def accuracy(gt, pred, mask_bbox, mask_isFg, mask_cls):
     # Compute the L1 error for x, y, w, h of BBoxes. Skip locations without an
     # object because the BBox predictions there are meaningless.
     bbox_err = np.abs(true_bbox - pred_bbox)
-    bbox_err = bbox_err[:, mask_bbox_idx]
+    bbox_err = bbox_err[:, mask_bbox_idx[0]]
     bbox_err = bbox_err.astype(np.float16)
+    assert bbox_err.shape == (4, len(mask_bbox_idx[0]))
 
     return ErrorMetrics(
-        bbox_err, wrong_BgFg, wrong_cls,
-        len(mask_isFg_idx[0]), len(mask_cls_idx[0]),
-        falsepos_bg, falsepos_fg
+        bbox=bbox_err, BgFg=wrong_BgFg, label=wrong_cls,
+        num_BgFg=len(mask_isFg_idx[0]),
+        num_Bg=np.count_nonzero(true_isFg == 0),
+        num_Fg=np.count_nonzero(true_isFg == 1),
+        num_labels=len(mask_cls_idx[0]),
+        falsepos_bg=falsepos_bg, falsepos_fg=falsepos_fg
     )
 
 
@@ -129,7 +133,7 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
     # for all of them.
     rpcn_dims = ds.getRpcnDimensions()
     if 'rpcn' not in log:
-        log['rpcn'] = {ft_dim: {'acc': [], 'cost': []} for ft_dim in rpcn_dims}
+        log['rpcn'] = {ft_dim: {'err': [], 'cost': []} for ft_dim in rpcn_dims}
 
     # Train on one image at a time.
     batch = -1
@@ -213,11 +217,11 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
 
             # Log training stats. The validation script will use these.
             rpcn_cost = all_costs[rpcn_dim]
-            log['rpcn'][rpcn_dim]['acc'].append(err)
+            log['rpcn'][rpcn_dim]['err'].append(err)
             log['rpcn'][rpcn_dim]['cost'].append(rpcn_cost)
 
             # Print progress report to terminal.
-            cls_err = 100 * err.label / err.num_label
+            cls_err = 100 * err.label / err.num_labels
             bgFg_err = 100 * err.BgFg / err.num_BgFg
             cost_bbox = int(rpcn_cost["bbox"])
             cost_isFg = int(rpcn_cost["isFg"])
