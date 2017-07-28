@@ -282,8 +282,8 @@ class TestCost:
             mask_cls = np.random.randint(0, 2, self.ft_dim)
 
             # Create random network output.
-            cls_fg = np.random.randint(0, 2, (2, *self.ft_dim))
-            cls_labels = np.random.randint(0, num_cls, (num_cls, *self.ft_dim))
+            cls_fg = np.random.uniform(-10, 10, (2, *self.ft_dim))
+            cls_labels = np.random.uniform(-10, 10, (num_cls, *self.ft_dim))
             bbox_rects = np.random.uniform(0, 512, (4, *self.ft_dim))
             y_pred = setIsFg(y_pred, cls_fg)
             y_pred = setClassLabel(y_pred, cls_labels)
