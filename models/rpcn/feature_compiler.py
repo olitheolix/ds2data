@@ -263,6 +263,7 @@ def downsampleMatrix(mat, ft_dim):
 
 def unpackBBoxes(im_dim, bb_rects, bb_labels):
     ft_dim = bb_labels.shape[:2]
+    assert bb_rects.shape == (4, *ft_dim)
 
     # Find all locations that are *not* background, ie every location where the
     # predicted label is anything but zero.
