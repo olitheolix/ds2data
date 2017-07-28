@@ -373,9 +373,9 @@ class BBox(DataSet):
                         isFg_hot[1, fy, fx] = 1
                     cls_label_hot[lap[fy, fx], fy, fx] = 1
 
-            y = feature_compiler.setBBoxRects(y, bbox_rects)
-            y = feature_compiler.setIsFg(y, isFg_hot)
-            y = feature_compiler.setClassLabel(y, cls_label_hot)
+            y[0] = feature_compiler.setBBoxRects(y[0], bbox_rects)
+            y[0] = feature_compiler.setIsFg(y[0], isFg_hot)
+            y[0] = feature_compiler.setClassLabel(y[0], cls_label_hot)
 
             meta[ft_dim] = self.MetaData(
                 filename=None,
