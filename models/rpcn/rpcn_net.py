@@ -9,9 +9,13 @@ correspond to a larger receptive field (the filter sizes are identical in all
 RPCN layers)
 """
 import pickle
-import feature_compiler
 import numpy as np
 import tensorflow as tf
+
+
+_SCALE_BBOX = 100
+_SCALE_ISFG = 3000
+_SCALE_CLS = 1000
 
 
 def model(x_in, name, bwt1, bwt2):
@@ -48,10 +52,6 @@ def cost(y_pred):
     mask_dim = y_dim[2:]
     ft_height, ft_width = mask_dim
     name = f'{ft_height}x{ft_width}'
-
-    num_cls = feature_compiler.getNumClassesFromY(y_dim)
-    scale_isFg, scale_cls = 1 / np.log(np.array([2, num_cls], np.float32))
-    scale_bbox = 1 / ft_height
     del ft_height, ft_width, y_dim
 
     with tf.variable_scope(f'rpcn-{name}-cost'):
@@ -99,9 +99,9 @@ def cost(y_pred):
         cost_cls = tf.reduce_mean(cost_cls)
 
         # Normalise the costs.
-        cost_bbox = tf.multiply(cost_bbox, scale_bbox, name='bbox')
-        cost_isFg = tf.multiply(cost_isFg, scale_isFg, name='isFg')
-        cost_cls = tf.multiply(cost_cls, scale_cls, name='cls')
+        cost_bbox = tf.multiply(cost_bbox, _SCALE_BBOX, name='bbox')
+        cost_isFg = tf.multiply(cost_isFg, _SCALE_ISFG, name='isFg')
+        cost_cls = tf.multiply(cost_cls, _SCALE_CLS, name='cls')
 
         # Compute final scalar cost.
         return tf.add_n([cost_bbox, cost_isFg, cost_cls], name='total')

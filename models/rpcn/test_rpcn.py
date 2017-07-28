@@ -145,8 +145,8 @@ class TestCost:
         assert np.allclose(out_full, ref, 0, 1E-4)
 
         # Average and scale all active costs.
-        ref = np.mean(ref * mask) / np.log(2)
-        assert np.abs(ref - out) < 1E-4
+        ref = np.mean(ref * mask)
+        assert np.abs(ref - out / rpcn_net._SCALE_ISFG) < 1E-4
         return out
 
     def test_cost_isForeground(self):
@@ -196,8 +196,8 @@ class TestCost:
         assert np.allclose(out_full, ref, 0, 1E-4)
 
         # Average and scale all active costs.
-        ref = np.mean(ref * mask) / np.log(self.num_classes)
-        assert np.abs(ref - out) < 1E-4
+        ref = np.mean(ref * mask)
+        assert np.abs(ref - out / rpcn_net._SCALE_CLS) < 1E-4
         return out
 
     def test_cost_classLabels(self):
@@ -247,8 +247,8 @@ class TestCost:
         assert np.allclose(out_full, ref, 0, 1E-4)
 
         # Average and scale all active costs.
-        ref = np.mean(ref * mask) / ft_height
-        assert np.abs(ref - out) < 1E-4
+        ref = np.mean(ref * mask)
+        assert np.abs(ref - out / rpcn_net._SCALE_BBOX) < 1E-4
         return out
 
     def test_cost_BBox(self):
