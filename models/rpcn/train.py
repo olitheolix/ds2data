@@ -208,7 +208,11 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
         cost_nodes = {'tot': g('cost:0')}
         for rpcn_dim in rpcn_dims:
             layer_name = f'{rpcn_dim[0]}x{rpcn_dim[1]}'
-            cost_nodes[rpcn_dim] = g(f'rpcn-{layer_name}-cost/total:0')
+            cost_nodes[rpcn_dim] = {
+                'bbox': g(f'rpcn-{layer_name}-cost/bbox:0'),
+                'isFg': g(f'rpcn-{layer_name}-cost/isFg:0'),
+                'cls': g(f'rpcn-{layer_name}-cost/cls:0'),
+            }
         all_costs, _ = sess.run([cost_nodes, opt], feed_dict=fd)
         log['cost'].append(all_costs['tot'])
         del fd
@@ -252,10 +256,14 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             # Print progress report to terminal.
             cls_err = 100 * err.label / err.num_label
             bgFg_err = 100 * err.BgFg / err.num_BgFg
-            s1 = f'BgFgErr={bgFg_err:4.1f}%  '
-            s2 = f'ClsErr={cls_err:4.1f}%  '
-            s3 = f'X=({bb_50p:2.0f}, {bb_90p:2.0f})  '
-            print(f'  {batch:,}: Cost: {int(rpcn_cost):,}  ' + s1 + s2 + s3)
+            cost_bbox = rpcn_cost['bbox']
+            cost_isFg = rpcn_cost['isFg']
+            cost_cls = rpcn_cost['cls']
+            s0 = f'BgFg={cost_isFg:5.2e}  Cls={cost_cls:5.2e}  BBox={cost_bbox:5.2f}  '
+            s1 = f'BgFg={bgFg_err:4.1f}%  '
+            s2 = f'Cls={cls_err:4.1f}%  '
+            s3 = f'BBox=({bb_50p:2.0f}, {bb_90p:2.0f})  '
+            print(f'  {batch:,}: Cost: ' + s0 + ' Err: ' + s1 + s2 + s3)
 
 
 def main():
