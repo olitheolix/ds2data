@@ -48,6 +48,11 @@ def plotTrainingSample(img_hwc, ys, rpcn_filter_size, int2name):
         horizontalalignment='center', verticalalignment='center'
     )
 
+    # Convenience.
+    getBBoxRects = feature_compiler.getBBoxRects
+    getClassLabel = feature_compiler.getClassLabel
+    unpackBBoxes = feature_compiler.unpackBBoxes
+
     for ft_dim, y in sorted(ys.items()):
         assert y.ndim == 3
 
@@ -60,8 +65,9 @@ def plotTrainingSample(img_hwc, ys, rpcn_filter_size, int2name):
         # BBoxes over original image.
         ax = plt.subplot(1, 2, 2)
         plt.imshow(img)
-        hard = np.argmax(y[6:], axis=0)
-        bb_rects, pick_yx = feature_compiler.unpackBBoxes(im_dim, y[:4], hard)
+
+        hard = np.argmax(getClassLabel(y), axis=0)
+        bb_rects, pick_yx = unpackBBoxes(im_dim, getBBoxRects(y), hard)
         label = hard[pick_yx]
         for label, (x0, y0, x1, y1) in zip(label, bb_rects):
             w = x1 - x0
