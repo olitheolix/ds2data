@@ -172,3 +172,11 @@ class TestFeatureCompiler:
         # Number of classes is larger than 16 Bit number.
         with pytest.raises(AssertionError):
             enc([0, 1.5], 2 ** 16)
+
+    def test_getNumClassesFromY(self):
+        fun = feature_compiler.getNumClassesFromY
+        assert fun((1, 4 + 2 + 1, 64, 64)) == 1
+        assert fun((1, 4 + 2 + 5, 64, 64)) == 5
+
+        with pytest.raises(AssertionError):
+            fun((1, 4 + 2, 64, 64))

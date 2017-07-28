@@ -120,6 +120,24 @@ def oneHotEncoder(labels, num_classes):
     return out.reshape((num_classes, *dim))
 
 
+def getNumClassesFromY(y_dim):
+    """ Return the number of possible class that a `y_dim` tensoer can hold.
+
+    This is a convenience function only to remove code duplication and hard
+    coded magic number throughout the code base.
+
+    Raise AssertionError if `y_dim` does not satisfy (1, >6, *, *).
+
+    Inputs:
+        y_dim: 4 Integers
+
+    Returns:
+        int: number of classes that can be one-hot encoded.
+    """
+    assert len(y_dim) == 4 and y_dim[0] == 1 and y_dim[1] > 4 + 2
+    return y_dim[1] - 6
+
+
 def setBBoxRects(y, val):
     y = np.array(y)
     assert y.ndim == 4 and y.shape[0] == 1
