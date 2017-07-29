@@ -182,7 +182,7 @@ def _maskFgLabel(img, objID_at_pixel_ft, obj_pixels_ft):
     return mask
 
 
-def compileFeatures(fname, img, rpcn_dims):
+def generate(fname, img, rpcn_dims):
     assert img.ndim == 3 and img.shape[2] == 3 and img.dtype == np.uint8
     im_dim = img.shape[:2]
 
@@ -250,7 +250,7 @@ def compileFeatures(fname, img, rpcn_dims):
 def compileSingle(args):
     fname, rpcn_out_dims = args
     img = np.array(Image.open(fname + '.jpg').convert('RGB'))
-    features = compileFeatures(fname, img, rpcn_out_dims)
+    features = generate(fname, img, rpcn_out_dims)
     pickle.dump(features, open(fname + '-compiled.pickle', 'wb'))
 
 

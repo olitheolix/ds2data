@@ -291,7 +291,7 @@ class BBox(DataSet):
         if len(missing) > 0:
             print('Compiling training data...')
             for fn in tqdm.tqdm(missing):
-                compile_features.compileFeatures(fn, (height, width), self.rpcn_dims)
+                compile_features.generate(fn, (height, width), self.rpcn_dims)
         else:
             print('Using pre-compiled training data')
 
