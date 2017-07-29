@@ -363,10 +363,6 @@ class BBox(DataSet):
             # Unpack pixel labels.
             lap = training_data[ft_dim]['label_at_pixel']
             bbox_rects = training_data[ft_dim]['bboxes']
-            bbox_rects[0, :] = bbox_rects[0, :] * width
-            bbox_rects[1, :] = bbox_rects[1, :] * height
-            bbox_rects[2, :] = bbox_rects[2, :] * width
-            bbox_rects[3, :] = bbox_rects[3, :] * height
             assert lap.dtype == np.int32 and lap.shape == ft_dim
             assert 0 <= np.amin(lap) <= np.amax(lap) < num_classes
 
