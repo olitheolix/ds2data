@@ -17,10 +17,10 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
     bb_err_all = [_.bbox for _ in layer_log['err']]
     assert len(bb_err_all) == num_epochs * samples_per_epoch
 
-    data = {}
+    stats = {}
     for percentile in [50, 75, 90, 95, 99, 100]:
         pstr = f'{percentile}p'
-        data[pstr] = {
+        stats[pstr] = {
             'cost_bbox': np.zeros(num_epochs, np.float32),
             'cost_isFg': np.zeros(num_epochs, np.float32),
             'cost_cls': np.zeros(num_epochs, np.float32),
@@ -34,7 +34,7 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
             'bb_err_y1': np.zeros(num_epochs, np.float32),
             'bb_err_all': np.zeros(num_epochs, np.float32),
         }
-        d = data[pstr]
+        d = stats[pstr]
 
         for epoch in range(num_epochs):
             start = epoch * samples_per_epoch
@@ -103,7 +103,7 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
                 bb_all = bb_err.flatten()
                 d['bb_err_all'][epoch] = computePercentile(bb_all, percentile)
             del bb_err, num_bb
-    return data
+    return stats
 
 
 def plotTrainingProgress(log):
