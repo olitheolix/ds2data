@@ -66,10 +66,10 @@ def _computeBBoxes(bb_rects, objID_at_pixel_ft, im_dim):
         anchor_x = ft2im(x, ft_dim[1], im_dim[1])
         anchor_y = ft2im(y, ft_dim[0], im_dim[0])
         x0, y0, x1, y1 = bb_rects[objID]
-        x0 = x0 - anchor_x
-        x1 = x1 - anchor_x
-        y0 = y0 - anchor_y
-        y1 = y1 - anchor_y
+        x0 = float(x0 - anchor_x) / im_dim[1]
+        x1 = float(x1 - anchor_x) / im_dim[1]
+        y0 = float(y0 - anchor_y) / im_dim[0]
+        y1 = float(y1 - anchor_y) / im_dim[0]
         bboxes[:, y, x] = (x0, y0, x1, y1)
     return bboxes
 

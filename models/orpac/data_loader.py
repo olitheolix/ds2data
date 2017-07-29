@@ -304,6 +304,7 @@ class BBox(DataSet):
 
     def loadTrainingData(self, fnames, im_dim, colour_format):
         chan, height, width = im_dim
+        ft_dims = self.rpcn_dims
 
         all_y, all_meta = [], []
         all_x = np.zeros((len(fnames), *im_dim), np.uint8)
@@ -335,7 +336,7 @@ class BBox(DataSet):
             assert int2name == data['int2name']
 
             # Crate the training output for different feature sizes.
-            y, m = self.compileTrainingOutput(data, self.rpcn_dims, num_classes)
+            y, m = self.compileTrainingOutput(data, ft_dims, im_dim, num_classes)
 
             # Replace the file name in all MetaData instances.
             m = {k: v._replace(filename=fname) for k, v in m.items()}
@@ -347,11 +348,13 @@ class BBox(DataSet):
         # Return image, network output, label mapping, and meta data.
         return all_x, all_y, int2name, all_meta
 
-    def compileTrainingOutput(self, training_data, ft_dims, num_classes):
+    def compileTrainingOutput(self, training_data, ft_dims, im_dim, num_classes):
+        height, width = im_dim[1:]
+
         # Allocate the array for the expected network outputs (one for each
         # feature dimension size).
-        y_out = {_: np.zeros((1, 4 + 2 + num_classes, *_)) for _ in ft_dims}
         meta = {}
+        y_out = {_: np.zeros((1, 4 + 2 + num_classes, *_)) for _ in ft_dims}
 
         # Populate the training output with the BBox data and one-hot-label.
         for ft_dim in ft_dims:
@@ -360,6 +363,10 @@ class BBox(DataSet):
             # Unpack pixel labels.
             lap = training_data[ft_dim]['label_at_pixel']
             bbox_rects = training_data[ft_dim]['bboxes']
+            bbox_rects[0, :] = bbox_rects[0, :] * width
+            bbox_rects[1, :] = bbox_rects[1, :] * height
+            bbox_rects[2, :] = bbox_rects[2, :] * width
+            bbox_rects[3, :] = bbox_rects[3, :] * height
             assert lap.dtype == np.int32 and lap.shape == ft_dim
             assert 0 <= np.amin(lap) <= np.amax(lap) < num_classes
 
