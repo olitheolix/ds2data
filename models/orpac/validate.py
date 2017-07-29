@@ -154,14 +154,14 @@ def validateEpoch(sess, ds, x_in, rpcn_filter_size, dset='test'):
 
         # Predict the BBoxes and ensure there are no NaNs in the output.
         t0 = time.perf_counter()
-        preds = predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name)
-        preds, bb_rects, bb_labels, gt_labels = preds
+        tmp = predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name)
+        preds, pred_rect, pred_cls, true_cls = tmp
         etime.append(time.perf_counter() - t0)
         for _ in preds.values():
             assert not np.any(np.isnan(_))
 
         # Show the input image and add the BBoxes and save the result.
-        fig = showPredictedBBoxes(img, bb_rects, bb_labels, gt_labels, int2name)
+        fig = showPredictedBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
         fig.set_size_inches(20, 11)
         fig.savefig(f'/tmp/bbox_{i:04d}.jpg', **fig_opts)
 
@@ -172,7 +172,6 @@ def validateEpoch(sess, ds, x_in, rpcn_filter_size, dset='test'):
             plotPredictedLabelMap(img, preds, ys, int2name)
         else:
             plt.close(fig)
-        del bb_rects, bb_labels, gt_labels
 
     # Compute average prediction time.
     etime.sort()
