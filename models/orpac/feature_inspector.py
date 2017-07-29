@@ -12,10 +12,11 @@ import time
 import config
 import argparse
 import data_loader
-import feature_compiler
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+
+from feature_utils import getBBoxRects, getClassLabel, unpackBBoxes
 
 
 def parseCmdline():
@@ -47,11 +48,6 @@ def plotTrainingSample(img_hwc, ys, rpcn_filter_size, int2name):
         fontdict=dict(color='white', size=12, weight='normal'),
         horizontalalignment='center', verticalalignment='center'
     )
-
-    # Convenience.
-    getBBoxRects = feature_compiler.getBBoxRects
-    getClassLabel = feature_compiler.getClassLabel
-    unpackBBoxes = feature_compiler.unpackBBoxes
 
     for ft_dim, y in sorted(ys.items()):
         assert y.ndim == 3

@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 from config import NetConf
 from collections import namedtuple
+from feature_utils import setIsFg, setBBoxRects, setClassLabel
 
 
 class DataSet:
@@ -373,9 +374,9 @@ class BBox(DataSet):
                         isFg_hot[1, fy, fx] = 1
                     cls_label_hot[lap[fy, fx], fy, fx] = 1
 
-            y[0] = feature_compiler.setBBoxRects(y[0], bbox_rects)
-            y[0] = feature_compiler.setIsFg(y[0], isFg_hot)
-            y[0] = feature_compiler.setClassLabel(y[0], cls_label_hot)
+            y[0] = setBBoxRects(y[0], bbox_rects)
+            y[0] = setIsFg(y[0], isFg_hot)
+            y[0] = setClassLabel(y[0], cls_label_hot)
 
             meta[ft_dim] = self.MetaData(
                 filename=None,

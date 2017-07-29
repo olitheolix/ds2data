@@ -1,14 +1,10 @@
 import rpcn_net
 import numpy as np
 import tensorflow as tf
-import feature_compiler
 
-setBBoxRects = feature_compiler.setBBoxRects
-getBBoxRects = feature_compiler.getBBoxRects
-setIsFg = feature_compiler.setIsFg
-getIsFg = feature_compiler.getIsFg
-setClassLabel = feature_compiler.setClassLabel
-getClassLabel = feature_compiler.getClassLabel
+from feature_utils import getIsFg, getBBoxRects, getClassLabel
+from feature_utils import setIsFg, setBBoxRects, setClassLabel
+from feature_utils import oneHotEncoder
 
 
 class TestCost:
@@ -301,8 +297,8 @@ class TestCost:
             # Create random ground truth.
             cls_fg = np.random.randint(0, 2, self.ft_dim)
             cls_labels = np.random.randint(0, num_cls, self.ft_dim)
-            cls_fg = feature_compiler.oneHotEncoder(cls_fg, 2)
-            cls_labels = feature_compiler.oneHotEncoder(cls_labels, num_cls)
+            cls_fg = oneHotEncoder(cls_fg, 2)
+            cls_labels = oneHotEncoder(cls_labels, num_cls)
             bbox_rects = np.random.uniform(0, 512, (4, *self.ft_dim))
             y_true[0] = setIsFg(y_true[0], cls_fg)
             y_true[0] = setClassLabel(y_true[0], cls_labels)

@@ -6,12 +6,13 @@ import argparse
 import rpcn_net
 import shared_net
 import data_loader
-import feature_compiler
 
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+
+from feature_utils import getIsFg, getBBoxRects, getClassLabel, unpackBBoxes
 
 
 def parseCmdline():
@@ -61,11 +62,6 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name):
     # Run the input through all RPCN nodes, then strip off the batch dimension.
     preds = sess.run(rpcn_out, feed_dict={x_in: np.expand_dims(img, 0)})
     preds = {k: v[0] for k, v in preds.items()}
-
-    getIsFg = feature_compiler.getIsFg
-    getBBoxRects = feature_compiler.getBBoxRects
-    getClassLabel = feature_compiler.getClassLabel
-    unpackBBoxes = feature_compiler.unpackBBoxes
 
     # Compute the BBox predictions from every RPCN layer.
     bb_rects_out = {}
@@ -189,16 +185,16 @@ def plotPredictedLabelMap(img, preds, ys, int2name):
     plt.figure()
     for idx, ft_dim in enumerate(preds.keys()):
         # Find out which pixels the net thinks are foreground.
-        pred_isFg = feature_compiler.getIsFg(preds[ft_dim])
+        pred_isFg = getIsFg(preds[ft_dim])
 
         # Unpack the true foreground class labels and make hard decision.
-        true_labels = feature_compiler.getClassLabel(ys[ft_dim])
+        true_labels = getClassLabel(ys[ft_dim])
         true_labels = np.argmax(true_labels, axis=0)
 
         # Repeat with the predicted foreground class labels. The only
         # difference is that we need to mask out all those pixels that network
         # thinks are background.
-        pred_labels = feature_compiler.getClassLabel(preds[ft_dim])
+        pred_labels = getClassLabel(preds[ft_dim])
         pred_isFg = np.argmax(pred_isFg, axis=0)
         pred_labels = pred_isFg * np.argmax(pred_labels, axis=0)
 

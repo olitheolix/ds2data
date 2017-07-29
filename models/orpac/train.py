@@ -6,11 +6,11 @@ import argparse
 import shared_net
 import data_loader
 import collections
-import feature_compiler
 import numpy as np
 import tensorflow as tf
 
 from config import ErrorMetrics
+from feature_utils import sampleMasks
 
 
 def parseCmdline():
@@ -154,7 +154,7 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             # esitmation locations or 100, whichever is larger.
             N = meta[rpcn_dim].mask_bbox * meta[rpcn_dim].mask_valid
             N = np.count_nonzero(N)
-            mask_bbox, mask_isFg, mask_cls = feature_compiler.sampleMasks(
+            mask_bbox, mask_isFg, mask_cls = sampleMasks(
                 meta[rpcn_dim].mask_valid,
                 meta[rpcn_dim].mask_fg,
                 meta[rpcn_dim].mask_bbox,
@@ -185,7 +185,6 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
 
 
 def logTrainingStats(sess, log, img, ys, meta, batch, all_costs):
-    sampleMasks = feature_compiler.sampleMasks
     g = tf.get_default_graph().get_tensor_by_name
     x_in = g('x_in:0')
     log['cost'].append(all_costs['tot'])
