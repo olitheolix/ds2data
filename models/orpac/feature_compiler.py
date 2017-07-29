@@ -65,7 +65,7 @@ def _computeBBoxes(bb_rects, objID_at_pixel_ft, im_dim):
         objID = objID_at_pixel_ft[y, x]
         anchor_x = ft2im(x, ft_dim[1], im_dim[1])
         anchor_y = ft2im(y, ft_dim[0], im_dim[0])
-        x0, y0, x1, y1 = bb_data[objID]['bbox']
+        x0, y0, x1, y1 = bb_rects[objID]
         x0 = x0 - anchor_x
         x1 = x1 - anchor_x
         y0 = y0 - anchor_y
@@ -187,26 +187,36 @@ def compileFeatures(fname, img, rpcn_dims):
     assert img.ndim == 3 and img.shape[2] == 3 and img.dtype == np.uint8
     im_dim = img.shape[:2]
 
-    out = {}
     # Load the True output and verify that all files use the same
     # int->label mapping.
     img_meta = bz2.open(fname + '-meta.json.bz2', 'rb').read()
     img_meta = json.loads(img_meta.decode('utf8'))
-    out['int2name'] = {int(k): v for k, v in img_meta['int2name'].items()}
 
     # Undo JSON's int->str conversion for dict keys.
-    bb_data = {int(k): v for k, v in img_meta['bb_data'].items()}
+    int2name = {int(k): v for k, v in img_meta['int2name'].items()}
+    bb_rects = {int(k): v for k, v in img_meta['bb_rects'].items()}
     obj_pixels = {int(k): v for k, v in img_meta['obj-pixels'].items()}
     objID2label = {int(k): v for k, v in img_meta['objID2label'].items()}
     objID_at_pixel = np.array(img_meta['objID-at-pixel'], np.int32)
     del img_meta
+
+    # The label map *must* contain a None labels -> these are the background
+    # pixels.
+    assert int2name[0] == 'None'
+    name2int = {v: k for k, v in int2name.items()}
 
     # For each non-zero pixel, map the object ID to its label. This
     # will produce an image where each pixel corresponds to a label
     # that can be looked up with `int2name`.
     label_at_pixel = np.zeros_like(objID_at_pixel)
     for idx in zip(*np.nonzero(objID_at_pixel)):
-        label_at_pixel[idx] = objID2label[objID_at_pixel[idx]]
+        label_name = objID2label[objID_at_pixel[idx]]
+        assert label_name != 'None'
+        label_at_pixel[idx] = name2int[label_name]
+
+    # Add the int2name map to the function output.
+    out = {}
+    out['int2name'] = int2name
 
     # Compile dictionary with feature size specific data. This includes the
     # BBox data relative to the anchor point.
