@@ -122,7 +122,6 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
         lrate: float
             Learning rate for this epoch.
     """
-    sampleMasks = feature_compiler.sampleMasks
     g = tf.get_default_graph().get_tensor_by_name
 
     # Get missing placeholder variables.
@@ -136,22 +135,20 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
         log['rpcn'] = {ft_dim: {'err': [], 'cost': []} for ft_dim in rpcn_dims}
 
     # Train on one image at a time.
-    batch = -1
-    while True:
-        batch += 1
-
+    ds.reset('train')
+    for batch in range(ds.lenOfEpoch('train')):
         # Get the next image or reset the data store if we have reached the
         # end of an epoch.
         img, ys, uuid = ds.nextSingle('train')
-        if img is None:
-            return
+        assert img is not None
         assert img.ndim == 3 and isinstance(ys, dict)
+
         meta = ds.getMeta([uuid])[uuid]
 
         # Compile the feed dictionary so that we can train all RPCNs.
         fd = {x_in: np.expand_dims(img, 0), lrate_in: lrate}
-        for rpcn_dim in rpcn_dims:
-            m_bbox, m_isFg, m_cls = sampleMasks(
+        for rpcn_dim, y in ys.items():
+            m_bbox, m_isFg, m_cls = feature_compiler.sampleMasks(
                 meta[rpcn_dim].mask_valid,
                 meta[rpcn_dim].mask_fgbg,
                 meta[rpcn_dim].mask_bbox,
@@ -162,7 +159,7 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             # Fetch the variables and assign them the current values. We need
             # to add the batch dimensions for Tensorflow.
             layer_name = f'{rpcn_dim[0]}x{rpcn_dim[1]}'
-            fd[g(f'rpcn-{layer_name}-cost/y_true:0')] = np.expand_dims(ys[rpcn_dim], 0)
+            fd[g(f'rpcn-{layer_name}-cost/y_true:0')] = np.expand_dims(y, 0)
             fd[g(f'rpcn-{layer_name}-cost/mask_cls:0')] = m_cls
             fd[g(f'rpcn-{layer_name}-cost/mask_bbox:0')] = m_bbox
             fd[g(f'rpcn-{layer_name}-cost/mask_isFg:0')] = m_isFg
