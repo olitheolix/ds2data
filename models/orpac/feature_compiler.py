@@ -98,9 +98,16 @@ def _maskBBox(objID_at_pixel_ft, obj_pixels_ft):
     # to recognise the object.
     mask = np.zeros(objID_at_pixel_ft.shape, np.uint8)
     for objID, pixels in obj_pixels_ft.items():
+        # Skip background locations.
+        if objID == 0:
+            continue
+
+        # Find out which pixels belong to the current object AND are visible in
+        # the scene right now.
         idx_visible = np.nonzero(objID_at_pixel_ft == objID)
 
-        # Are enough pixels visible in the scene.
+        # We decide that BBox estimation is possible if at least 10% of all
+        # pixels for the object are visible.
         num_visible = len(idx_visible[0])
         num_tot = np.count_nonzero(pixels)
         if num_visible >= 9 and num_visible >= 0.1 * num_tot:
