@@ -23,7 +23,7 @@ def parseCmdline():
     return parser.parse_args()
 
 
-def accuracy(gt, pred, mask_bbox, mask_isFg, mask_cls):
+def compileErrorStats(gt, pred, mask_bbox, mask_isFg, mask_cls):
     """Return accuracy metrics in a named tuple.
 
     NOTE: the accuracy is always with respect to `mask_cls` and `mask_bbox`.
@@ -214,7 +214,7 @@ def logTrainingStats(sess, log, img, ys, meta, batch, all_costs):
             int(max(100, 0.25 * N))
         )
 
-        err = accuracy(y, pred[0], mask_bbox, mask_isFg, mask_cls)
+        err = compileErrorStats(y, pred[0], mask_bbox, mask_isFg, mask_cls)
 
         # Log training stats. The validation script will use these.
         rpcn_cost = all_costs[rpcn_dim]
