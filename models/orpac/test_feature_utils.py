@@ -1,14 +1,14 @@
 import random
 import pytest
 import numpy as np
-import feature_compiler
+import feature_utils
 
-setBBoxRects = feature_compiler.setBBoxRects
-getBBoxRects = feature_compiler.getBBoxRects
-setIsFg = feature_compiler.setIsFg
-getIsFg = feature_compiler.getIsFg
-setClassLabel = feature_compiler.setClassLabel
-getClassLabel = feature_compiler.getClassLabel
+setBBoxRects = feature_utils.setBBoxRects
+getBBoxRects = feature_utils.getBBoxRects
+setIsFg = feature_utils.setIsFg
+getIsFg = feature_utils.getIsFg
+setClassLabel = feature_utils.setClassLabel
+getClassLabel = feature_utils.getClassLabel
 
 
 class TestFeatureCompiler:
@@ -129,7 +129,7 @@ class TestFeatureCompiler:
                 labels = labels.astype(dtype) if dtype else labels.tolist()
 
                 # Encode the labels and verify shape and data type.
-                hot = feature_compiler.oneHotEncoder(labels, num_labels)
+                hot = feature_utils.oneHotEncoder(labels, num_labels)
                 assert hot.dtype == np.uint16
                 assert np.array(hot).shape == (num_labels, *dim)
 
@@ -144,14 +144,14 @@ class TestFeatureCompiler:
 
     def test_oneHotEncoder_err(self):
         """Degenerate inputs to one-hot-encoder."""
-        enc = feature_compiler.oneHotEncoder
+        enc = feature_utils.oneHotEncoder
 
         # Must not raise any errors.
         enc([0, 2], 3)
 
         # Degenerate input array.
         with pytest.raises(AssertionError):
-            feature_compiler.oneHotEncoder([], 10)
+            feature_utils.oneHotEncoder([], 10)
 
         # Invalid number of labels.
         for num_classes in [-1, 0, 0.5, 1.5]:
@@ -175,7 +175,7 @@ class TestFeatureCompiler:
             enc([0, 1.5], 2 ** 16)
 
     def test_getNumClassesFromY(self):
-        fun = feature_compiler.getNumClassesFromY
+        fun = feature_utils.getNumClassesFromY
         assert fun((1, 4 + 2 + 1, 64, 64)) == 1
         assert fun((1, 4 + 2 + 5, 64, 64)) == 5
 
@@ -186,7 +186,7 @@ class TestFeatureCompiler:
         """Use a tiny test matrix that is easy to verify manually."""
         random.seed(0)
         np.random.seed(0)
-        sampleMasks = feature_compiler.sampleMasks
+        sampleMasks = feature_utils.sampleMasks
 
         mask_valid = np.zeros((1, 4), np.uint8)
         mask_fgbg = np.zeros_like(mask_valid)
