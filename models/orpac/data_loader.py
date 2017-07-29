@@ -374,10 +374,10 @@ class BBox(DataSet):
 
             meta[ft_dim] = self.MetaData(
                 filename=None,
-                mask_fg=training_data[ft_dim]['mask_fgbg'],
+                mask_fg=training_data[ft_dim]['mask_fg'],
                 mask_bbox=training_data[ft_dim]['mask_bbox'],
                 mask_valid=training_data[ft_dim]['mask_valid'],
-                mask_cls=training_data[ft_dim]['mask_fg_label'],
+                mask_cls=training_data[ft_dim]['mask_cls'],
             )
 
             # Sanity check: masks must be binary with correct shape.
