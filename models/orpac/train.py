@@ -10,7 +10,8 @@ import numpy as np
 import tensorflow as tf
 
 from config import ErrorMetrics
-from feature_utils import sampleMasks
+from feature_utils import sampleMasks, getNumClassesFromY
+from feature_utils import getIsFg, getBBoxRects, getClassLabel
 
 
 def parseCmdline():
@@ -56,7 +57,7 @@ def compileErrorStats(gt, pred, mask_bbox, mask_isFg, mask_cls):
     # First 4 dimensions are BBox parameters (x, y, w, h), next 2 are bg/fg
     # label, and the remaining ones are one-hot class labels. Find out how many
     # of those there are.
-    num_classes = pred.shape[0] - (4 + 2)
+    num_classes = getNumClassesFromY(pred.shape)
 
     # Flattened vectors will be more convenient.
     mask_isFg_idx = np.nonzero(mask_isFg.flatten())
@@ -64,10 +65,10 @@ def compileErrorStats(gt, pred, mask_bbox, mask_isFg, mask_cls):
     mask_cls_idx = np.nonzero(mask_cls.flatten())
     del mask_bbox, mask_isFg, mask_cls
 
-    # Flatten the predicted tensor into (4 + 2 + num_classes, height * width).
-    # Then unpack the BBox parameters and one-hot labels.
-    pred = pred.reshape([4 + 2 + num_classes, -1])
-    pred_bbox, pred_isFg, pred_label = pred[:4], pred[4:6], pred[6:]
+    # Unpack the tensor constituents and flatten the feature dimensions.
+    pred_bbox = getBBoxRects(pred).reshape([4, -1])
+    pred_isFg = getIsFg(pred).reshape([2, -1])
+    pred_label = getClassLabel(pred).reshape([num_classes, -1])
 
     # Repeat with the ground truth tensor.
     gt = gt.reshape([4 + 2 + num_classes, -1])
