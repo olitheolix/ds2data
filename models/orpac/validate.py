@@ -286,7 +286,7 @@ def main():
 
     # Build the shared layers and connect it to the RPCN layers.
     print('\n----- Network Setup -----')
-    x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
+    x_in = tf.placeholder(tf_dtype, [1, *im_dim], name='x_in')
     sh_out = shared_net.setup(fnames['shared_net'], x_in, conf.num_pools_shared, True)
     rpcn_net.setup(
         fnames['rpcn_net'], sh_out, len(int2name),
