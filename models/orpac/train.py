@@ -156,9 +156,9 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             N = np.count_nonzero(N)
             mask_bbox, mask_isFg, mask_cls = feature_compiler.sampleMasks(
                 meta[rpcn_dim].mask_valid,
-                meta[rpcn_dim].mask_fgbg,
+                meta[rpcn_dim].mask_fg,
                 meta[rpcn_dim].mask_bbox,
-                meta[rpcn_dim].mask_fg_label,
+                meta[rpcn_dim].mask_cls,
                 int(max(100, 0.25 * N))
             )
 
@@ -208,9 +208,9 @@ def logTrainingStats(sess, log, img, ys, meta, batch, all_costs):
         N = np.count_nonzero(N)
         mask_bbox, mask_isFg, mask_cls = sampleMasks(
             meta[rpcn_dim].mask_valid,
-            meta[rpcn_dim].mask_fgbg,
+            meta[rpcn_dim].mask_fg,
             meta[rpcn_dim].mask_bbox,
-            meta[rpcn_dim].mask_fg_label,
+            meta[rpcn_dim].mask_cls,
             int(max(100, 0.25 * N))
         )
 

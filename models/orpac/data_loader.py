@@ -220,7 +220,7 @@ class BBox(DataSet):
     """
     # Define the MetaData container for this data set.
     MetaData = namedtuple(
-        'MetaData', 'filename mask_fgbg mask_bbox mask_fg_label mask_valid')
+        'MetaData', 'filename mask_fg mask_bbox mask_cls mask_valid')
 
     def getRpcnDimensions(self):
         return tuple(self.rpcn_dims)
@@ -379,14 +379,14 @@ class BBox(DataSet):
 
             meta[ft_dim] = self.MetaData(
                 filename=None,
-                mask_fgbg=training_data[ft_dim]['mask_fgbg'],
+                mask_fg=training_data[ft_dim]['mask_fgbg'],
                 mask_bbox=training_data[ft_dim]['mask_bbox'],
                 mask_valid=training_data[ft_dim]['mask_valid'],
-                mask_fg_label=training_data[ft_dim]['mask_fg_label'],
+                mask_cls=training_data[ft_dim]['mask_fg_label'],
             )
 
             # Sanity check: masks must be binary with correct shape.
-            for field in ['fgbg', 'bbox', 'fg_label', 'valid']:
+            for field in ['fg', 'bbox', 'cls', 'valid']:
                 tmp = getattr(meta[ft_dim], 'mask_' + field)
                 assert tmp.dtype == np.uint8, field
                 assert tmp.shape == ft_dim, field

@@ -87,7 +87,7 @@ def plotMasks(img, metas):
         plt.title('Input Image')
 
         plt.subplot(2, 3, 2)
-        plt.imshow(meta.mask_fgbg, cmap='gray', clim=[0, 1])
+        plt.imshow(meta.mask_fg, cmap='gray', clim=[0, 1])
         plt.title('Foreground')
 
         plt.subplot(2, 3, 3)
@@ -95,7 +95,7 @@ def plotMasks(img, metas):
         plt.title('BBox Estimation Possible')
 
         plt.subplot(2, 3, 4)
-        plt.imshow(meta.mask_fg_label, cmap='gray', clim=[0, 1])
+        plt.imshow(meta.mask_cls, cmap='gray', clim=[0, 1])
         plt.title('Label Estimation Possible')
 
         plt.subplot(2, 3, 5)
