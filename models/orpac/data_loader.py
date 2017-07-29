@@ -3,7 +3,7 @@ import os
 import glob
 import tqdm
 import pickle
-import feature_compiler
+import compile_features
 import numpy as np
 
 from PIL import Image
@@ -291,7 +291,7 @@ class BBox(DataSet):
         if len(missing) > 0:
             print('Compiling training data...')
             for fn in tqdm.tqdm(missing):
-                feature_compiler.compileFeatures(fn, (height, width), self.rpcn_dims)
+                compile_features.compileFeatures(fn, (height, width), self.rpcn_dims)
         else:
             print('Using pre-compiled training data')
 
