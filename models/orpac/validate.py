@@ -81,8 +81,8 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name):
 
         # Determine all locations where the network thinks it sees background
         # and mask those locations. This is tantamount to setting the
-        # foreground label to Zero, which is, by definition, 'background' and
-        # will be ignored in `unpackBBoxes` in the next step.
+        # foreground label to Zero, which is, by definition, 'None' and will be
+        # ignored in `unpackBBoxes` in the next step.
         hard_cls = np.argmax(pred_labels, axis=0)
         hard_fg = np.argmax(isFg, axis=0)
         hard = hard_cls * hard_fg
