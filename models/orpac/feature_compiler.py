@@ -74,9 +74,8 @@ def _computeBBoxes(bb_rects, objID_at_pixel_ft, im_dim):
     return bboxes
 
 
-def _maskFgBg(objID_at_pixel_ft):
-    """Return the "this-is-not-a-background-pixel" mask.
-    """
+def _maskForeground(objID_at_pixel_ft):
+    """Return the "this-is-not-a-background-pixel" mask."""
     mask = np.zeros(objID_at_pixel_ft.shape, np.uint8)
 
     # Activate all feature map locations that show anything but background.
@@ -230,7 +229,7 @@ def compileFeatures(fname, img, rpcn_dims):
         obj_pixels_ft = {k: downsampleMatrix(v, ft_dim) for k, v in obj_pixels.items()}
 
         bboxes = _computeBBoxes(bb_rects, objID_at_pixel_ft, im_dim)
-        mask_fg = _maskFgBg(objID_at_pixel_ft)
+        mask_fg = _maskForeground(objID_at_pixel_ft)
         mask_bbox = _maskBBox(objID_at_pixel_ft, obj_pixels_ft)
         mask_valid = _maskValid(objID_at_pixel_ft)
         mask_cls = _maskFgLabel(img_ft, objID_at_pixel_ft, obj_pixels_ft)
