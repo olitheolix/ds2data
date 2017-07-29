@@ -60,7 +60,7 @@ def analyseImage(sess, x_in, int2name, rpcn_dims, fname):
     # Load test image and predict BBoxes for it.
     img_hwc = np.array(Image.open(fname), np.float32) / 255
     img_chw = np.transpose(img_hwc, [2, 0, 1])
-    pred = validate.predictBBoxes(sess, x_in, img_chw, rpcn_dims, None)
+    pred = validate.predictBBoxes(sess, x_in, img_chw, rpcn_dims, None, int2name)
     _, bb_rects, bb_labels, _ = pred
 
     # Create the figure window and specify the Matplotlib rectangle parameters.
@@ -101,11 +101,11 @@ def main():
     fn_shared_net = os.path.join(net_dir, 'shared-net.pickle')
 
     # Simulation parameters.
-    num_cls = 11
-    im_dim = (3, 512, 512)
     meta = pickle.load(open(fn_meta, 'rb'))
     conf, int2name = meta['conf'], meta['int2name']
     rpcn_out_dims = conf.rpcn_out_dims
+    num_cls = len(int2name)
+    im_dim = (3, conf.height, conf.width)
 
     # Precision.
     tf_dtype = tf.float32 if conf.dtype == 'float32' else tf.float16
@@ -113,7 +113,7 @@ def main():
     # Build the shared- and RPCN layers.
     sess = tf.Session()
     print('\n----- Network Setup -----')
-    x_in = tf.placeholder(tf_dtype, [None, *im_dim], name='x_in')
+    x_in = tf.placeholder(tf_dtype, [1, *im_dim], name='x_in')
     sh_out = shared_net.setup(fn_shared_net, x_in, conf.num_pools_shared, True)
     rpcn_net.setup(
         fn_rpcn_net, sh_out, num_cls,
