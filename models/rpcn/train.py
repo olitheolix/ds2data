@@ -178,66 +178,83 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
                 'cls': g(f'rpcn-{layer_name}-cost/cls:0'),
             }
         all_costs, _ = sess.run([cost_nodes, opt], feed_dict=fd)
-        log['cost'].append(all_costs['tot'])
-        del fd
 
-        # Predict the RPCN outputs for the current image and compute the error
-        # statistics. All statistics will be added to the log dictionary.
-        feed_dict = {x_in: np.expand_dims(img, 0)}
-        for rpcn_dim in rpcn_dims:
-            layer_name = f'{rpcn_dim[0]}x{rpcn_dim[1]}'
+        logTrainingStats(sess, log, img, ys, meta, batch, all_costs)
 
-            # Predict. Ensure there are no NaN in the output.
-            pred = sess.run(g(f'rpcn-{layer_name}/rpcn_out:0'), feed_dict=feed_dict)
-            pred = pred[0]
-            assert not np.any(np.isnan(pred))
 
-            # Randomly sample another set of masks. This ensures that will
-            # predict on (mostly) different positions than during the
-            # optimisation step.
-            mask_bbox, mask_isFg, mask_cls = sampleMasks(
-                meta[rpcn_dim].mask_valid,
-                meta[rpcn_dim].mask_fgbg,
-                meta[rpcn_dim].mask_bbox,
-                meta[rpcn_dim].mask_fg_label,
-                500
-            )
+def logTrainingStats(sess, log, img, ys, meta, batch, all_costs):
+    sampleMasks = feature_compiler.sampleMasks
+    g = tf.get_default_graph().get_tensor_by_name
+    x_in = g('x_in:0')
+    log['cost'].append(all_costs['tot'])
 
-            err = accuracy(ys[rpcn_dim], pred, mask_bbox, mask_isFg, mask_cls)
+    # Predict the RPCN outputs for the current image and compute the error
+    # statistics. All statistics will be added to the log dictionary.
+    feed_dict = {x_in: np.expand_dims(img, 0)}
+    for rpcn_dim, y in ys.items():
+        layer_name = f'{rpcn_dim[0]}x{rpcn_dim[1]}'
 
-            # Compute maximum/90%/median for the BBox errors. If this features
-            # map did not have any BBoxes then report -1. The `bbox_err` shape
-            # is (4, N) where N is the number of BBoxes.
-            err_bbox_flat = err.bbox.flatten()
-            if len(err_bbox_flat) == 0:
-                bb_50p = bb_90p = -1
-            else:
-                bb_90p = err_bbox_flat[int(0.9 * len(err_bbox_flat))]
-                bb_50p = err_bbox_flat[int(0.5 * len(err_bbox_flat))]
+        # Predict. Ensure there are no NaN in the output.
+        pred = sess.run(g(f'rpcn-{layer_name}/rpcn_out:0'), feed_dict=feed_dict)
+        assert not np.any(np.isnan(pred))
 
-            # Log training stats. The validation script will use these.
-            rpcn_cost = all_costs[rpcn_dim]
-            log['rpcn'][rpcn_dim]['err'].append(err)
-            log['rpcn'][rpcn_dim]['cost'].append(rpcn_cost)
+        # Randomly sample another set of masks. This means we (probably)
+        # predict on (mostly) different positions than during the
+        # optimisation step.
+        mask_bbox, mask_isFg, mask_cls = sampleMasks(
+            meta[rpcn_dim].mask_valid,
+            meta[rpcn_dim].mask_fgbg,
+            meta[rpcn_dim].mask_bbox,
+            meta[rpcn_dim].mask_fg_label,
+            500
+        )
 
-            # Print progress report to terminal.
-            cls_err = 100 * err.label / max(err.num_labels, 1)
-            bgFg_err = 100 * err.BgFg / max(err.num_BgFg, 1)
-            cost_bbox = int(rpcn_cost["bbox"])
-            cost_isFg = int(rpcn_cost["isFg"])
-            cost_cls = int(rpcn_cost["cls"])
-            s1 = f'BgFg={cost_isFg:6,}'
-            s2 = f'Cls={cost_cls:6,}'
-            s3 = f'BBox={cost_bbox:6,}'
-            s_cost = str.join('  ', [s1, s2, s3])
+        err = accuracy(y, pred[0], mask_bbox, mask_isFg, mask_cls)
+        tmp = meta[rpcn_dim].mask_bbox * meta[rpcn_dim].mask_valid
+        #print(np.count_nonzero(tmp), err.num_labels, err.num_BgFg)
 
-            s1 = f'BgFg={bgFg_err:4.1f}%'
-            s2 = f'Cls={cls_err:4.1f}%'
+        # Log training stats. The validation script will use these.
+        rpcn_cost = all_costs[rpcn_dim]
+        log['rpcn'][rpcn_dim]['err'].append(err)
+        log['rpcn'][rpcn_dim]['cost'].append(rpcn_cost)
+
+        cost_bbox = int(rpcn_cost["bbox"])
+        cost_isFg = int(rpcn_cost["isFg"])
+        cost_cls = int(rpcn_cost["cls"])
+        s1 = f'BgFg={cost_isFg:6,}'
+        s2 = f'Cls={cost_cls:6,}'
+        s3 = f'BBox={cost_bbox:6,}'
+        s_cost = str.join('  ', [s1, s2, s3])
+
+        # Print progress report to terminal.
+        cls_err = 100 * err.label / max(err.num_labels, 1)
+        bgFg_err = 100 * err.BgFg / max(err.num_BgFg, 1)
+        if err.num_BgFg >= 10:
+            bgFg_err = 100 * err.BgFg / err.num_BgFg
+            s1 = f'BgFg={bgFg_err:5.1f}%'
+        else:
+            bgFg_err = f'BgFg=  None'
+        if err.num_labels >= 10:
+            cls_err = 100 * err.label / err.num_labels
+            s2 = f'Cls={cls_err:5.1f}%'
+        else:
+            cls_err = f'Cls=  None'
+
+        # Compute maximum/90%/median for the BBox errors. If this features
+        # map did not have any BBoxes then report -1. The `bbox_err` shape
+        # is (4, N) where N is the number of BBoxes.
+        if np.count_nonzero(mask_bbox) < 10:
+            bb_50p = bb_90p = -1
+            s3 = f'BBox=None'
+        else:
+            tmp = np.sort(err.bbox.flatten())
+            bb_90p = tmp[int(0.9 * len(tmp))]
+            bb_50p = tmp[int(0.5 * len(tmp))]
             s3 = f'BBox=({bb_50p:2.0f}, {bb_90p:2.0f})'
-            s_err = str.join('  ', [s1, s2, s3])
+        s_err = str.join('  ', [s1, s2, s3])
 
-            fname = os.path.split(meta[rpcn_dim].filename)[-1]
-            print(f'  {batch:,} | {fname} | ' + s_cost + ' | ' + s_err)
+        fname = os.path.split(meta[rpcn_dim].filename)[-1]
+        print(f'  {batch:,} | {fname} | ' + s_cost + ' | ' + s_err)
 
 
 def main():
