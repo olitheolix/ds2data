@@ -221,8 +221,8 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             log['rpcn'][rpcn_dim]['cost'].append(rpcn_cost)
 
             # Print progress report to terminal.
-            cls_err = 100 * err.label / err.num_labels
-            bgFg_err = 100 * err.BgFg / err.num_BgFg
+            cls_err = 100 * err.label / max(err.num_labels, 1)
+            bgFg_err = 100 * err.BgFg / max(err.num_BgFg, 1)
             cost_bbox = int(rpcn_cost["bbox"])
             cost_isFg = int(rpcn_cost["isFg"])
             cost_cls = int(rpcn_cost["cls"])
