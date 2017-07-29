@@ -15,7 +15,7 @@ import json
 import pickle
 import argparse
 import multiprocessing
-import feature_inspector
+import inspect_feature
 
 import numpy as np
 import PIL.Image as Image
@@ -274,7 +274,7 @@ def main():
 
     # Show debug plots for the first file in the list.
     if param.debug:
-        feature_inspector.main(param.fnames[0] + '.jpg')
+        inspect_feature.main(param.fnames[0] + '.jpg')
 
 
 if __name__ == '__main__':
