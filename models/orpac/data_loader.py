@@ -9,7 +9,7 @@ import numpy as np
 from PIL import Image
 from config import NetConf
 from collections import namedtuple
-from feature_utils import setIsFg, setBBoxRects, setClassLabel
+from feature_utils import setIsFg, setBBoxRects, setClassLabel, oneHotEncoder
 
 
 class DataSet:
@@ -363,20 +363,14 @@ class BBox(DataSet):
             assert lap.dtype == np.int32 and lap.shape == ft_dim
             assert 0 <= np.amin(lap) <= np.amax(lap) < num_classes
 
-            # Convert integer label to one-hot-label.
-            isFg_hot = np.zeros((2, *ft_dim))
-            cls_label_hot = np.zeros((num_classes, *ft_dim))
-            for fy in range(ft_dim[0]):
-                for fx in range(ft_dim[1]):
-                    if lap[fy, fx] == 0:
-                        isFg_hot[0, fy, fx] = 1
-                    else:
-                        isFg_hot[1, fy, fx] = 1
-                    cls_label_hot[lap[fy, fx], fy, fx] = 1
+            # Compute binary mask that is 1 at every foreground pixel.
+            isFg = np.zeros(ft_dim)
+            isFg[np.nonzero(lap)] = 1
 
+            # Insert BBox parameter and hot-labels into the feature tensor.
             y[0] = setBBoxRects(y[0], bbox_rects)
-            y[0] = setIsFg(y[0], isFg_hot)
-            y[0] = setClassLabel(y[0], cls_label_hot)
+            y[0] = setIsFg(y[0], oneHotEncoder(isFg, 2))
+            y[0] = setClassLabel(y[0], oneHotEncoder(lap, num_classes))
 
             meta[ft_dim] = self.MetaData(
                 filename=None,
