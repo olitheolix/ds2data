@@ -175,12 +175,17 @@ class TestFeatureCompiler:
             enc([0, 1.5], 2 ** 16)
 
     def test_getNumClassesFromY(self):
-        fun = feature_utils.getNumClassesFromY
-        assert fun((1, 4 + 2 + 1, 64, 64)) == 1
-        assert fun((1, 4 + 2 + 5, 64, 64)) == 5
+        assert feature_utils.getNumClassesFromY((4 + 2 + 1, 64, 64)) == 1
+        assert feature_utils.getNumClassesFromY((4 + 2 + 5, 64, 64)) == 5
 
-        with pytest.raises(AssertionError):
-            fun((1, 4 + 2, 64, 64))
+        wrong_dims = [
+            (4 + 2, 64, 64),
+            (1, 4 + 2, 64, 64),
+            (4 + 2, 64),
+        ]
+        for dim in wrong_dims:
+            with pytest.raises(AssertionError):
+                feature_utils.getNumClassesFromY(dim)
 
     def test_sampleMasks(self):
         """Use a tiny test matrix that is easy to verify manually."""
