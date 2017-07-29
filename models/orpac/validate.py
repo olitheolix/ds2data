@@ -29,7 +29,7 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name):
     """ Compile the list of BBoxes and assoicated label that each RPCN found.
 
     Input:
-        sess: Tenseorflow sessions
+        sess: Tensorflow sessions
         img: CHW image
         x_in: Tensorflow Placeholder
         rpcn_dims: List[Tuple(ft_height, ft_width)]
