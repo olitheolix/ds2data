@@ -53,9 +53,10 @@ def parseCmdline():
     return param
 
 
-def _computeBBoxes(bb_data, objID_at_pixel_ft, ft_dim, im_dim):
+def _computeBBoxes(bb_rects, objID_at_pixel_ft, im_dim):
     # Find all feature map locations that show anything but background.
     fg_idx = np.nonzero(objID_at_pixel_ft)
+    ft_dim = objID_at_pixel_ft.shape
 
     # Convert the absolute BBox corners to relative values with respect to
     # the anchor point (all in image coordinates).
@@ -218,20 +219,20 @@ def compileFeatures(fname, img, rpcn_dims):
         objID_at_pixel_ft = downsampleMatrix(objID_at_pixel, ft_dim)
         obj_pixels_ft = {k: downsampleMatrix(v, ft_dim) for k, v in obj_pixels.items()}
 
-        bboxes = _computeBBoxes(bb_data, objID_at_pixel_ft, ft_dim, im_dim)
-        mask_fgbg = _maskFgBg(objID_at_pixel_ft)
+        bboxes = _computeBBoxes(bb_rects, objID_at_pixel_ft, im_dim)
+        mask_fg = _maskFgBg(objID_at_pixel_ft)
         mask_bbox = _maskBBox(objID_at_pixel_ft, obj_pixels_ft)
         mask_valid = _maskValid(objID_at_pixel_ft)
-        mask_fg_label = _maskFgLabel(img_ft, objID_at_pixel_ft, obj_pixels_ft)
+        mask_cls = _maskFgLabel(img_ft, objID_at_pixel_ft, obj_pixels_ft)
 
         # Compile all the information into the output dictionary.
         out[ft_dim] = {
             'bboxes': np.array(bboxes, np.float32),
             'objID_at_pixel': objID_at_pixel_ft,
             'label_at_pixel': label_at_pixel_ft,
-            'mask_fgbg': mask_fgbg,
+            'mask_fg': mask_fg,
             'mask_bbox': mask_bbox,
-            'mask_fg_label': mask_fg_label,
+            'mask_cls': mask_cls,
             'mask_valid': mask_valid,
         }
     return out
