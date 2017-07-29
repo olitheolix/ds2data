@@ -148,22 +148,27 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
         # Compile the feed dictionary so that we can train all RPCNs.
         fd = {x_in: np.expand_dims(img, 0), lrate_in: lrate}
         for rpcn_dim, y in ys.items():
-            m_bbox, m_isFg, m_cls = feature_compiler.sampleMasks(
+            # Determine how many locations to sample. We do not want to use every
+            # valid location in the image but only a random subset. The size of
+            # that subset, in this case, is 25% of the number of suitable BBox
+            # esitmation locations or 100, whichever is larger.
+            N = meta[rpcn_dim].mask_bbox * meta[rpcn_dim].mask_valid
+            N = np.count_nonzero(N)
+            mask_bbox, mask_isFg, mask_cls = feature_compiler.sampleMasks(
                 meta[rpcn_dim].mask_valid,
                 meta[rpcn_dim].mask_fgbg,
                 meta[rpcn_dim].mask_bbox,
                 meta[rpcn_dim].mask_fg_label,
-                500
+                int(max(100, 0.25 * N))
             )
 
             # Fetch the variables and assign them the current values. We need
             # to add the batch dimensions for Tensorflow.
             layer_name = f'{rpcn_dim[0]}x{rpcn_dim[1]}'
             fd[g(f'rpcn-{layer_name}-cost/y_true:0')] = np.expand_dims(y, 0)
-            fd[g(f'rpcn-{layer_name}-cost/mask_cls:0')] = m_cls
-            fd[g(f'rpcn-{layer_name}-cost/mask_bbox:0')] = m_bbox
-            fd[g(f'rpcn-{layer_name}-cost/mask_isFg:0')] = m_isFg
-            del rpcn_dim, m_cls, m_bbox, m_isFg, layer_name
+            fd[g(f'rpcn-{layer_name}-cost/mask_cls:0')] = mask_cls
+            fd[g(f'rpcn-{layer_name}-cost/mask_bbox:0')] = mask_bbox
+            fd[g(f'rpcn-{layer_name}-cost/mask_isFg:0')] = mask_isFg
 
         # Run one optimisation step and record all costs.
         cost_nodes = {'tot': g('cost:0')}
@@ -195,20 +200,21 @@ def logTrainingStats(sess, log, img, ys, meta, batch, all_costs):
         pred = sess.run(g(f'rpcn-{layer_name}/rpcn_out:0'), feed_dict=feed_dict)
         assert not np.any(np.isnan(pred))
 
-        # Randomly sample another set of masks. This means we (probably)
-        # predict on (mostly) different positions than during the
-        # optimisation step.
+        # Determine how many locations to sample. We do not want to use every
+        # valid location in the image but only a random subset. The size of
+        # that subset, in this case, is 25% of the number of suitable BBox
+        # esitmation locations or 100, whichever is larger.
+        N = meta[rpcn_dim].mask_bbox * meta[rpcn_dim].mask_valid
+        N = np.count_nonzero(N)
         mask_bbox, mask_isFg, mask_cls = sampleMasks(
             meta[rpcn_dim].mask_valid,
             meta[rpcn_dim].mask_fgbg,
             meta[rpcn_dim].mask_bbox,
             meta[rpcn_dim].mask_fg_label,
-            500
+            int(max(100, 0.25 * N))
         )
 
         err = accuracy(y, pred[0], mask_bbox, mask_isFg, mask_cls)
-        tmp = meta[rpcn_dim].mask_bbox * meta[rpcn_dim].mask_valid
-        #print(np.count_nonzero(tmp), err.num_labels, err.num_BgFg)
 
         # Log training stats. The validation script will use these.
         rpcn_cost = all_costs[rpcn_dim]
