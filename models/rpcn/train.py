@@ -84,8 +84,8 @@ def accuracy(gt, pred, mask_bbox, mask_isFg, mask_cls):
     pred_label = np.argmax(pred_label, axis=0)[mask_cls_idx]
 
     # Count the wrong foreground class predictions.
-    wrong_cls = np.count_nonzero(true_label == pred_label)
-    wrong_BgFg = np.count_nonzero(true_isFg == pred_isFg)
+    wrong_cls = np.count_nonzero(true_label != pred_label)
+    wrong_BgFg = np.count_nonzero(true_isFg != pred_isFg)
 
     # False-positive for background: net predicted background but is actually
     # foreground. Similarly for false-positive foreground.
