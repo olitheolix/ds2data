@@ -1,4 +1,5 @@
 import os
+import sys
 import pickle
 
 import numpy as np
@@ -115,6 +116,10 @@ def plotTrainingProgress(log):
     # indirectly from the number of recorded costs since there is exactly one
     # cost per sample.
     num_epochs = log['conf'].num_epochs
+    if num_epochs < 2:
+        print('Need at least 2 epochs to plot anything - Abort')
+        sys.exit(1)
+
     assert len(log['err']) % num_epochs == 0
     samples_per_epoch = len(log['cost']) // num_epochs
 
