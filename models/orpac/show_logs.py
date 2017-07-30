@@ -7,10 +7,13 @@ import matplotlib.pyplot as plt
 
 def computePercentile(vec, percentile):
     assert 0 <= percentile <= 100
-    N = len(vec) - 1
-    N = int(N * percentile / 100)
     vec = np.sort(vec)
-    return vec[N]
+    if percentile == 100:
+        return vec[-1]
+    else:
+        N = len(vec) - 1
+        N = int(N * percentile / 100)
+        return vec[N]
 
 
 def compileStatistics(layer_log, num_epochs, samples_per_epoch):
