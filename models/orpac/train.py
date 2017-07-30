@@ -295,7 +295,7 @@ def main():
 
     # Load the BBox training data.
     print('\n----- Data Set -----')
-    ds = data_loader.BBox(conf)
+    ds = data_loader.ORPAC(conf)
     ds.printSummary()
     int2name = ds.int2name()
     im_dim = ds.imageDimensions().tolist()

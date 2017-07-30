@@ -113,7 +113,7 @@ def main(data_path=None):
 
     # Load the data set and request a sample.
     t0 = time.time()
-    ds = data_loader.BBox(conf)
+    ds = data_loader.ORPAC(conf)
     etime = time.time() - t0
     print(f'Loaded dataset in {etime:,.1f}s')
     ds.printSummary()
