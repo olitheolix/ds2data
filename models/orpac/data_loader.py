@@ -286,14 +286,17 @@ class BBox(DataSet):
                 assert set(self.rpcn_dims).issubset(tmp.keys())
             except (pickle.UnpicklingError, FileNotFoundError, AssertionError):
                 missing.append(fname)
+            del fname
 
         # Compile the missing training output.
         if len(missing) > 0:
-            print('Compiling training data...')
-            for fn in tqdm.tqdm(missing):
-                compile_features.generate(fn, (height, width), self.rpcn_dims)
-        else:
-            print('Using pre-compiled training data')
+            progbar = tqdm.tqdm(missing, desc=f'Compiling Features', leave=False)
+            for fname in progbar:
+                img = Image.open(fname + '.jpg').convert(colour_format)
+                img = np.array(img)
+                out = compile_features.generate(fname, img, self.rpcn_dims)
+                pickle.dump(out, open(fname + '-compiled.pickle', 'wb'))
+                del fname
 
         # Load the compiled training data alongside each image.
         dims = (chan, height, width)
