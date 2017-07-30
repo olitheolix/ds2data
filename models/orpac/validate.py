@@ -152,9 +152,8 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name):
     return preds, bb_rects_out, pred_labels_out, true_labels_out
 
 
-def validateEpoch(sess, ds, x_in, rpcn_filter_size, dset):
-    # Predict the BBoxes for every image in the test data set and accumulate
-    # error statistics.
+def validateEpoch(sess, ds, x_in, dset):
+    # Predict the BBoxes for every image.
     ds.reset(dset)
     N = ds.lenOfEpoch(dset)
     int2name = ds.int2name()
@@ -306,7 +305,7 @@ def main():
     sess.run(tf.global_variables_initializer())
 
     # Compute and print statistics from test data set.
-    validateEpoch(sess, ds, x_in, conf.rpcn_filter_size, 'test')
+    validateEpoch(sess, ds, x_in, 'test')
     plt.show()
 
 
