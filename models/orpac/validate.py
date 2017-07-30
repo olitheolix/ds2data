@@ -18,9 +18,12 @@ def parseCmdline():
     """Parse the command line arguments."""
     # Create a parser and program description.
     parser = argparse.ArgumentParser(description='Validate Images')
-    parser.add_argument(
-        'N', metavar='', type=int, default=1, nargs='?',
-        help='Limit the validation set to at most N images')
+    padd = parser.add_argument
+    padd('N', metavar='', type=int, default=1, nargs='?',
+         help='Limit the validation set to at most N images')
+    padd('--dst', metavar='', type=str, default='/tmp',
+         help='Where to write predicted images (default /tmp)')
+
     return parser.parse_args()
 
 
@@ -152,7 +155,7 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name):
     return preds, bb_rects_out, pred_labels_out, true_labels_out
 
 
-def validateEpoch(sess, ds, x_in):
+def validateEpoch(sess, ds, x_in, dst_path):
     # Predict the BBoxes for every image.
     dset = 'test'
     ds.reset(dset)
@@ -161,10 +164,21 @@ def validateEpoch(sess, ds, x_in):
     fig_opts = dict(dpi=150, transparent=True, bbox_inches='tight', pad_inches=0)
     rpcn_dims = ds.getRpcnDimensions()
 
+    # Ensure target directory exists.
+    os.makedirs(dst_path, exist_ok=True)
+
     print('\n----- Validating Images -----')
     for i in tqdm.tqdm(range(N)):
         img, ys, uuid = ds.nextSingle(dset)
         assert img is not None
+
+        # Extract the original file name. To get it, just pop one of the
+        # feature dimensions and look up the file name in the meta data.
+        _, meta = ds.getMeta([uuid])[uuid].popitem()
+        fname = os.path.split(meta.filename)[-1]
+        fname = f'{fname}-pred.jpg'
+        fname = os.path.join(dst_path, fname)
+        del meta
 
         # Predict the BBoxes and ensure there are no NaNs in the output.
         tmp = predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name)
@@ -175,7 +189,7 @@ def validateEpoch(sess, ds, x_in):
         # Show the input image and add the BBoxes and save the result.
         fig = showPredictedBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
         fig.set_size_inches(20, 11)
-        fig.savefig(f'/tmp/bbox_{i:04d}.jpg', **fig_opts)
+        fig.savefig(fname, **fig_opts)
 
         # Close the figure unless it is the very first one which we will show
         # for debug purposes at the end of the script. Similarly, create a
@@ -306,7 +320,7 @@ def main():
     sess.run(tf.global_variables_initializer())
 
     # Compute and print statistics from test data set.
-    validateEpoch(sess, ds, x_in)
+    validateEpoch(sess, ds, x_in, param.dst)
     plt.show()
 
 
