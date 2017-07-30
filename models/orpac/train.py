@@ -1,6 +1,8 @@
 import os
+import time
 import pickle
 import config
+import datetime
 import rpcn_net
 import argparse
 import shared_net
@@ -330,7 +332,9 @@ def main():
     try:
         epoch_ofs = conf.num_epochs + 1
         lrates = np.logspace(-3, -5, param.N)
+        t0_all = time.time()
         for epoch in range(param.N):
+            t0_epoch = time.time()
             tot_epoch = epoch + epoch_ofs
             print(f'\nEpoch {tot_epoch} ({epoch+1}/{param.N} in this training cycle)')
 
@@ -345,6 +349,17 @@ def main():
             meta = {'conf': conf, 'int2name': int2name, 'log': log}
             pickle.dump(meta, open(fnames['meta'], 'wb'))
             saver.save(sess, fnames['checkpt'])
+
+            # Determine training time for epoch
+            etime = str(datetime.timedelta(seconds=int(time.time() - t0_epoch)))
+            et_h, et_m, et_s = etime.split(':')
+            etime_str = f'  Training time: {et_h}h {et_m}m {et_s}s'
+
+            # Print basic stats about epoch.
+            print(f'{etime_str}   Learning Rate: {lrates[epoch]:.1E}')
+        etime = str(datetime.timedelta(seconds=int(time.time() - t0_all)))
+        et_h, et_m, et_s = etime.split(':')
+        print(f'\nTotal training time: {et_h}h {et_m}m {et_s}s\n')
     except KeyboardInterrupt:
         pass
 
