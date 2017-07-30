@@ -91,10 +91,9 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name):
         bb_rects, pick_yx = unpackBBoxes(im_dim, bboxes, hard)
         del hard, hard_cls, hard_fg, bboxes, pred, isFg
 
-        # Compute a score for each BBox that will be used in the
-        # non-maximum-suppression stage. The score is simply the largest
-        # Softmax value.
-        scores = sess.run(tf.reduce_max(tf.nn.softmax(pred_labels, dim=0), axis=0))
+        # Compute a BBox score to prioritise on in the non-maximum suppression
+        # step below. In this case, the score is simply the network output.
+        scores = np.max(pred_labels, axis=0)
         scores = scores[pick_yx]
         assert len(scores) == len(bb_rects)
 
