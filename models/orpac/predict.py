@@ -23,9 +23,9 @@ def parseCmdline():
     padd = parser.add_argument
     padd('-N', metavar='', type=int, default=None,
          help='Predict only first N images (default all)')
-    padd('-src', metavar='', type=str, default=None,
-         help='Folder with images (default ./data/flightpath)')
-    padd('-dst', metavar='', type=str, default=None,
+    padd('--src', metavar='', type=str, default=None,
+         help='Folder with images (default ./data/3dflight)')
+    padd('--dst', metavar='', type=str, default=None,
          help='Images with BBoxes will be written here (default /tmp/flightpath)')
 
     param = parser.parse_args()
