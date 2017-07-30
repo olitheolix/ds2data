@@ -296,13 +296,13 @@ def main():
     }
 
     # Load configuration file for latest network.
+    fname = fnames['meta']
     try:
-        fname = fnames['meta']
         conf = pickle.load(open(fname, 'rb'))['conf']
-        del fname
     except FileNotFoundError:
         print(f'\nError: Configuration {fname} does not exist.')
         return
+    del fname
 
     # Overwrite the number of samples to load, and put all of them into the
     # 'test' set.
