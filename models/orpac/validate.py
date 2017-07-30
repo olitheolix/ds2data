@@ -25,6 +25,28 @@ def parseCmdline():
     return parser.parse_args()
 
 
+def nonMaxSuppress(sess, bb_rects, scores):
+    """ Wrapper around Tensorflow's non-max-suppression function.
+
+    Input:
+        sess: Tensorflow sessions
+        bb_rects: Array[N, 4]
+            BBox rectangles, one per column.
+        scores: Array[N]
+            One scalar score for each BBox.
+
+    Returns:
+        idx: Array
+            List of BBox indices that survived the operation.
+    """
+    g = tf.get_default_graph().get_tensor_by_name
+    fd = {
+        g('non-max-suppression/scores:0'): scores,
+        g('non-max-suppression/bb_rects:0'): bb_rects,
+    }
+    return sess.run(g('non-max-suppression/op:0'), feed_dict=fd)
+
+
 def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name):
     """ Compile the list of BBoxes and assoicated label that each RPCN found.
 
@@ -98,7 +120,7 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name):
         assert len(scores) == len(bb_rects)
 
         # Suppress overlapping BBoxes.
-        idx = sess.run(tf.image.non_max_suppression(bb_rects, scores, 30, 0.2))
+        idx = nonMaxSuppress(sess, bb_rects, scores)
         bb_rects = bb_rects[idx]
         del scores, idx
 

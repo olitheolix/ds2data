@@ -141,6 +141,14 @@ def setup(fname, x_in, num_classes, filter_size, ft_out_dims, trainable):
     print(f'RPCN ({len(ft_out_dims)} layers):')
     print(f'  Restored from <{fname}>')
 
+    # Create non-maximum-suppression nodes. This is irrelevant for training but
+    # the predictor will need it and it is better to create the necessary
+    # variables and operations only once.
+    with tf.variable_scope('non-max-suppression'):
+        r_in = tf.placeholder(tf.float32, [None, 4], name='bb_rects')
+        s_in = tf.placeholder(tf.float32, [None], name='scores')
+        tf.image.non_max_suppression(r_in, s_in, 30, 0.2, name='op')
+
     for layer_dim in ft_out_dims:
         assert isinstance(layer_dim, tuple) and len(layer_dim) == 2
         assert x_in.shape.as_list()[2:] == list(2 * np.array(layer_dim))
