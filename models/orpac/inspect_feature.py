@@ -34,7 +34,7 @@ def parseCmdline():
     return param
 
 
-def plotTrainingSample(img_hwc, ys, rpcn_filter_size, int2name):
+def plotFeature(img_hwc, ys, rpcn_filter_size, int2name):
     assert img_hwc.ndim == 3 and img_hwc.shape[2] == 3
 
     # Convert to HWC format for Matplotlib.
@@ -122,7 +122,7 @@ def main(data_path=None):
     assert x.ndim == 3 and x.shape[0] == 3
     img = np.transpose(x, [1, 2, 0])
 
-    plotTrainingSample(img, y, conf.rpcn_filter_size, ds.int2name())
+    plotFeature(img, y, conf.rpcn_filter_size, ds.int2name())
 
     meta = ds.getMeta([uuid])[uuid]
     plotMasks(img, meta)
