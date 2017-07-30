@@ -19,10 +19,11 @@ def parseCmdline():
     # Create a parser and program description.
     parser = argparse.ArgumentParser(description='Validate Images')
     padd = parser.add_argument
-    padd('N', metavar='', type=int, default=1, nargs='?',
-         help='Limit the validation set to at most N images')
+    padd('src', metavar='src', type=str, help='Folder with labelled images')
+    padd('N', metavar='N', type=int, default=None, nargs='?',
+         help='Only validate the first N images')
     padd('--dst', metavar='', type=str, default='/tmp',
-         help='Where to write predicted images (default /tmp)')
+         help='Folder for predicted images (default /tmp)')
 
     return parser.parse_args()
 
@@ -168,7 +169,9 @@ def validateEpoch(sess, ds, x_in, dst_path):
     os.makedirs(dst_path, exist_ok=True)
 
     print('\n----- Validating Images -----')
-    for i in tqdm.tqdm(range(N)):
+    progbar = tqdm.tqdm(range(N), total=N, desc=f'Predicting', leave=False)
+
+    for i in progbar:
         img, ys, uuid = ds.nextSingle(dset)
         assert img is not None
 
@@ -316,12 +319,14 @@ def main():
     rpcn_net.setup(
         fnames['rpcn_net'], sh_out, len(int2name),
         conf.rpcn_filter_size, conf.rpcn_out_dims, True)
-
     sess.run(tf.global_variables_initializer())
 
-    # Compute and print statistics from test data set.
-    validateEpoch(sess, ds, x_in, param.dst)
-    plt.show()
+    # Predict each image and produce a new image with BBoxes and labels in it.
+    try:
+        validateEpoch(sess, ds, x_in, param.dst)
+        plt.show()
+    except KeyboardInterrupt:
+        print('User Abort')
 
 
 if __name__ == '__main__':
