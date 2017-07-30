@@ -307,6 +307,7 @@ def main():
     # Overwrite the number of samples to load, and put all of them into the
     # 'test' set.
     conf = conf._replace(
+        path=param.src,
         num_samples=param.N,
         train_rat=0.0,
     )
