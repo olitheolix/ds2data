@@ -27,8 +27,6 @@ class DataSet:
 
     Args:
         conf (NetConf): simulation parameters.
-        conf.width, conf.height (int):
-            resize the image to these dimensions
         conf.colour (str):
             PIL image format. Must be 'L' or 'RGB'.
         conf.seed (int):
@@ -248,13 +246,8 @@ class BBox(DataSet):
             return None, None, None
 
     def loadRawData(self):
-        # Unpack parameters for convenience.
-        N = self.conf.num_samples
-        width = self.conf.width or 128
-        height = self.conf.height or 128
-        colour_format = self.conf.colour.upper()
-
         # Ensure the colour format is valid.
+        colour_format = self.conf.colour.upper()
         assert colour_format in {'RGB', 'L'}
         chan = 1 if colour_format == 'L' else 3
 
@@ -334,10 +327,9 @@ class BBox(DataSet):
         # to the data set.
         num_classes = None
         for i, fname in enumerate(fnames):
-            # Load image and convert to correct colour format and resize.
+            # Load image and convert to correct colour format.
             img = Image.open(fname + '.jpg').convert(colour_format)
-            if img.size != (width, height):
-                img = img.resize((width, height), Image.BILINEAR)
+            assert img.size == (width, height)
 
             # Switch to NumPy and insert a dummy dim for Grayscale (2d images).
             img = np.array(img, np.uint8)
