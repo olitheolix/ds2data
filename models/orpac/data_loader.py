@@ -323,8 +323,7 @@ class BBox(DataSet):
         all_y, all_meta = [], []
         all_x = np.zeros((len(fnames), *im_dim), np.uint8)
 
-        # Load each image, pre-process it (eg resize, RGB/Gray), and add it
-        # to the data set.
+        # Load each image and associated features.
         num_classes = None
         for i, fname in enumerate(fnames):
             # Load image and convert to correct colour format.
@@ -340,8 +339,7 @@ class BBox(DataSet):
             all_x[i] = np.transpose(img, [2, 0, 1])
             del img
 
-            # Open the pre-compiled training output and ensure it uses the same
-            # label map.
+            # All pre-compiled features must use the same label map.
             data = pickle.load(open(fname + '-compiled.pickle', 'rb'))
             if num_classes is None:
                 int2name = data['int2name']
