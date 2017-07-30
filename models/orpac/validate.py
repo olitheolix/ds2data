@@ -1,6 +1,5 @@
 import os
 import tqdm
-import time
 import pickle
 import argparse
 import rpcn_net
@@ -162,18 +161,14 @@ def validateEpoch(sess, ds, x_in, rpcn_filter_size, dset='test'):
     fig_opts = dict(dpi=150, transparent=True, bbox_inches='tight', pad_inches=0)
     rpcn_dims = ds.getRpcnDimensions()
 
-    etime = []
-
     print('\n----- Validating Images -----')
     for i in tqdm.tqdm(range(N)):
         img, ys, uuid = ds.nextSingle(dset)
         assert img is not None
 
         # Predict the BBoxes and ensure there are no NaNs in the output.
-        t0 = time.perf_counter()
         tmp = predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name)
         preds, pred_rect, pred_cls, true_cls = tmp
-        etime.append(time.perf_counter() - t0)
         for _ in preds.values():
             assert not np.any(np.isnan(_))
 
@@ -189,14 +184,6 @@ def validateEpoch(sess, ds, x_in, rpcn_filter_size, dset='test'):
             plotPredictedLabelMap(img, preds, ys, int2name)
         else:
             plt.close(fig)
-
-    # Compute average prediction time.
-    etime.sort()
-    if len(etime) < 3:
-        etime = np.mean(etime)
-    else:
-        etime = np.mean(etime[1:-1])
-    print(f'Prediction time per image: {1000 * etime:.0f}ms')
 
 
 def plotPredictedLabelMap(img, preds, ys, int2name):
