@@ -295,7 +295,17 @@ def main():
         'shared_net': os.path.join(netstate_path, 'shared-net.pickle'),
     }
 
-    conf = pickle.load(open(fnames['meta'], 'rb'))['conf']
+    # Load configuration file for latest network.
+    try:
+        fname = fnames['meta']
+        conf = pickle.load(open(fname, 'rb'))['conf']
+        del fname
+    except FileNotFoundError:
+        print(f'\nError: Configuration {fname} does not exist.')
+        return
+
+    # Overwrite the number of samples to load, and put all of them into the
+    # 'test' set.
     conf = conf._replace(
         num_samples=param.N,
         train_rat=0.0,
