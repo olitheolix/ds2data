@@ -31,7 +31,7 @@ def parseCmdline():
     param = parser.parse_args()
     if param.src is None:
         cwd = os.path.dirname(os.path.abspath(rpcn_net.__file__))
-        param.src = os.path.join(cwd, 'data', 'flightpath')
+        param.src = os.path.join(cwd, 'data', '3dflight')
     if param.dst is None:
         param.dst = os.path.join('/', 'tmp', 'predictions')
     return param
