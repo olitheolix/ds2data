@@ -18,7 +18,7 @@ from feature_utils import getIsFg, getBBoxRects, getClassLabel, unpackBBoxes
 def parseCmdline():
     """Parse the command line arguments."""
     # Create a parser and program description.
-    parser = argparse.ArgumentParser(description='Train the network for N epochs')
+    parser = argparse.ArgumentParser(description='Validate Images')
     parser.add_argument(
         'N', metavar='', type=int, default=1, nargs='?',
         help='Limit the validation set to at most N images')
