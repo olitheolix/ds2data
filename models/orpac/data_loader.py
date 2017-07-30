@@ -27,8 +27,6 @@ class DataSet:
 
     Args:
         conf (NetConf): simulation parameters.
-        conf.colour (str):
-            PIL image format. Must be 'L' or 'RGB'.
         conf.seed (int):
             Seed for Numpy random generator.
         conf.train_rat (float): 0.0-1.0
@@ -246,11 +244,6 @@ class BBox(DataSet):
             return None, None, None
 
     def loadRawData(self):
-        # Ensure the colour format is valid.
-        colour_format = self.conf.colour.upper()
-        assert colour_format in {'RGB', 'L'}
-        chan = 1 if colour_format == 'L' else 3
-
         # Store the feature map sizes for which we have data.
         self.rpcn_dims = self.conf.rpcn_out_dims
 
@@ -260,11 +253,11 @@ class BBox(DataSet):
         height, width = self.checkImageDimensions(fnames)
 
         # If the features have not been compiled yet, do so now.
-        self.compileMissingFeatures(fnames, colour_format)
+        self.compileMissingFeatures(fnames)
 
         # Load the compiled training data alongside each image.
-        dims = (chan, height, width)
-        x, y, int2name, meta = self.loadTrainingData(fnames, dims, colour_format)
+        dims = (3, height, width)
+        x, y, int2name, meta = self.loadTrainingData(fnames, dims)
 
         # Return the data expected by the base class.
         return x, y, dims, int2name, meta
@@ -297,7 +290,7 @@ class BBox(DataSet):
             raise FileNotFoundError(self.conf.path)
         return fnames
 
-    def compileMissingFeatures(self, fnames, colour_format):
+    def compileMissingFeatures(self, fnames):
         # Find out which images have no training output yet.
         missing = []
         for fname in fnames:
@@ -311,33 +304,26 @@ class BBox(DataSet):
         if len(missing) > 0:
             progbar = tqdm.tqdm(missing, desc=f'Compiling Features', leave=False)
             for fname in progbar:
-                img = Image.open(fname + '.jpg').convert(colour_format)
+                img = Image.open(fname + '.jpg').convert('RGB')
                 img = np.array(img)
                 out = compile_features.generate(fname, img, self.rpcn_dims)
                 pickle.dump(out, open(fname + '-compiled.pickle', 'wb'))
 
-    def loadTrainingData(self, fnames, im_dim, colour_format):
-        chan, height, width = im_dim
-        ft_dims = self.rpcn_dims
-
+    def loadTrainingData(self, fnames, im_dim):
+        num_classes = None
         all_y, all_meta = [], []
         all_x = np.zeros((len(fnames), *im_dim), np.uint8)
 
         # Load each image and associated features.
-        num_classes = None
         for i, fname in enumerate(fnames):
-            # Load image and convert to correct colour format.
-            img = Image.open(fname + '.jpg').convert(colour_format)
-            assert img.size == (width, height)
-
-            # Switch to NumPy and insert a dummy dim for Grayscale (2d images).
-            img = np.array(img, np.uint8)
-            if img.ndim == 2:
-                img = np.expand_dims(img, axis=2)
+            # Load image as RGB and convert to Numpy.
+            img = np.array(Image.open(fname + '.jpg').convert('RGB'), np.uint8)
+            img_chw = np.transpose(img, [2, 0, 1])
+            assert img_chw.shape == im_dim
 
             # Store image in CHW format.
-            all_x[i] = np.transpose(img, [2, 0, 1])
-            del img
+            all_x[i] = img_chw
+            del img, img_chw
 
             # All pre-compiled features must use the same label map.
             data = pickle.load(open(fname + '-compiled.pickle', 'rb'))
@@ -347,7 +333,7 @@ class BBox(DataSet):
             assert int2name == data['int2name']
 
             # Crate the training output for different feature sizes.
-            y, m = self.compileTrainingOutput(data, ft_dims, im_dim, num_classes)
+            y, m = self.compileTrainingOutput(data, self.rpcn_dims, im_dim, num_classes)
 
             # Replace the file name in all MetaData instances.
             m = {k: v._replace(filename=fname) for k, v in m.items()}
