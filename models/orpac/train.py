@@ -285,10 +285,10 @@ def main():
     else:
         log = collections.defaultdict(list)
         conf = config.NetConf(
-            seed=0, width=512, height=512, colour='rgb', dtype='float32',
-            path=os.path.join('data', '3dflight'), train_rat=0.8,
-            num_pools_shared=2, rpcn_out_dims=[(64, 64), (32, 32)],
-            rpcn_filter_size=31, num_epochs=0, num_samples=None
+            seed=0, dtype='float32', train_rat=0.8, num_pools_shared=2,
+            rpcn_out_dims=[(64, 64), (32, 32)], rpcn_filter_size=31,
+            path=os.path.join('data', '3dflight'),
+            num_epochs=0, num_samples=None
         )
         print(f'Restored from <{None}>')
     print(conf)

@@ -106,8 +106,7 @@ def main(data_path=None):
 
     # Dummy Net configuration. We only fill in the values for the Loader.
     conf = config.NetConf(
-        seed=0, width=512, height=512, colour='rgb', dtype='float32',
-        path=data_path, train_rat=0.8,
+        seed=0, dtype='float32', path=data_path, train_rat=0.8,
         num_pools_shared=None, rpcn_out_dims=[(64, 64), (32, 32)],
         rpcn_filter_size=None, num_epochs=None, num_samples=None
     )
