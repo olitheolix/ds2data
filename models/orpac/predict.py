@@ -137,7 +137,10 @@ def main():
         fname_out = os.path.basename(fname)
         fname_out = os.path.join(param.dst, f'pred-{fname_out}')
         fig.savefig(fname_out, **fig_opts)
-        if i > 0:
+
+        # Close all but the first 5 figures because we will show these for
+        # debug purposes.
+        if i > 5:
             plt.close(fig)
     plt.show()
 
