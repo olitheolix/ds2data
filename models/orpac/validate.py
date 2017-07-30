@@ -152,10 +152,10 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name):
     return preds, bb_rects_out, pred_labels_out, true_labels_out
 
 
-def validateEpoch(sess, ds, x_in, rpcn_filter_size, dset='test'):
+def validateEpoch(sess, ds, x_in, rpcn_filter_size, dset):
     # Predict the BBoxes for every image in the test data set and accumulate
     # error statistics.
-    ds.reset()
+    ds.reset(dset)
     N = ds.lenOfEpoch(dset)
     int2name = ds.int2name()
     fig_opts = dict(dpi=150, transparent=True, bbox_inches='tight', pad_inches=0)
@@ -279,7 +279,10 @@ def main():
     }
 
     conf = pickle.load(open(fnames['meta'], 'rb'))['conf']
-    conf = conf._replace(num_samples=param.N)
+    conf = conf._replace(
+        num_samples=param.N,
+        train_rat=0.0,
+    )
 
     # Load the BBox training data.
     print('\n----- Data Set -----')
