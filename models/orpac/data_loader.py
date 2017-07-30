@@ -261,6 +261,31 @@ class BBox(DataSet):
         # Store the feature map sizes for which we have data.
         self.rpcn_dims = self.conf.rpcn_out_dims
 
+        # Compile a list of JPG images in the source folder. Then verify that
+        # a) each is a valid JPG file and b) all images have the same size.
+        fnames = self.findTrainingFiles(self.conf.num_samples)
+        height, width = self.checkImageDimensions(fnames)
+
+        # If the features have not been compiled yet, do so now.
+        self.compileMissingFeatures(fnames, colour_format)
+
+        # Load the compiled training data alongside each image.
+        dims = (chan, height, width)
+        x, y, int2name, meta = self.loadTrainingData(fnames, dims, colour_format)
+
+        # Return the data expected by the base class.
+        return x, y, dims, int2name, meta
+
+    def checkImageDimensions(self, fnames):
+        dims = {Image.open(fname + '.jpg').size for fname in fnames}
+        if len(dims) == 1:
+            width, height = dims.pop()
+            return height, width
+
+        print('\nError: found different images sizes: ', dims)
+        assert False, 'Images do not all have the same size'
+
+    def findTrainingFiles(self, N):
         # Find all training images and strip off the '.jpg' extension. Abort if
         # there are no files.
         if os.path.isdir(self.conf.path):
@@ -277,7 +302,9 @@ class BBox(DataSet):
         else:
             print(f'\nError: <{self.conf.path}> is not a valid file or path\n')
             raise FileNotFoundError(self.conf.path)
+        return fnames
 
+    def compileMissingFeatures(self, fnames, colour_format):
         # Find out which images have no training output yet.
         missing = []
         for fname in fnames:
@@ -286,7 +313,6 @@ class BBox(DataSet):
                 assert set(self.rpcn_dims).issubset(tmp.keys())
             except (pickle.UnpicklingError, FileNotFoundError, AssertionError):
                 missing.append(fname)
-            del fname
 
         # Compile the missing training output.
         if len(missing) > 0:
@@ -296,14 +322,6 @@ class BBox(DataSet):
                 img = np.array(img)
                 out = compile_features.generate(fname, img, self.rpcn_dims)
                 pickle.dump(out, open(fname + '-compiled.pickle', 'wb'))
-                del fname
-
-        # Load the compiled training data alongside each image.
-        dims = (chan, height, width)
-        x, y, int2name, meta = self.loadTrainingData(fnames, dims, colour_format)
-
-        # Return the data expected by the base class.
-        return x, y, dims, int2name, meta
 
     def loadTrainingData(self, fnames, im_dim, colour_format):
         chan, height, width = im_dim
