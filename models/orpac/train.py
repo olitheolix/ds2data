@@ -26,7 +26,7 @@ def parseCmdline():
     return parser.parse_args()
 
 
-def compileErrorStats(gt, pred, mask_bbox, mask_isFg, mask_cls):
+def compileErrorStats(true_y, pred_y, mask_bbox, mask_isFg, mask_cls):
     """Return accuracy metrics in a named tuple.
 
     NOTE: the accuracy is always with respect to `mask_cls` and `mask_bbox`.
@@ -34,9 +34,9 @@ def compileErrorStats(gt, pred, mask_bbox, mask_isFg, mask_cls):
     statistics.
 
     Input:
-        gt: Array [:, height, width]
+        true_y: Array [:, height, width]
             Ground truth values.
-        pred: Array [:, height, width]
+        pred_y: Array [:, height, width]
             Contains the network predictions. Must be same size as `gt`
         mask_bbox: Array [height, width]
             The locations that contribute to the BBox error statistics.
@@ -52,29 +52,28 @@ def compileErrorStats(gt, pred, mask_bbox, mask_isFg, mask_cls):
     # the same shape.
     assert mask_cls.shape == mask_bbox.shape == mask_isFg.shape
     assert mask_cls.ndim == mask_bbox.ndim == mask_isFg.ndim == 2
-    assert pred.ndim == gt.ndim == 3
-    assert pred.shape == gt.shape
-    assert pred.shape[1:] == mask_cls.shape
+    assert pred_y.ndim == true_y.ndim == 3
+    assert pred_y.shape == true_y.shape
+    assert pred_y.shape[1:] == mask_cls.shape
 
-    # First 4 dimensions are BBox parameters (x, y, w, h), next 2 are bg/fg
-    # label, and the remaining ones are one-hot class labels. Find out how many
-    # of those there are.
-    num_classes = getNumClassesFromY(pred.shape)
+    num_classes = getNumClassesFromY(pred_y.shape)
 
-    # Flattened vectors will be more convenient.
+    # Flattened vectors will be more convenient to work with.
     mask_isFg_idx = np.nonzero(mask_isFg.flatten())
     mask_bbox_idx = np.nonzero(mask_bbox.flatten())
     mask_cls_idx = np.nonzero(mask_cls.flatten())
     del mask_bbox, mask_isFg, mask_cls
 
     # Unpack the tensor constituents and flatten the feature dimensions.
-    pred_bbox = getBBoxRects(pred).reshape([4, -1])
-    pred_isFg = getIsFg(pred).reshape([2, -1])
-    pred_label = getClassLabel(pred).reshape([num_classes, -1])
+    pred_bbox = getBBoxRects(pred_y).reshape([4, -1])
+    pred_isFg = getIsFg(pred_y).reshape([2, -1])
+    pred_label = getClassLabel(pred_y).reshape([num_classes, -1])
+    del pred_y
 
     # Repeat with the ground truth tensor.
-    gt = gt.reshape([4 + 2 + num_classes, -1])
-    true_bbox, true_isFg, true_label = gt[:4], gt[4:6], gt[6:]
+    true_y = true_y.reshape([4 + 2 + num_classes, -1])
+    true_bbox, true_isFg, true_label = true_y[:4], true_y[4:6], true_y[6:]
+    del true_y
 
     # Determine the background/foreground flag at each location. Only retain
     # locations permitted by the mask.
