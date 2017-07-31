@@ -26,7 +26,7 @@ def parseCmdline():
     return parser.parse_args()
 
 
-def compileErrorStats(true_y, pred_y, mask_bbox, mask_isFg, mask_cls):
+def compileErrorStats(true_y, pred_y, mask_bbox, mask_bgfg, mask_cls):
     """Return accuracy metrics in a named tuple.
 
     NOTE: the accuracy is always with respect to `mask_cls` and `mask_bbox`.
@@ -39,19 +39,19 @@ def compileErrorStats(true_y, pred_y, mask_bbox, mask_isFg, mask_cls):
         pred_y: Array [:, height, width]
             Contains the network predictions. Must be same size as `true_y`
         mask_bbox: Array [height, width]
-            The locations that contribute to the BBox error statistics.
-        mask_isFg: Array [height, width]
-            The locations that enter the fg/bg error statistics.
+            Active locations for BBox statistics.
+        mask_bgfg: Array [height, width]
+            Activate locations for bg/fg statistics.
         mask_cls: Array [height, width]
-            The locations that enter the class label error statistics.
+            Activate locations for label statistics.
 
     Returns:
         NamedTuple
     """
     # Mask must be 2D and have the same shape. Pred/True must be 3D and also have
     # the same shape.
-    assert mask_cls.shape == mask_bbox.shape == mask_isFg.shape
-    assert mask_cls.ndim == mask_bbox.ndim == mask_isFg.ndim == 2
+    assert mask_cls.shape == mask_bbox.shape == mask_bgfg.shape
+    assert mask_cls.ndim == mask_bbox.ndim == mask_bgfg.ndim == 2
     assert pred_y.ndim == true_y.ndim == 3
     assert pred_y.shape == true_y.shape
     assert pred_y.shape[1:] == mask_cls.shape
@@ -59,10 +59,11 @@ def compileErrorStats(true_y, pred_y, mask_bbox, mask_isFg, mask_cls):
     num_classes = getNumClassesFromY(pred_y.shape)
 
     # Flattened vectors will be more convenient to work with.
-    mask_isFg_idx = np.nonzero(mask_isFg.flatten())
+    mask_bgfg_idx = np.nonzero(mask_bgfg.flatten())
     mask_bbox_idx = np.nonzero(mask_bbox.flatten())
     mask_cls_idx = np.nonzero(mask_cls.flatten())
-    del mask_bbox, mask_isFg, mask_cls
+    num_cls = np.count_nonzero(mask_cls)
+    del mask_bbox, mask_bgfg, mask_cls
 
     # Unpack and flatten the True/Predicted tensor components.
     true_bbox = getBBoxRects(true_y).reshape([4, -1])
@@ -74,8 +75,8 @@ def compileErrorStats(true_y, pred_y, mask_bbox, mask_isFg, mask_cls):
     del pred_y, true_y
 
     # Make decision: Background/Foreground for each valid location.
-    true_isFg = np.argmax(true_isFg, axis=0)[mask_isFg_idx]
-    pred_isFg = np.argmax(pred_isFg, axis=0)[mask_isFg_idx]
+    true_isFg = np.argmax(true_isFg, axis=0)[mask_bgfg_idx]
+    pred_isFg = np.argmax(pred_isFg, axis=0)[mask_bgfg_idx]
 
     # Make decision: Label for each valid location.
     true_label = np.argmax(true_label, axis=0)[mask_cls_idx]
