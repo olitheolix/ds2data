@@ -41,24 +41,28 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
         d = stats[pstr]
 
         for epoch in range(num_epochs):
+            # Compute delimiters for current epoch.
             start = epoch * samples_per_epoch
             stop = start + samples_per_epoch
-            err = layer_log['err'][start:stop]
 
+            # Slice out the corresponding costs and convert to NumPy.
             cost = layer_log['cost'][start:stop]
             cost_bbox = np.array([_['bbox'] for _ in cost])
             cost_isFg = np.array([_['isFg'] for _ in cost])
             cost_cls = np.array([_['cls'] for _ in cost])
             del cost
 
+            # Unpack the error statistics for all images in the epoch.
+            err = layer_log['err'][start:stop]
             bgfg = np.array([_.BgFg for _ in err])
             label = np.array([_.label for _ in err])
-            num_labels = np.array([_.num_labels for _ in err])
+            bb_err = np.hstack([_.bbox for _ in err])
             num_fg = np.array([_.num_Fg for _ in err])
             num_bg = np.array([_.num_Bg for _ in err])
+            num_labels = np.array([_.num_labels for _ in err])
             falsepos_bg = np.array([_.falsepos_bg for _ in err])
             falsepos_fg = np.array([_.falsepos_fg for _ in err])
-            del start, stop
+            del start, stop, err
 
             # These will be used to compute percentages and may lead to
             # division-by-zero errors.
@@ -66,7 +70,7 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
             num_bg = np.clip(num_bg, 1, None)
             num_labels = np.clip(num_labels, 1, None)
 
-            # Cost.
+            # Compute and store cost percentiles.
             assert cost_bbox.ndim == cost_isFg.ndim == cost_cls.ndim == 1
             d['cost_bbox'][epoch] = computePercentile(cost_bbox, percentile)
             d['cost_isFg'][epoch] = computePercentile(cost_isFg, percentile)
@@ -74,29 +78,32 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
             del cost_bbox, cost_isFg, cost_cls
 
             # Class accuracy for foreground/background distinction.
-            bgfg_err = 100 * bgfg / (num_fg + num_bg)
+            tot = num_fg + num_bg
+            idx = np.nonzero((num_fg >= 10) & (num_bg >= 10))
+            bgfg_err = 100 * bgfg[idx] / tot[idx]
             d['bgfg_err'][epoch] = computePercentile(bgfg_err, percentile)
-            del bgfg_err
+            del tot, idx, bgfg, bgfg_err
 
             # Class accuracy for foreground label.
-            label_err = 100 * label / num_labels
+            idx = np.nonzero(num_labels >= 10)
+            label_err = 100 * label[idx] / num_labels[idx]
             d['label_err'][epoch] = computePercentile(label_err, percentile)
-            del label_err
+            del idx, label, label_err
 
-            # False positive background predictions.
-            bg_falsepos = 100 * falsepos_bg / num_bg
-            d['bg_falsepos'][epoch] = computePercentile(bg_falsepos, percentile)
-            del bg_falsepos
+            # False positive background.
+            idx = np.nonzero(num_bg >= 10)
+            fp_bg = 100 * falsepos_bg[idx] / num_bg[idx]
+            d['bg_falsepos'][epoch] = computePercentile(fp_bg, percentile)
+            del idx, fp_bg, falsepos_bg, num_bg
 
-            # False positive foreground predictions.
-            fg_falsepos = 100 * falsepos_fg / num_fg
-            d['fg_falsepos'][epoch] = computePercentile(fg_falsepos, percentile)
-            del fg_falsepos
+            # False positive foreground.
+            idx = np.nonzero(num_fg >= 10)
+            fp_fg = 100 * falsepos_fg[idx] / num_fg[idx]
+            d['fg_falsepos'][epoch] = computePercentile(fp_fg, percentile)
+            del idx, fp_fg, falsepos_fg, num_fg
 
             # BBox error.
-            bb_err = np.hstack([_.bbox for _ in err])
-            num_bb = bb_err.shape[1]
-            if num_bb > 0:
+            if bb_err.shape[1] > 0:
                 d['bb_err_x0'][epoch] = computePercentile(bb_err[0], percentile)
                 d['bb_err_y0'][epoch] = computePercentile(bb_err[1], percentile)
                 d['bb_err_x1'][epoch] = computePercentile(bb_err[2], percentile)
@@ -104,7 +111,7 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
 
                 bb_all = bb_err.flatten()
                 d['bb_err_all'][epoch] = computePercentile(bb_all, percentile)
-            del bb_err, num_bb
+            del bb_err
     return stats
 
 
