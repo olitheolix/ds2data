@@ -34,7 +34,7 @@ def parseCmdline():
     return param
 
 
-def plotFeature(img_hwc, ys, rpcn_filter_size, int2name):
+def plotMasksAndFeatures(img_hwc, ys, metas, int2name):
     assert img_hwc.ndim == 3 and img_hwc.shape[2] == 3
 
     # Convert to HWC format for Matplotlib.
@@ -49,35 +49,15 @@ def plotFeature(img_hwc, ys, rpcn_filter_size, int2name):
         horizontalalignment='center', verticalalignment='center'
     )
 
-    for ft_dim, y in sorted(ys.items()):
+    for ft_dim in sorted(ys):
+        y = ys[ft_dim]
         assert y.ndim == 3
+        meta = metas[ft_dim]
+
+        fig = plt.figure()
+        fig.canvas.set_window_title(f'File {meta.filename}')
 
         # Original image.
-        plt.figure()
-        plt.subplot(1, 2, 1)
-        plt.imshow(img)
-        plt.title('Input Image')
-
-        # BBoxes over original image.
-        ax = plt.subplot(1, 2, 2)
-        plt.imshow(img)
-
-        hard = np.argmax(getClassLabel(y), axis=0)
-        bb_rects, pick_yx = unpackBBoxes(im_dim, getBBoxRects(y), hard)
-        label = hard[pick_yx]
-        for label, (x0, y0, x1, y1) in zip(label, bb_rects):
-            w = x1 - x0
-            h = y1 - y0
-            ax.add_patch(patches.Rectangle((x0, y0), w, h, **rect_opts))
-            ax.text(x0 + w / 2, y0, f' {int2name[label]} ', **txt_opts)
-
-        plt.suptitle(f'Feature Map Size: {ft_dim[0]}x{ft_dim[1]}')
-
-
-def plotMasks(img, metas):
-    for ft_dim, meta in sorted(metas.items()):
-        # Original image.
-        plt.figure()
         plt.subplot(2, 3, 1)
         plt.imshow(img)
         plt.title('Input Image')
@@ -97,6 +77,19 @@ def plotMasks(img, metas):
         plt.subplot(2, 3, 5)
         plt.imshow(meta.mask_valid, cmap='gray', clim=[0, 1])
         plt.title('Valid')
+
+        # BBoxes over original image.
+        ax = plt.subplot(2, 3, 6)
+        plt.imshow(img)
+
+        hard = np.argmax(getClassLabel(y), axis=0)
+        bb_rects, pick_yx = unpackBBoxes(im_dim, getBBoxRects(y), hard)
+        label = hard[pick_yx]
+        for label, (x0, y0, x1, y1) in zip(label, bb_rects):
+            w = x1 - x0
+            h = y1 - y0
+            ax.add_patch(patches.Rectangle((x0, y0), w, h, **rect_opts))
+            ax.text(x0 + w / 2, y0, f' {int2name[label]} ', **txt_opts)
 
         plt.suptitle(f'Feature Map Size: {ft_dim[0]}x{ft_dim[1]}')
 
@@ -122,10 +115,8 @@ def main(data_path=None):
     assert x.ndim == 3 and x.shape[0] == 3
     img = np.transpose(x, [1, 2, 0])
 
-    plotFeature(img, y, conf.rpcn_filter_size, ds.int2name())
-
     meta = ds.getMeta([uuid])[uuid]
-    plotMasks(img, meta)
+    plotMasksAndFeatures(img, y, meta, ds.int2name())
 
     plt.show()
 
