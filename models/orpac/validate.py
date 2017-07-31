@@ -193,12 +193,14 @@ def validateEpoch(sess, ds, x_in, dst_path):
         fig = showPredictedBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
         fig.set_size_inches(20, 11)
         fig.savefig(fname, **fig_opts)
+        fig.canvas.set_window_title(fname)
 
         # Close the figure unless it is the very first one which we will show
         # for debug purposes at the end of the script. Similarly, create a
         # single plot with the predicted label map.
         if i == 0:
-            plotPredictedLabelMap(img, preds, ys, int2name)
+            fig = plotPredictedLabelMap(img, preds, ys, int2name)
+            fig.canvas.set_window_title(fname)
         else:
             plt.close(fig)
 
@@ -207,7 +209,7 @@ def plotPredictedLabelMap(img, preds, ys, int2name):
     num_classes = len(int2name)
     num_cols, num_rows = 3, len(preds)
 
-    plt.figure()
+    fig = plt.figure()
     for idx, ft_dim in enumerate(preds.keys()):
         # Find out which pixels the net thinks are foreground.
         pred_isFg = getIsFg(preds[ft_dim])
@@ -237,6 +239,7 @@ def plotPredictedLabelMap(img, preds, ys, int2name):
         plt.subplot(num_rows, 3, idx * num_cols + 3)
         plt.imshow(pred_labels, clim=[0, num_classes])
         plt.title(f'Pred {ft_dim}')
+    return fig
 
 
 def showPredictedBBoxes(img_chw, pred_bboxes, pred_labels, true_labels, int2name):
