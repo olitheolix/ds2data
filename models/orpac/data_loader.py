@@ -178,34 +178,24 @@ class DataSet:
         NOTE: sub-classes must implement this method themselves.
 
         Returns:
-            features: UInt8 Array[N:chan:height:width]
-                All images in NCHW format
-            labels: Int32 Array[N]
-                The corresponding labels for `features`.
-            dims: Array[4]
-                redundant
-            label2name: dict[int:str]
-                A LUT to translate one-hot labels to human readable string
+            images: UInt8 Array[N:chan:height:width]
+                Images in CHW format
+            feature map: N-List[Dict[ft_dim: Array[*, ft_dim[0], ft_dim[1]]]]
+                One entry for each image. Each entry is a dictionary with the
+                supported feature dimension (typically (64, 64) and (32, 32)).
+                Each of those keys references a 3D NumPy array. The first
+                dimension encodes the features (eg BBox, isFg, labels) whereas
+                the shape of the remaining two dimension must match `ft_dim`.
+            dims: Array[3]
+                Image shape in CHW format, eg (3, 512, 512).
+            int: dict[int:str]
+                A LUT to translate machine labels to human readable strings.
+                For instance {0: 'None', 1: 'Cube 0', 2: 'Cube 1'}.
+            meta: N-List[Dict[ft_dim: MetaData]]
+                One MetaData structure for each image and feature size.
         """
-        # This base class uses 2x2 gray scale images.
-        dims = (1, 2, 2)
-
-        # Compile a dict that maps numeric labels to human readable ones.
-        label2name = {idx: name for idx, name in enumerate(['0', '1', '2'])}
-
-        # Create and return dummy images and labels.
-        meta = []
-        x, y = [], []
-        for i in range(10):
-            label = i % 3
-            if label in label2name:
-                name = label2name[label]
-                x.append(i * np.ones(dims, np.uint8))
-                y.append(label)
-                meta.append(self.MetaData(f'file_{i}', label, name))
-        x = np.array(x, np.uint8)
-        y = np.array(y, np.int32)
-        return x, y, dims, label2name, meta
+        x, y, dims, label2name, meta = self.loadRawData()
+        raise NotImplementedError()
 
 
 class ORPAC(DataSet):
