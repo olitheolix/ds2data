@@ -9,5 +9,5 @@ NetConf = collections.namedtuple(
 
 ErrorMetrics = collections.namedtuple(
     'ErrorMetrics',
-    'bbox BgFg label num_BgFg num_Bg num_Fg num_labels falsepos_bg falsepos_fg'
+    'bbox BgFg label num_Bg num_Fg num_labels falsepos_bg falsepos_fg'
 )

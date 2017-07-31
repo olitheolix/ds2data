@@ -82,6 +82,10 @@ def compileErrorStats(true_y, pred_y, mask_bbox, mask_bgfg, mask_cls):
     true_label = np.argmax(true_label, axis=0)[mask_cls_idx]
     pred_label = np.argmax(pred_label, axis=0)[mask_cls_idx]
 
+    # Count the number of background and foreground locations.
+    num_bg = np.count_nonzero(true_isFg == 0)
+    num_fg = np.count_nonzero(true_isFg != 0)
+
     # Count the wrong predictions: FG/BG and class label.
     wrong_cls = np.count_nonzero(true_label != pred_label)
     wrong_BgFg = np.count_nonzero(true_isFg != pred_isFg)
@@ -98,10 +102,7 @@ def compileErrorStats(true_y, pred_y, mask_bbox, mask_bgfg, mask_cls):
 
     return ErrorMetrics(
         bbox=bbox_err, BgFg=wrong_BgFg, label=wrong_cls,
-        num_BgFg=len(mask_isFg_idx[0]),
-        num_Bg=np.count_nonzero(true_isFg == 0),
-        num_Fg=np.count_nonzero(true_isFg == 1),
-        num_labels=len(mask_cls_idx[0]),
+        num_labels=num_cls, num_Bg=num_bg, num_Fg=num_fg,
         falsepos_bg=falsepos_bg, falsepos_fg=falsepos_fg
     )
 
