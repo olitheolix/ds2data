@@ -64,12 +64,6 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
             falsepos_fg = np.array([_.falsepos_fg for _ in err])
             del start, stop, err
 
-            # These will be used to compute percentages and may lead to
-            # division-by-zero errors.
-            num_fg = np.clip(num_fg, 1, None)
-            num_bg = np.clip(num_bg, 1, None)
-            num_labels = np.clip(num_labels, 1, None)
-
             # Compute and store cost percentiles.
             assert cost_bbox.ndim == cost_isFg.ndim == cost_cls.ndim == 1
             d['cost_bbox'][epoch] = computePercentile(cost_bbox, percentile)
