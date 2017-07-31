@@ -230,18 +230,19 @@ def logTrainingStats(sess, log, img, ys, meta, batch, all_costs):
         s2 = f'Cls={cost_cls:6,}'
         s3 = f'BBox={cost_bbox:6,}'
         s_cost = str.join('  ', [s1, s2, s3])
+        del s1, s2, s3
 
         # Print progress report to terminal.
         if err.num_BgFg >= 10:
             bgFg_err = 100 * err.BgFg / err.num_BgFg
             s1 = f'BgFg={bgFg_err:5.1f}%'
         else:
-            bgFg_err = f'BgFg=  None'
+            s1 = f'BgFg=  None'
         if err.num_labels >= 10:
             cls_err = 100 * err.label / err.num_labels
             s2 = f'Cls={cls_err:5.1f}%'
         else:
-            cls_err = f'Cls=  None'
+            s2 = f'Cls=  None'
 
         # Compute maximum/90%/median for the BBox errors. If this features
         # map did not have any BBoxes then report -1. The `bbox_err` shape
