@@ -116,11 +116,14 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name):
         bb_rects, pick_yx = unpackBBoxes(im_dim, bboxes, hard)
         del hard, hard_cls, hard_fg, bboxes, pred, isFg
 
-        # Compute a BBox score to prioritise on in the non-maximum suppression
-        # step below. In this case, the score is simply the network output.
-        scores = np.max(pred_labels, axis=0)
-        scores = scores[pick_yx]
-        assert len(scores) == len(bb_rects)
+        # Use Non-Maximum-Suppression to remove overlapping BBoxes.
+        # Compute a BBox score to prioritise on in the non-maximum
+        # suppression step below. In softmax as the score.
+        softmax_scores = np.exp(np.clip(pred_labels, -20, 20))
+        softmax_scores = softmax_scores / np.max(softmax_scores, axis=0)
+        softmax_scores = np.max(softmax_scores, axis=0)
+        softmax_scores = softmax_scores[pick_yx]
+        assert len(softmax_scores) == len(bb_rects)
 
         # Suppress overlapping BBoxes.
         idx = nonMaxSuppress(sess, bb_rects, scores)
