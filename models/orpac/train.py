@@ -223,35 +223,25 @@ def logTrainingStats(sess, log, img, ys, meta, batch, all_costs):
         cost_bbox = int(rpcn_cost["bbox"])
         cost_isFg = int(rpcn_cost["isFg"])
         cost_cls = int(rpcn_cost["cls"])
-        s1 = f'BgFg={cost_isFg:6,}'
-        s2 = f'Cls={cost_cls:6,}'
-        s3 = f'BBox={cost_bbox:6,}'
-        s_cost = str.join('  ', [s1, s2, s3])
-        del s1, s2, s3
+        s_cost = f'BgFg={cost_isFg:6,}  Cls={cost_cls:6,}  BBox={cost_bbox:6,}'
 
-        # Print progress report to terminal.
-        if err.num_BgFg >= 10:
-            bgFg_err = 100 * err.BgFg / err.num_BgFg
-            s1 = f'BgFg={bgFg_err:5.1f}%'
-        else:
-            s1 = f'BgFg=  None'
-        if err.num_labels >= 10:
-            cls_err = 100 * err.label / err.num_labels
-            s2 = f'Cls={cls_err:5.1f}%'
-        else:
-            s2 = f'Cls=  None'
+        # Compute error rate for Bg/Fg estimation.
+        num_bgfg = err.num_Bg + err.num_Fg
+        err_bgfg = 100 * err.BgFg / num_bgfg if num_bgfg >= 10 else None
+        err_cls = 100 * err.label / err.num_labels if err.num_labels >= 10 else None
 
-        # Compute maximum/90%/median for the BBox errors. If this features
-        # map did not have any BBoxes then report -1. The `bbox_err` shape
-        # is (4, N) where N is the number of BBoxes.
+        # Compute median/90% percentile for the BBox errors. If this feature map
+        # had no BBoxes then report None. NOTE: the `bbox_err` shape is (4, N)
+        # where N is the number of BBoxes.
         if np.count_nonzero(mask_bbox) < 10:
-            bb_50p = bb_90p = -1
-            s3 = f'BBox=None'
+            bb90p = bb50p = None
         else:
-            tmp = np.sort(err.bbox.flatten())
-            bb_90p = tmp[int(0.9 * len(tmp))]
-            bb_50p = tmp[int(0.5 * len(tmp))]
-            s3 = f'BBox=({bb_50p:2.0f}, {bb_90p:2.0f})'
+            err_bbox = np.sort(err.bbox.flatten())
+            bb90p = err_bbox[int(0.9 * len(err_bbox))]
+            bb50p = err_bbox[int(0.5 * len(err_bbox))]
+        s1 = 'BgFg=  None' if err_bgfg is None else f'BgFg={err_bgfg:5.1f}%'
+        s2 = 'BgFg=  None' if err_cls is None else f'Cls={err_cls:5.1f}%'
+        s3 = 'BBox=  None' if bb50p is None else f'BBox=({bb50p:2.0f}, {bb90p:2.0f})'
         s_err = str.join('  ', [s1, s2, s3])
 
         fname = os.path.split(meta[rpcn_dim].filename)[-1]
