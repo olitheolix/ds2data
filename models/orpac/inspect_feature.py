@@ -50,7 +50,7 @@ def plotMasksAndFeatures(img_hwc, ys, metas, int2name):
         horizontalalignment='center', verticalalignment='center'
     )
 
-    num_rows, num_cols = 2, 5
+    num_rows, num_cols = 3, 5
     for ft_dim in sorted(ys):
         y = ys[ft_dim]
         assert y.ndim == 3
@@ -106,20 +106,25 @@ def plotMasksAndFeatures(img_hwc, ys, metas, int2name):
         m_bbox, m_fg, m_cls = sampleMasks(
             meta.mask_valid, meta.mask_fg, meta.mask_bbox, meta.mask_cls, 100)
 
-        # Sampled locations to estimate foreground/background.
+        # Object ID inside rendering engine at each pixel.
         plt.subplot(num_rows, num_cols, 8)
-        plt.imshow(m_fg, cmap='gray', clim=[0, 1])
-        plt.title('Sampled Fg/Bg Locations')
+        plt.imshow(meta.mask_objid_at_pix)
+        plt.title('Object ID at Pixel')
 
         # Sampled locations to estimate BBox dimensions.
-        plt.subplot(num_rows, num_cols, 9)
+        plt.subplot(num_rows, num_cols, 11)
         plt.imshow(true_labels * m_bbox, clim=[0, num_classes])
         plt.title('Sampled BBox Locations')
 
         # Sampled locations to estimate Class label.
-        plt.subplot(num_rows, num_cols, 10)
+        plt.subplot(num_rows, num_cols, 12)
         plt.imshow(true_labels * m_cls, clim=[0, num_classes])
         plt.title('Sampled Class Locations')
+
+        # Sampled locations to estimate foreground/background.
+        plt.subplot(num_rows, num_cols, 13)
+        plt.imshow(m_fg, cmap='gray', clim=[0, 1])
+        plt.title('Sampled Fg/Bg Locations')
 
         plt.suptitle(f'Feature Map Size: {ft_dim[0]}x{ft_dim[1]}')
 
