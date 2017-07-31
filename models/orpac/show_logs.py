@@ -197,8 +197,14 @@ def plotTrainingProgress(log):
 
         # False positive for background and foreground.
         plt.subplot(num_rows, num_cols, num_cols * idx + 4)
-        plt.plot(vec_x, data['99p']['bg_falsepos'], '-b', label='Background')
-        plt.plot(vec_x, data['99p']['fg_falsepos'], '-r', label='Foreground')
+        plt.plot(vec_x, data['99p']['bg_falsepos'], '--b', label='Background (99%)')
+        plt.plot(vec_x, data['99p']['fg_falsepos'], '--r', label='Foreground (99%)')
+        pfill(vec_x, 0, data['99p']['bg_falsepos'], facecolor='b', alpha=0.1)
+        pfill(vec_x, 0, data['99p']['fg_falsepos'], facecolor='r', alpha=0.1)
+        plt.plot(vec_x, data['50p']['bg_falsepos'], '-b', label='Background (Median)')
+        plt.plot(vec_x, data['50p']['fg_falsepos'], '-r', label='Foreground (Median)')
+        pfill(vec_x, 0, data['50p']['bg_falsepos'], facecolor='b', alpha=0.2)
+        pfill(vec_x, 0, data['50p']['fg_falsepos'], facecolor='r', alpha=0.2)
 
         plt.xlim(min(vec_x), max(vec_x))
         plt.ylim(0, 50)
