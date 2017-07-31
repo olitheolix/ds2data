@@ -53,7 +53,6 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
 
             bgfg = np.array([_.BgFg for _ in err])
             label = np.array([_.label for _ in err])
-            num_BgFg = np.array([_.num_BgFg for _ in err])
             num_labels = np.array([_.num_labels for _ in err])
             num_fg = np.array([_.num_Fg for _ in err])
             num_bg = np.array([_.num_Bg for _ in err])
@@ -65,7 +64,6 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
             # division-by-zero errors.
             num_fg = np.clip(num_fg, 1, None)
             num_bg = np.clip(num_bg, 1, None)
-            num_BgFg = np.clip(num_BgFg, 1, None)
             num_labels = np.clip(num_labels, 1, None)
 
             # Cost.
@@ -76,7 +74,7 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
             del cost_bbox, cost_isFg, cost_cls
 
             # Class accuracy for foreground/background distinction.
-            bgfg_err = 100 * bgfg / num_BgFg
+            bgfg_err = 100 * bgfg / (num_fg + num_bg)
             d['bgfg_err'][epoch] = computePercentile(bgfg_err, percentile)
             del bgfg_err
 
