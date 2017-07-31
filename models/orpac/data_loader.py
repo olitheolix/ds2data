@@ -35,7 +35,7 @@ class DataSet:
         conf.num_samples (int):
             Number of samples to use for each label. Use all if set to None.
     """
-    MetaData = namedtuple('MetaData', 'filename label name')
+    MetaData = namedtuple('MetaData', 'filename')
 
     def __init__(self, conf):
         # Sanity check.
@@ -246,11 +246,7 @@ class ORPAC(DataSet):
         self.compileMissingFeatures(fnames)
 
         # Load the compiled training data alongside each image.
-        dims = (3, height, width)
-        x, y, int2name, meta = self.loadTrainingData(fnames, dims)
-
-        # Return the data expected by the base class.
-        return x, y, dims, int2name, meta
+        return self.loadTrainingData(fnames, width, height)
 
     def checkImageDimensions(self, fnames):
         dims = {Image.open(fname + '.jpg').size for fname in fnames}
@@ -299,17 +295,19 @@ class ORPAC(DataSet):
                 out = compile_features.generate(fname, img, self.rpcn_dims)
                 pickle.dump(out, open(fname + '-compiled.pickle', 'wb'))
 
-    def loadTrainingData(self, fnames, im_dim):
-        num_classes = None
+    def loadTrainingData(self, fnames, im_width, im_height):
+        im_shape = (3, im_height, im_width)
+
+        num_cls = None
         all_y, all_meta = [], []
-        all_x = np.zeros((len(fnames), *im_dim), np.uint8)
+        all_x = np.zeros((len(fnames), *im_shape), np.uint8)
 
         # Load each image and associated features.
         for i, fname in enumerate(fnames):
             # Load image as RGB and convert to Numpy.
             img = np.array(Image.open(fname + '.jpg').convert('RGB'), np.uint8)
             img_chw = np.transpose(img, [2, 0, 1])
-            assert img_chw.shape == im_dim
+            assert img_chw.shape == im_shape
 
             # Store image in CHW format.
             all_x[i] = img_chw
@@ -317,13 +315,13 @@ class ORPAC(DataSet):
 
             # All pre-compiled features must use the same label map.
             data = pickle.load(open(fname + '-compiled.pickle', 'rb'))
-            if num_classes is None:
+            if num_cls is None:
                 int2name = data['int2name']
-                num_classes = len(int2name)
+                num_cls = len(int2name)
             assert int2name == data['int2name']
 
             # Crate the training output for different feature sizes.
-            y, m = self.compileTrainingOutput(data, self.rpcn_dims, im_dim, num_classes)
+            y, m = self.compileTrainingOutput(data, self.rpcn_dims, im_shape, num_cls)
 
             # Replace the file name in all MetaData instances.
             m = {k: v._replace(filename=fname) for k, v in m.items()}
@@ -333,7 +331,7 @@ class ORPAC(DataSet):
             all_meta.append(m)
 
         # Return image, network output, label mapping, and meta data.
-        return all_x, all_y, int2name, all_meta
+        return all_x, all_y, im_shape, int2name, all_meta
 
     def compileTrainingOutput(self, training_data, ft_dims, im_dim, num_classes):
         height, width = im_dim[1:]
