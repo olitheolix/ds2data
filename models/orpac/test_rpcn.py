@@ -248,7 +248,7 @@ class TestCost:
         return out
 
     def test_cost_BBox(self):
-        """Cost function for the num_classes possible class labels."""
+        """Verify the cost function for BBox parameters."""
         # Activate two locations in 2x2 mask.
         mask = np.zeros(self.ft_dim, np.float32)
         mask[0, 0] = mask[1, 1] = 1
