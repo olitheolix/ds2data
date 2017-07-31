@@ -22,8 +22,8 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
     assert len(bb_err_all) == num_epochs * samples_per_epoch
 
     stats = {}
-    for percentile in [50, 75, 90, 95, 99, 100]:
-        pstr = f'{percentile}p'
+    for perc in [50, 75, 90, 95, 99, 100]:
+        pstr = f'{perc}p'
         stats[pstr] = {
             'cost_bbox': np.zeros(num_epochs, np.float32),
             'cost_isFg': np.zeros(num_epochs, np.float32),
@@ -66,45 +66,43 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
 
             # Compute and store cost percentiles.
             assert cost_bbox.ndim == cost_isFg.ndim == cost_cls.ndim == 1
-            d['cost_bbox'][epoch] = computePercentile(cost_bbox, percentile)
-            d['cost_isFg'][epoch] = computePercentile(cost_isFg, percentile)
-            d['cost_cls'][epoch] = computePercentile(cost_cls, percentile)
+            d['cost_bbox'][epoch] = computePercentile(cost_bbox, perc)
+            d['cost_isFg'][epoch] = computePercentile(cost_isFg, perc)
+            d['cost_cls'][epoch] = computePercentile(cost_cls, perc)
             del cost_bbox, cost_isFg, cost_cls
 
             # Class accuracy for foreground/background distinction.
             tot = num_fg + num_bg
             idx = np.nonzero((num_fg >= 10) & (num_bg >= 10))
             bgfg_err = 100 * bgfg[idx] / tot[idx]
-            d['bgfg_err'][epoch] = computePercentile(bgfg_err, percentile)
+            d['bgfg_err'][epoch] = computePercentile(bgfg_err, perc)
             del tot, idx, bgfg, bgfg_err
 
             # Class accuracy for foreground label.
             idx = np.nonzero(num_labels >= 10)
             label_err = 100 * label[idx] / num_labels[idx]
-            d['label_err'][epoch] = computePercentile(label_err, percentile)
+            d['label_err'][epoch] = computePercentile(label_err, perc)
             del idx, label, label_err
 
             # False positive background.
             idx = np.nonzero(num_bg >= 10)
             fp_bg = 100 * falsepos_bg[idx] / num_bg[idx]
-            d['bg_falsepos'][epoch] = computePercentile(fp_bg, percentile)
+            d['bg_falsepos'][epoch] = computePercentile(fp_bg, perc)
             del idx, fp_bg, falsepos_bg, num_bg
 
             # False positive foreground.
             idx = np.nonzero(num_fg >= 10)
             fp_fg = 100 * falsepos_fg[idx] / num_fg[idx]
-            d['fg_falsepos'][epoch] = computePercentile(fp_fg, percentile)
+            d['fg_falsepos'][epoch] = computePercentile(fp_fg, perc)
             del idx, fp_fg, falsepos_fg, num_fg
 
             # BBox error.
             if bb_err.shape[1] > 0:
-                d['bb_err_x0'][epoch] = computePercentile(bb_err[0], percentile)
-                d['bb_err_y0'][epoch] = computePercentile(bb_err[1], percentile)
-                d['bb_err_x1'][epoch] = computePercentile(bb_err[2], percentile)
-                d['bb_err_y1'][epoch] = computePercentile(bb_err[3], percentile)
-
-                bb_all = bb_err.flatten()
-                d['bb_err_all'][epoch] = computePercentile(bb_all, percentile)
+                d['bb_err_x0'][epoch] = computePercentile(bb_err[0], perc)
+                d['bb_err_y0'][epoch] = computePercentile(bb_err[1], perc)
+                d['bb_err_x1'][epoch] = computePercentile(bb_err[2], perc)
+                d['bb_err_y1'][epoch] = computePercentile(bb_err[3], perc)
+                d['bb_err_all'][epoch] = computePercentile(bb_err.flatten(), perc)
             del bb_err
     return stats
 
