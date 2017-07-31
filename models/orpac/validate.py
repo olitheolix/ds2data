@@ -163,7 +163,7 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name, nms):
     return preds, bb_rects_out, pred_labels_out, true_labels_out
 
 
-def validateEpoch(sess, ds, x_in, dst_path):
+def predictImagesInEpoch(sess, ds, x_in, dst_path):
     # Predict the BBoxes for every image.
     dset = 'test'
     ds.reset(dset)
@@ -207,7 +207,7 @@ def validateEpoch(sess, ds, x_in, dst_path):
                 fname_bbox = f'{fname}-all-pred.jpg'
 
             # Show the BBoxes over the image and save it.
-            fig1 = showPredictedBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
+            fig1 = plotPredictedBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
             fig1.set_size_inches(20, 11)
             fig1.savefig(fname_bbox, **fig_opts)
             fig1.canvas.set_window_title(fname)
@@ -256,7 +256,7 @@ def plotPredictedLabelMap(img, preds, ys, int2name):
     return fig
 
 
-def showPredictedBBoxes(img_chw, pred_bboxes, pred_labels, true_labels, int2name):
+def plotPredictedBBoxes(img_chw, pred_bboxes, pred_labels, true_labels, int2name):
     assert img_chw.ndim == 3 and img_chw.shape[0] == 3
     assert isinstance(pred_bboxes, dict)
     assert isinstance(pred_labels, dict)
@@ -351,7 +351,7 @@ def main():
 
     # Predict each image and produce a new image with BBoxes and labels in it.
     try:
-        validateEpoch(sess, ds, x_in, param.dst)
+        predictImagesInEpoch(sess, ds, x_in, param.dst)
         plt.show()
     except KeyboardInterrupt:
         print('User Abort')
