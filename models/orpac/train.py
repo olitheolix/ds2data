@@ -162,7 +162,8 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
                 meta[rpcn_dim].mask_fg,
                 meta[rpcn_dim].mask_bbox,
                 meta[rpcn_dim].mask_cls,
-                int(max(100, 0.25 * N))
+                meta[rpcn_dim].mask_objid_at_pix,
+                10,
             )
 
             # Fetch the variables and assign them the current values. We need
@@ -213,7 +214,8 @@ def logTrainingStats(sess, log, img, ys, meta, batch, all_costs):
             meta[rpcn_dim].mask_fg,
             meta[rpcn_dim].mask_bbox,
             meta[rpcn_dim].mask_cls,
-            int(max(100, 0.25 * N))
+            meta[rpcn_dim].mask_objid_at_pix,
+            10,
         )
 
         err = compileErrorStats(y, pred[0], mask_bbox, mask_isFg, mask_cls)

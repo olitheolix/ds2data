@@ -104,7 +104,8 @@ def plotMasksAndFeatures(img_hwc, ys, metas, int2name):
 
         # Densly sample the masks.
         m_bbox, m_fg, m_cls = sampleMasks(
-            meta.mask_valid, meta.mask_fg, meta.mask_bbox, meta.mask_cls, 100)
+            meta.mask_valid, meta.mask_fg, meta.mask_bbox,
+            meta.mask_cls, meta.mask_objid_at_pix, 10)
 
         # Object ID inside rendering engine at each pixel.
         plt.subplot(num_rows, num_cols, 8)
