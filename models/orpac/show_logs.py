@@ -170,10 +170,10 @@ def plotTrainingProgress(log):
 
         # Classification error rate.
         plt.subplot(num_rows, num_cols, num_cols * idx + 2)
-        plt.plot(vec_x, data['90p']['bgfg_err'], '-b', label='90%')
-        plt.plot(vec_x, data['50p']['bgfg_err'], '-r', label='Median')
-        pfill(vec_x, 0, data['90p']['bgfg_err'], facecolor='b', alpha=0.2)
-        pfill(vec_x, 0, data['50p']['bgfg_err'], facecolor='r', alpha=0.2)
+        plt.plot(vec_x, data['90p']['label_err'], '-b', label='90%')
+        plt.plot(vec_x, data['50p']['label_err'], '-r', label='Median')
+        pfill(vec_x, 0, data['90p']['label_err'], facecolor='b', alpha=0.2)
+        pfill(vec_x, 0, data['50p']['label_err'], facecolor='r', alpha=0.2)
 
         plt.grid()
         plt.xlim(min(vec_x), max(vec_x))
