@@ -22,7 +22,7 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
     assert len(bb_err_all) == num_epochs * samples_per_epoch
 
     stats = {}
-    for perc in [50, 75, 90, 95, 99, 100]:
+    for perc in [50, 90, 99, 100]:
         pstr = f'{perc}p'
         stats[pstr] = {
             'cost_bbox': np.zeros(num_epochs, np.float32),
