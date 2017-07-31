@@ -185,31 +185,38 @@ def validateEpoch(sess, ds, x_in, dst_path):
         # Extract the original file name. To get it, just pop one of the
         # feature dimensions and look up the file name in the meta data.
         _, meta = ds.getMeta([uuid])[uuid].popitem()
-        fname = os.path.split(meta.filename)[-1]
-        fname = f'{fname}-pred.jpg'
-        fname = os.path.join(dst_path, fname)
+        fname = os.path.join(dst_path, os.path.split(meta.filename)[-1])
         del meta
 
-        # Predict the BBoxes and ensure there are no NaNs in the output.
-        tmp = predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name)
-        preds, pred_rect, pred_cls, true_cls = tmp
-        for _ in preds.values():
-            assert not np.any(np.isnan(_))
+        # Predict BBoxes with- and without non-max-suppression.
+        for nms in [True, False]:
+            # Predict the BBoxes and ensure there are no NaNs in the output.
+            tmp = predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name, nms)
+            preds, pred_rect, pred_cls, true_cls = tmp
+            for _ in preds.values():
+                assert not np.any(np.isnan(_))
 
-        # Show the input image and add the BBoxes and save the result.
-        fig = showPredictedBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
-        fig.set_size_inches(20, 11)
-        fig.savefig(fname, **fig_opts)
-        fig.canvas.set_window_title(fname)
+            # Plot the label map only only once, in this case for NMS.
+            if nms:
+                fname_bbox = f'{fname}-nms-pred.jpg'
+                fig0 = plotPredictedLabelMap(img, preds, ys, int2name)
+                fig0.canvas.set_window_title(fname)
+                fig0.set_size_inches(20, 11)
+                fig0.savefig(f'{fname}-nms-lmap.jpg', **fig_opts)
+            else:
+                fname_bbox = f'{fname}-all-pred.jpg'
 
-        # Close the figure unless it is the very first one which we will show
-        # for debug purposes at the end of the script. Similarly, create a
-        # single plot with the predicted label map.
-        if i == 0:
-            fig = plotPredictedLabelMap(img, preds, ys, int2name)
-            fig.canvas.set_window_title(fname)
-        else:
-            plt.close(fig)
+            # Show the BBoxes over the image and save it.
+            fig1 = showPredictedBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
+            fig1.set_size_inches(20, 11)
+            fig1.savefig(fname_bbox, **fig_opts)
+            fig1.canvas.set_window_title(fname)
+
+            # Close the figures except for the first ones We will show these
+            # for debug purposes at the end of the script.
+            if i != 0:
+                fig0.close()
+                fig1.close()
 
 
 def plotPredictedLabelMap(img, preds, ys, int2name):
