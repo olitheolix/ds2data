@@ -88,13 +88,15 @@ def getNumClassesFromY(y_dim):
     return y_dim[0] - 6
 
 
-def sampleMasks(m_valid, m_isFg, m_bbox, m_cls, N):
-    """ Return binary valued masks with valid locations for each type.
+def sampleMasks(m_valid, m_isFg, m_bbox, m_cls, m_id, N):
+    """Return binary valued masks with valid locations for each type.
 
-    All returned masks except the one for foreground/background estimation will
-    have N active pixels (fewer if there were less than N to begin with).
-    The FGBG will have up to 2N activate pixels, namely at most N pixels that
-    are active over foreground and background, respectively.
+    Activate N locations for each object. If the object does not occupy N
+    pixels then activate all that it occupies.
+
+    In an ideal scenario where all distinct objects occupy at least N pixels,
+    the BBox and Label masks will have "N * num_objects" activate pixels, and
+    the BGFG mask "2 * N * num_objects".
 
     NOTE: all input masks must have the same 2D shape.
 
@@ -107,61 +109,78 @@ def sampleMasks(m_valid, m_isFg, m_bbox, m_cls, N):
             Indicate the locations where BBox estimation is possible.
         m_cls: 2D Array
             Indicate the locations were class label estimation is possible.
+            Visible objID at each pixel.
+        m_id: 2D Array
+            Object ID at each pixel. The IDs themselves are meaningless but
+            denoted distinct elements in the render engine and will be used
+            here to sample locations that involve all objects equally to the
+            extent possible.
         N: int
             Number of locations to sample for each mask.
 
     Returns:
         mask_bbox: 2D Array
             BBox mask with up to N active pixels.
-        mask_fgbg: 2D Array
+        mask_bgfg: 2D Array
             Fg/Bg mask with up to 2N active pixels. Of these 2N pixels, up to N
             will mark a foreground location, and up to another N a background
             location.
         mask_cls: 2D Array
             Mask with up to N active pixels where estimating the foreground
             class (eg cube number) is possible.
+
     """
     assert N > 0
     assert m_valid.ndim == 2
-    assert m_valid.shape == m_isFg.shape == m_bbox.shape == m_cls.shape
+    assert m_valid.shape == m_isFg.shape == m_bbox.shape == m_cls.shape == m_id.shape
 
     # Backup the input dimension because we will flatten the arrays afterwards
     # since it is easier to work with vectors.
     dim = m_valid.shape
-    out_fgbg = np.zeros_like(m_isFg).flatten()
+    out_bgfg = np.zeros_like(m_isFg).flatten()
     out_bbox = np.zeros_like(m_bbox).flatten()
     out_cls = np.zeros_like(m_cls).flatten()
 
-    # Remove all the locations prohibited by the 'valid' mask.
-    bbox = ((m_valid * m_bbox).flatten())
-    labl = ((m_valid * m_cls).flatten())
-    isFg = ((m_valid * m_isFg).flatten())
-    isBg = ((m_valid * (1 - m_isFg)).flatten())
+    # Create the masks for all our cases.
+    bbox = (m_valid * m_id * m_bbox).flatten()
+    labl = (m_valid * m_id * m_cls).flatten()
+    isFg = (m_valid * m_id * m_isFg).flatten()
+    isBg = (m_valid * (m_id == 0) * (m_isFg == 0)).flatten()
 
-    # BBox: sample subset of the valid positions.
-    ix_bbox = np.nonzero(bbox)[0].tolist()
-    ix_bbox = ix_bbox if len(ix_bbox) <= N else random.sample(ix_bbox, N)
-    out_bbox[ix_bbox] = 1
+    # Sample BBox locations for each object ID.
+    for objID in np.unique(bbox):
+        if objID != 0:
+            idx = np.nonzero(bbox == objID)[0].tolist()
+            idx = random.sample(idx, N) if len(idx) > N else idx
+            out_bbox[idx] = 1
+    del bbox
 
-    # Class: sample subset of the valid positions.
-    ix_cls = np.nonzero(labl)[0].tolist()
-    ix_cls = ix_cls if len(ix_cls) <= N else random.sample(ix_cls, N)
-    out_cls[ix_cls] = 1
+    # Sample Label locations for each object ID.
+    for objID in np.unique(labl):
+        if objID != 0:
+            idx = np.nonzero(labl == objID)[0].tolist()
+            idx = random.sample(idx, N) if len(idx) > N else idx
+            out_cls[idx] = 1
+    del labl
 
-    # Foreground, background: need to find N valid foreground locations, and
-    # another N valid background locations.
-    ix_fg = np.nonzero(isFg)[0].tolist()
-    ix_bg = np.nonzero(isBg)[0].tolist()
-    ix_fg = ix_fg if len(ix_fg) <= N else random.sample(ix_fg, N)
-    ix_bg = ix_bg if len(ix_bg) <= N else random.sample(ix_bg, N)
-    out_fgbg[ix_fg] = 1
-    out_fgbg[ix_bg] = 1
+    # Sample Foreground locations for each object ID.
+    for objID in np.unique(isFg):
+        if objID != 0:
+            idx = np.nonzero(isFg == objID)[0].tolist()
+            idx = random.sample(idx, N) if len(idx) > N else idx
+            out_bgfg[idx] = 1
+
+    # Sample Background locations and add them to the `out_bgfg` array.
+    num_fg = np.count_nonzero(out_bgfg)
+    idx = np.nonzero(isBg)[0].tolist()
+    idx = random.sample(idx, num_fg) if len(idx) > num_fg else idx
+    out_bgfg[idx] = 1
 
     # Restore the original matrix shapes and return them.
     out_bbox = out_bbox.reshape(dim)
-    out_fgbg = out_fgbg.reshape(dim)
+    out_bgfg = out_bgfg.reshape(dim)
     out_cls = out_cls.reshape(dim)
-    return out_bbox, out_fgbg, out_cls
+    return out_bbox, out_bgfg, out_cls
 
 
 def setBBoxRects(y, val):
