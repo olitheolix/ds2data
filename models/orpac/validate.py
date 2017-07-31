@@ -50,7 +50,7 @@ def nonMaxSuppress(sess, bb_rects, scores):
     return sess.run(g('non-max-suppression/op:0'), feed_dict=fd)
 
 
-def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name):
+def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name, nms):
     """ Compile the list of BBoxes and assoicated label that each RPCN found.
 
     Input:
@@ -64,6 +64,9 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name):
             The keys are RPCN feature dimensions (eg (64, 64)) and the values
             are the ground truth tensors for that particular RPCN. Set this
             value to *None* if no ground truth data is available.
+        nms: Bool
+            Use non-maximum-suppression to filter BBoxes if True, otherwise do
+            not filter and use all BBoxes.
 
     Returns:
         preds: Dict[ft_dim: Tensor]
@@ -119,16 +122,17 @@ def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name):
         # Use Non-Maximum-Suppression to remove overlapping BBoxes.
         # Compute a BBox score to prioritise on in the non-maximum
         # suppression step below. In softmax as the score.
-        softmax_scores = np.exp(np.clip(pred_labels, -20, 20))
-        softmax_scores = softmax_scores / np.max(softmax_scores, axis=0)
-        softmax_scores = np.max(softmax_scores, axis=0)
-        softmax_scores = softmax_scores[pick_yx]
-        assert len(softmax_scores) == len(bb_rects)
+        if nms:
+            softmax_scores = np.exp(np.clip(pred_labels, -20, 20))
+            softmax_scores = softmax_scores / np.max(softmax_scores, axis=0)
+            softmax_scores = np.max(softmax_scores, axis=0)
+            softmax_scores = softmax_scores[pick_yx]
+            assert len(softmax_scores) == len(bb_rects)
 
-        # Suppress overlapping BBoxes.
-        idx = nonMaxSuppress(sess, bb_rects, scores)
-        bb_rects = bb_rects[idx]
-        del scores, idx
+            # Suppress overlapping BBoxes.
+            idx = nonMaxSuppress(sess, bb_rects, softmax_scores)
+            bb_rects = bb_rects[idx]
+            del idx, softmax_scores
 
         # Create new entry for current RPAC output.
         bb_rects_out[layer_dim] = []
