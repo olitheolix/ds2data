@@ -171,13 +171,13 @@ def plotTrainingProgress(log):
         # Classification error rate.
         plt.subplot(num_rows, num_cols, num_cols * idx + 2)
         plt.plot(vec_x, data['90p']['label_err'], '-b', label='90%')
-        plt.plot(vec_x, data['50p']['label_err'], '-r', label='Median')
+        plt.plot(vec_x, data['50p']['label_err'], '--b', label='Median')
         pfill(vec_x, 0, data['90p']['label_err'], facecolor='b', alpha=0.2)
-        pfill(vec_x, 0, data['50p']['label_err'], facecolor='r', alpha=0.2)
+        pfill(vec_x, 0, data['50p']['label_err'], facecolor='b', alpha=0.2)
 
         plt.grid()
         plt.xlim(min(vec_x), max(vec_x))
-        plt.ylim(0, 50)
+        plt.ylim(0, 100)
         plt.ylabel('Percent')
         plt.legend(loc='best')
         plt.title(f'Class Error Rate')
@@ -185,9 +185,9 @@ def plotTrainingProgress(log):
         # BBox position error in x-dimension.
         plt.subplot(num_rows, num_cols, num_cols * idx + 3)
         plt.plot(vec_x, data['90p']['bb_err_all'], '-b', label='90%')
-        plt.plot(vec_x, data['50p']['bb_err_all'], '-r', label='Median')
+        plt.plot(vec_x, data['50p']['bb_err_all'], '--b', label='Median')
         pfill(vec_x, 0, data['90p']['bb_err_all'], facecolor='b', alpha=0.2)
-        pfill(vec_x, 0, data['50p']['bb_err_all'], facecolor='r', alpha=0.2)
+        pfill(vec_x, 0, data['50p']['bb_err_all'], facecolor='b', alpha=0.2)
 
         plt.xlim(min(vec_x), max(vec_x))
         plt.ylim(0, 100)
@@ -197,17 +197,17 @@ def plotTrainingProgress(log):
 
         # False positive for background and foreground.
         plt.subplot(num_rows, num_cols, num_cols * idx + 4)
-        plt.plot(vec_x, data['99p']['bg_falsepos'], '--b', label='Background (99%)')
-        plt.plot(vec_x, data['99p']['fg_falsepos'], '--r', label='Foreground (99%)')
+        plt.plot(vec_x, data['99p']['bg_falsepos'], '-b', label='Background (99%)')
+        plt.plot(vec_x, data['99p']['fg_falsepos'], '-r', label='Foreground (99%)')
         pfill(vec_x, 0, data['99p']['bg_falsepos'], facecolor='b', alpha=0.1)
         pfill(vec_x, 0, data['99p']['fg_falsepos'], facecolor='r', alpha=0.1)
-        plt.plot(vec_x, data['50p']['bg_falsepos'], '-b', label='Background (Median)')
-        plt.plot(vec_x, data['50p']['fg_falsepos'], '-r', label='Foreground (Median)')
+        plt.plot(vec_x, data['50p']['bg_falsepos'], '--b', label='Background (Median)')
+        plt.plot(vec_x, data['50p']['fg_falsepos'], '--r', label='Foreground (Median)')
         pfill(vec_x, 0, data['50p']['bg_falsepos'], facecolor='b', alpha=0.2)
         pfill(vec_x, 0, data['50p']['fg_falsepos'], facecolor='r', alpha=0.2)
 
         plt.xlim(min(vec_x), max(vec_x))
-        plt.ylim(0, 50)
+        plt.ylim(0, 100)
         plt.grid()
         plt.ylabel('Percent')
         plt.legend(loc='best')
