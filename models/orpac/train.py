@@ -232,8 +232,6 @@ def logTrainingStats(sess, log, img, ys, meta, batch, all_costs):
         s_cost = str.join('  ', [s1, s2, s3])
 
         # Print progress report to terminal.
-        cls_err = 100 * err.label / max(err.num_labels, 1)
-        bgFg_err = 100 * err.BgFg / max(err.num_BgFg, 1)
         if err.num_BgFg >= 10:
             bgFg_err = 100 * err.BgFg / err.num_BgFg
             s1 = f'BgFg={bgFg_err:5.1f}%'
