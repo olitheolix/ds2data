@@ -37,7 +37,7 @@ def compileErrorStats(true_y, pred_y, mask_bbox, mask_isFg, mask_cls):
         true_y: Array [:, height, width]
             Ground truth values.
         pred_y: Array [:, height, width]
-            Contains the network predictions. Must be same size as `gt`
+            Contains the network predictions. Must be same size as `true_y`
         mask_bbox: Array [height, width]
             The locations that contribute to the BBox error statistics.
         mask_isFg: Array [height, width]
@@ -48,7 +48,7 @@ def compileErrorStats(true_y, pred_y, mask_bbox, mask_isFg, mask_cls):
     Returns:
         NamedTuple
     """
-    # Mask must be 2D and have the same shape. Pred/GT must be 3D and also have
+    # Mask must be 2D and have the same shape. Pred/True must be 3D and also have
     # the same shape.
     assert mask_cls.shape == mask_bbox.shape == mask_isFg.shape
     assert mask_cls.ndim == mask_bbox.ndim == mask_isFg.ndim == 2
@@ -64,16 +64,14 @@ def compileErrorStats(true_y, pred_y, mask_bbox, mask_isFg, mask_cls):
     mask_cls_idx = np.nonzero(mask_cls.flatten())
     del mask_bbox, mask_isFg, mask_cls
 
-    # Unpack the tensor constituents and flatten the feature dimensions.
+    # Unpack and flatten the True/Predicted tensor components.
+    true_bbox = getBBoxRects(true_y).reshape([4, -1])
     pred_bbox = getBBoxRects(pred_y).reshape([4, -1])
+    true_isFg = getIsFg(true_y).reshape([2, -1])
     pred_isFg = getIsFg(pred_y).reshape([2, -1])
+    true_label = getClassLabel(true_y).reshape([num_classes, -1])
     pred_label = getClassLabel(pred_y).reshape([num_classes, -1])
-    del pred_y
-
-    # Repeat with the ground truth tensor.
-    true_y = true_y.reshape([4 + 2 + num_classes, -1])
-    true_bbox, true_isFg, true_label = true_y[:4], true_y[4:6], true_y[6:]
-    del true_y
+    del pred_y, true_y
 
     # Determine the background/foreground flag at each location. Only retain
     # locations permitted by the mask.
