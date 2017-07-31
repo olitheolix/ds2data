@@ -207,7 +207,9 @@ class ORPAC(DataSet):
     """
     # Define the MetaData container for this data set.
     MetaData = namedtuple(
-        'MetaData', 'filename mask_fg mask_bbox mask_cls mask_valid')
+        'MetaData',
+        'filename mask_fg mask_bbox mask_cls mask_valid mask_objid_at_pix '
+    )
 
     def getRpcnDimensions(self):
         return tuple(self.rpcn_dims)
@@ -346,19 +348,20 @@ class ORPAC(DataSet):
             y = y_out[ft_dim]
 
             # Unpack pixel labels.
-            lap = training_data[ft_dim]['label_at_pixel']
+            label_ap = training_data[ft_dim]['label_at_pixel']
+            objID_ap = training_data[ft_dim]['objID_at_pixel']
             bbox_rects = training_data[ft_dim]['bboxes']
-            assert lap.dtype == np.int32 and lap.shape == ft_dim
-            assert 0 <= np.amin(lap) <= np.amax(lap) < num_classes
+            assert label_ap.dtype == np.int32 and label_ap.shape == ft_dim
+            assert 0 <= np.amin(label_ap) <= np.amax(label_ap) < num_classes
 
             # Compute binary mask that is 1 at every foreground pixel.
             isFg = np.zeros(ft_dim)
-            isFg[np.nonzero(lap)] = 1
+            isFg[np.nonzero(label_ap)] = 1
 
             # Insert BBox parameter and hot-labels into the feature tensor.
             y[0] = setBBoxRects(y[0], bbox_rects)
             y[0] = setIsFg(y[0], oneHotEncoder(isFg, 2))
-            y[0] = setClassLabel(y[0], oneHotEncoder(lap, num_classes))
+            y[0] = setClassLabel(y[0], oneHotEncoder(label_ap, num_classes))
 
             meta[ft_dim] = self.MetaData(
                 filename=None,
@@ -366,6 +369,7 @@ class ORPAC(DataSet):
                 mask_bbox=training_data[ft_dim]['mask_bbox'],
                 mask_valid=training_data[ft_dim]['mask_valid'],
                 mask_cls=training_data[ft_dim]['mask_cls'],
+                mask_objid_at_pix=objID_ap,
             )
 
             # Sanity check: masks must be binary with correct shape.
