@@ -73,27 +73,23 @@ def compileErrorStats(true_y, pred_y, mask_bbox, mask_isFg, mask_cls):
     pred_label = getClassLabel(pred_y).reshape([num_classes, -1])
     del pred_y, true_y
 
-    # Determine the background/foreground flag at each location. Only retain
-    # locations permitted by the mask.
+    # Make decision: Background/Foreground for each valid location.
     true_isFg = np.argmax(true_isFg, axis=0)[mask_isFg_idx]
     pred_isFg = np.argmax(pred_isFg, axis=0)[mask_isFg_idx]
 
-    # Determine the true and predicted label at each location. Only retain
-    # locations permitted by the mask.
+    # Make decision: Label for each valid location.
     true_label = np.argmax(true_label, axis=0)[mask_cls_idx]
     pred_label = np.argmax(pred_label, axis=0)[mask_cls_idx]
 
-    # Count the wrong foreground class predictions.
+    # Count the wrong predictions: FG/BG and class label.
     wrong_cls = np.count_nonzero(true_label != pred_label)
     wrong_BgFg = np.count_nonzero(true_isFg != pred_isFg)
 
-    # False-positive for background: net predicted background but is actually
-    # foreground. Similarly for false-positive foreground.
-    falsepos_fg = np.count_nonzero((true_isFg != pred_isFg) & (pred_isFg == 1))
-    falsepos_bg = np.count_nonzero((true_isFg != pred_isFg) & (pred_isFg == 0))
+    # False-positive for background and foreground.
+    falsepos_fg = np.count_nonzero((true_isFg != pred_isFg) & (true_isFg == 0))
+    falsepos_bg = np.count_nonzero((true_isFg != pred_isFg) & (true_isFg == 1))
 
-    # Compute the L1 error for x, y, w, h of BBoxes. Skip locations without an
-    # object because the BBox predictions there are meaningless.
+    # Compute the L1 error for BBox parameters at valid locations.
     bbox_err = np.abs(true_bbox - pred_bbox)
     bbox_err = bbox_err[:, mask_bbox_idx[0]]
     bbox_err = bbox_err.astype(np.float16)
