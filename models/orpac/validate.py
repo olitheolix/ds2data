@@ -1,5 +1,6 @@
 import os
 import tqdm
+import train
 import pickle
 import argparse
 import rpcn_net
@@ -218,6 +219,18 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
             fig2.set_size_inches(20, 11)
             fig2.savefig(f'{fname}-pred-all.jpg', **fig_opts)
             fig2.canvas.set_window_title(fname)
+
+            # Create dummy costs and log dictionary, then log the error
+            # statistics for the current image.
+            all_costs = {'tot': -1}
+            log = {'rpcn': {}, 'cost': []}
+            for rpcn_dim in rpcn_dims:
+                all_costs[rpcn_dim] = {'bbox': -1, 'isFg': -1, 'cls': -1, 'tot': -1}
+                log['rpcn'][rpcn_dim] = {'err': [], 'cost': []}
+            train.logTrainingStats(
+                sess, log, img, ys,
+                meta=ds.getMeta([uuid])[uuid], batch=0, all_costs=all_costs)
+            del all_costs, log
         else:
             # Close the window with the predicted BBoxes.
             plt.close(fig0)
