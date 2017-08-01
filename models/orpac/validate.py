@@ -188,35 +188,39 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
         fname = os.path.join(dst_path, os.path.split(meta.filename)[-1])
         del meta
 
-        # Predict BBoxes with- and without non-max-suppression.
-        for nms in [True, False]:
-            # Predict the BBoxes and ensure there are no NaNs in the output.
-            tmp = predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name, nms)
-            preds, pred_rect, pred_cls, true_cls = tmp
-            for _ in preds.values():
-                assert not np.any(np.isnan(_))
+        # Predict the BBoxes with NMS. There must be no NaNs in the output.
+        pred_nms = predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name, True)
+        preds, pred_rect, pred_cls, true_cls = pred_nms
+        for _ in preds.values():
+            assert not np.any(np.isnan(_))
 
-            # Plot the label map only only once, in this case for NMS.
-            if nms:
-                fname_bbox = f'{fname}-nms-pred.jpg'
-                fig0 = plotPredictedLabelMap(img, preds, ys, int2name)
-                fig0.canvas.set_window_title(fname)
-                fig0.set_size_inches(20, 11)
-                fig0.savefig(f'{fname}-nms-lmap.jpg', **fig_opts)
-            else:
-                fname_bbox = f'{fname}-all-pred.jpg'
+        # Draw the BBoxes over the image and save it.
+        fig0 = plotPredictedBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
+        fig0.set_size_inches(20, 11)
+        fig0.savefig(f'{fname}-pred-nms.jpg', **fig_opts)
+        fig0.canvas.set_window_title(fname)
 
-            # Show the BBoxes over the image and save it.
-            fig1 = plotPredictedBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
-            fig1.set_size_inches(20, 11)
-            fig1.savefig(fname_bbox, **fig_opts)
+        # The first frame is for debugging. We add another plot that shows *all*
+        # predicted BBoxes (ie without NMS), as well as a label map.
+        if i == 0:
+            # Plot and save the label map.
+            fig1 = plotPredictedLabelMap(img, preds, ys, int2name)
             fig1.canvas.set_window_title(fname)
+            fig1.set_size_inches(20, 11)
+            fig1.savefig(f'{fname}-lmap.jpg', **fig_opts)
 
-            # Close the figures except for the first ones We will show these
-            # for debug purposes at the end of the script.
-            if i != 0:
-                fig0.close()
-                fig1.close()
+            # Predict the BBoxes without NMS.
+            pred_all = predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name, False)
+            _, pred_rect, pred_cls, true_cls = pred_all
+
+            # Draw the BBoxes over the image and save it.
+            fig2 = plotPredictedBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
+            fig2.set_size_inches(20, 11)
+            fig2.savefig(f'{fname}-pred-all.jpg', **fig_opts)
+            fig2.canvas.set_window_title(fname)
+        else:
+            # Close the window with the predicted BBoxes.
+            plt.close(fig0)
 
 
 def plotPredictedLabelMap(img, preds, ys, int2name):
