@@ -194,7 +194,6 @@ class DataSet:
             meta: N-List[Dict[ft_dim: MetaData]]
                 One MetaData structure for each image and feature size.
         """
-        x, y, dims, label2name, meta = self.loadRawData()
         raise NotImplementedError()
 
 
