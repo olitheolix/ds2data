@@ -13,7 +13,7 @@ import numpy as np
 import tensorflow as tf
 
 
-_SCALE_BBOX = 100
+_SCALE_BBOX = 10
 _SCALE_ISFG = 3000
 _SCALE_CLS = 1000
 
