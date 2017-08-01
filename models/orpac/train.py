@@ -220,9 +220,9 @@ def logTrainingStats(sess, log, img, ys, meta, batch, all_costs):
         log['rpcn'][rpcn_dim]['err'].append(err)
         log['rpcn'][rpcn_dim]['cost'].append(rpcn_cost)
 
-        cost_bbox = int(rpcn_cost["bbox"])
-        cost_isFg = int(rpcn_cost["isFg"])
-        cost_cls = int(rpcn_cost["cls"])
+        cost_bbox = int(rpcn_cost['bbox'])
+        cost_isFg = int(rpcn_cost['isFg'])
+        cost_cls = int(rpcn_cost['cls'])
         s_cost = f'BgFg={cost_isFg:6,}  Cls={cost_cls:6,}  BBox={cost_bbox:6,}'
 
         # Compute error rate for Bg/Fg estimation.
