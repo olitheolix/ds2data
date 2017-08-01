@@ -184,7 +184,7 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
 
         # Extract the original file name. To get it, just pop one of the
         # feature dimensions and look up the file name in the meta data.
-        _, meta = ds.getMeta([uuid])[uuid].popitem()
+        meta = ds.getMeta([uuid])[uuid][rpcn_dims[0]]
         fname = os.path.join(dst_path, os.path.split(meta.filename)[-1])
         del meta
 
