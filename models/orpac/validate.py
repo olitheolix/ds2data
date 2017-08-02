@@ -81,10 +81,10 @@ def predictBBoxes(sess, x_in, img, true_y, int2name, nms):
 
     # Compile the list of RPCN output nodes.
     g = tf.get_default_graph().get_tensor_by_name
-    rpcn_out = g(f'orpac/out:0')
+    orpac_out = g(f'orpac/out:0')
 
     # Pass the image to ORPAC and strip off the batch dimension from the result.
-    pred_y = sess.run(rpcn_out, feed_dict={x_in: np.expand_dims(img, 0)})
+    pred_y = sess.run(orpac_out, feed_dict={x_in: np.expand_dims(img, 0)})
 
     # Unpack true class labels. If the caller did not provide any then use the
     # predicted ones instead.
