@@ -282,7 +282,7 @@ def main():
     shared_out = shared_net.setup(None, x_in, conf.num_pools_shared, True)
     orpac_out = rpcn_net.setup(
         None, shared_out, len(int2name),
-        conf.rpcn_filter_size, conf.rpcn_out_dims, True)
+        conf.rpcn_filter_size, True)
     # Select cost function and optimiser, then initialise the TF graph.
     cost = rpcn_net.cost(orpac_out)
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)

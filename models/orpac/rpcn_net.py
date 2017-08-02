@@ -126,12 +126,12 @@ def load(fname):
     return pickle.load(open(fname, 'rb'))
 
 
-def setup(fname, x_in, num_classes, filter_size, ft_dim, trainable):
+def setup(fname, x_in, num_classes, filter_size, trainable):
     assert x_in.dtype in [tf.float16, tf.float32]
     dtype = np.float16 if x_in.dtype == tf.float16 else np.float32
     num_features_out = 64
 
-    print(f'ORPAC ({len(ft_dim)} layers):')
+    print(f'ORPAC:')
     print(f'  Restored from <{fname}>')
 
     # Create non-maximum-suppression nodes. This is irrelevant for training but
@@ -141,9 +141,6 @@ def setup(fname, x_in, num_classes, filter_size, ft_dim, trainable):
         r_in = tf.placeholder(tf.float32, [None, 4], name='bb_rects')
         s_in = tf.placeholder(tf.float32, [None], name='scores')
         tf.image.non_max_suppression(r_in, s_in, 30, 0.2, name='op')
-
-    assert isinstance(ft_dim, tuple) and len(ft_dim) == 2
-    assert x_in.shape.as_list()[2:] == list(2 * np.array(ft_dim))
 
     num_features_in = x_in.shape.as_list()[1]
 
@@ -161,11 +158,6 @@ def setup(fname, x_in, num_classes, filter_size, ft_dim, trainable):
         net = load(fname)
         b1, W1 = net['b1'], net['W1']
         b2, W2 = net['b2'], net['W2']
-
-    # Compute receptive field based on a 512x512 input image.
-    rf = int(W2_dim[0] * (512 / ft_dim[0]))
-    print(f'  Feature size: {ft_dim}  '
-          f'  Receptive field on 512x512 image: {rf}x{rf}')
 
     assert b1.dtype == W1.dtype == dtype
     assert b1.shape == b1_dim and W1.shape == W1_dim
