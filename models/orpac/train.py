@@ -3,7 +3,7 @@ import time
 import pickle
 import config
 import datetime
-import rpcn_net
+import orpac_net
 import argparse
 import data_loader
 import collections
@@ -279,10 +279,10 @@ def main():
     # Create the input variable, the shared network and the ORPAC.
     lrate_in = tf.placeholder(tf.float32, name='lrate')
     x_in = tf.placeholder(tf_dtype, [1, *im_dim], name='x_in')
-    net = rpcn_net.Orpac(sess, x_in, conf.layers, num_classes, bw_init)
+    net = orpac_net.Orpac(sess, x_in, conf.layers, num_classes, bw_init)
 
     # Select cost function and optimiser, then initialise the TF graph.
-    cost = rpcn_net.cost(net.output())
+    cost = orpac_net.cost(net.output())
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
     sess.run(tf.global_variables_initializer())
     del cost

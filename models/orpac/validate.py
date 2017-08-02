@@ -3,7 +3,7 @@ import tqdm
 import train
 import pickle
 import argparse
-import rpcn_net
+import orpac_net
 import data_loader
 
 import numpy as np
@@ -345,7 +345,7 @@ def main():
     # Build the shared layers and connect it to ORPAC.
     print('\n----- Network Setup -----')
     x_in = tf.placeholder(tf_dtype, [1, *im_dim], name='x_in')
-    rpcn_net.Orpac(sess, x_in, conf.layers, num_classes, bw_init)
+    orpac_net.Orpac(sess, x_in, conf.layers, num_classes, bw_init)
     sess.run(tf.global_variables_initializer())
 
     # Predict each image and produce a new image with BBoxes and labels in it.

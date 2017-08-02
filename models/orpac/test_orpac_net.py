@@ -1,4 +1,4 @@
-import rpcn_net
+import orpac_net
 import numpy as np
 import tensorflow as tf
 
@@ -20,7 +20,7 @@ class TestCost:
         cls.y_pred_in = tf.placeholder(tf.float32, out_dim, name='y_pred')
 
         # Setup cost computation. This will create a node for `y_true`.
-        cls.total_cost = rpcn_net.cost(cls.y_pred_in)
+        cls.total_cost = orpac_net.cost(cls.y_pred_in)
 
         # Get the placeholder for the true input (see above).
         g = tf.get_default_graph().get_tensor_by_name
@@ -142,7 +142,7 @@ class TestCost:
 
         # Average and scale all active costs.
         ref = np.mean(ref * mask)
-        assert np.abs(ref - out / rpcn_net._SCALE_ISFG) < 1E-4
+        assert np.abs(ref - out / orpac_net._SCALE_ISFG) < 1E-4
         return out
 
     def test_cost_isForeground(self):
@@ -193,7 +193,7 @@ class TestCost:
 
         # Average and scale all active costs.
         ref = np.mean(ref * mask)
-        assert np.abs(ref - out / rpcn_net._SCALE_CLS) < 1E-4
+        assert np.abs(ref - out / orpac_net._SCALE_CLS) < 1E-4
         return out
 
     def test_cost_classLabels(self):
@@ -244,7 +244,7 @@ class TestCost:
 
         # Average and scale all active costs.
         ref = np.mean(ref * mask)
-        assert np.abs(ref - out / rpcn_net._SCALE_BBOX) < 1E-4
+        assert np.abs(ref - out / orpac_net._SCALE_BBOX) < 1E-4
         return out
 
     def test_cost_BBox(self):
@@ -360,7 +360,7 @@ class TestNetworkSetup:
         tf_dtype, np_dtype = tf.float32, np.float32
 
         x_in = tf.placeholder(tf_dtype, [1, 5, 512, 512])
-        net = rpcn_net.Orpac(self.sess, x_in, num_layers, num_classes, None)
+        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None)
         self.sess.run(tf.global_variables_initializer())
 
         # The feature size must be 1/8 of the image size because the network
@@ -385,7 +385,7 @@ class TestNetworkSetup:
 
         # Create network with random weights.
         x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
-        net = rpcn_net.Orpac(self.sess, x_in, num_layers, num_classes, None)
+        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None)
         self.sess.run(tf.global_variables_initializer())
 
         # First layer must be compatible with input.
@@ -413,7 +413,7 @@ class TestNetworkSetup:
 
         # Setup default network. Variables are random.
         x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
-        net = rpcn_net.Orpac(self.sess, x_in, num_layers, num_classes, None)
+        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None)
         self.sess.run(tf.global_variables_initializer())
 
         # Serialise the network biases and weights.
@@ -458,7 +458,7 @@ class TestNetworkSetup:
         bw_init['num-layers'] = 3
 
         # Create a new network and restore its weights.
-        net = rpcn_net.Orpac(self.sess, x_in, num_layers, num_classes, bw_init)
+        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, bw_init)
         self.sess.run(tf.global_variables_initializer())
 
         # Ensure the weights are as specified.
@@ -478,7 +478,7 @@ class TestNetworkSetup:
 
         # Create a network (parameters do not matter).
         x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
-        rpcn_net.Orpac(self.sess, x_in, 7, 10, None)
+        orpac_net.Orpac(self.sess, x_in, 7, 10, None)
 
         # All NMS nodes must now exist.
         assert g('non-max-suppression/op:0') is not None
