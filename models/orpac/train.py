@@ -259,7 +259,7 @@ def main():
             seed=0, dtype='float32', train_rat=0.8,
             path=os.path.join('data', '3dflight'),
             ft_dim=(64, 64), filter_size=31, layers=7,
-            epochs=0, samples=10
+            epochs=0, samples=None
         )
         bw_init = None
         print(f'Restored from <{None}>')
