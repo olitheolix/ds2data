@@ -419,9 +419,10 @@ class TestNetworkSetup:
         # Serialise the network biases and weights.
         data = net.serialise()
         assert isinstance(data, dict)
-        assert set(data.keys()) == {'weight', 'bias'}
+        assert set(data.keys()) == {'weight', 'bias', 'num-layers'}
         assert set(data['bias'].keys()) == set(range(net.numLayers()))
         assert set(data['weight'].keys()) == set(range(net.numLayers()))
+        assert data['num-layers'] == num_layers
 
         # Verify the variables.
         for i in range(net.numLayers()):
@@ -454,6 +455,7 @@ class TestNetworkSetup:
         bw_init['weight'][1] = 1 * np.ones((3, 3, 64, 64), np.float32)
         bw_init['bias'][2] = 2 * np.ones((num_out, 1, 1), np.float32)
         bw_init['weight'][2] = 2 * np.ones((33, 33, 64, num_out), np.float32)
+        bw_init['num-layers'] = 3
 
         # Create a new network and restore its weights.
         net = rpcn_net.Orpac(self.sess, x_in, num_layers, num_classes, bw_init)

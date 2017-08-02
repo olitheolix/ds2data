@@ -266,7 +266,7 @@ class Orpac:
         self.feature_shape = tuple(out.shape.as_list()[2:])
 
     def serialise(self):
-        out = {'weight': {}, 'bias': {}}
+        out = {'weight': {}, 'bias': {}, 'num-layers': self.numLayers()}
         for i in range(self.num_layers):
             out['bias'][i] = self.getBias(i)
             out['weight'][i] = self.getWeight(i)
