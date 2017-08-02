@@ -182,7 +182,7 @@ def _maskFgLabel(img, objID_at_pixel_ft, obj_pixels_ft):
     return mask
 
 
-def generate(fname, img, rpcn_dims):
+def generate(fname, img, ft_dims):
     assert img.ndim == 3 and img.shape[2] == 3 and img.dtype == np.uint8
     im_dim = img.shape[:2]
 
@@ -219,7 +219,7 @@ def generate(fname, img, rpcn_dims):
 
     # Compile dictionary with feature size specific data. This includes the
     # BBox data relative to the anchor point.
-    for ft_dim in rpcn_dims:
+    for ft_dim in ft_dims:
         img_ft = Image.fromarray(img).resize((ft_dim[1], ft_dim[0]))
         img_ft = np.array(img_ft)
 
@@ -248,17 +248,17 @@ def generate(fname, img, rpcn_dims):
 
 
 def compileSingle(args):
-    fname, rpcn_out_dims = args
+    fname, ft_dims = args
     img = np.array(Image.open(fname + '.jpg').convert('RGB'))
-    features = generate(fname, img, rpcn_out_dims)
+    features = generate(fname, img, ft_dims)
     pickle.dump(features, open(fname + '-compiled.pickle', 'wb'))
 
 
 def main():
     param = parseCmdline()
-    rpcn_out_dims = [(64, 64)]
+    ft_dims = [(64, 64)]
 
-    args = [(_, rpcn_out_dims) for _ in param.fnames]
+    args = [(_, ft_dims) for _ in param.fnames]
 
     if len(args) == 1:
         compileSingle(args[0])
