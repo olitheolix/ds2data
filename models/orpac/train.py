@@ -251,17 +251,14 @@ def main():
         meta = pickle.load(open(fnames['meta'], 'rb'))
         conf, log = meta['conf'], meta['log']
         bw_init = pickle.load(open(fnames['orpac-net'], 'rb'))
-        num_layers = bw_init['num-layers']
-        print(f'Restored from <{fnames["meta"]}>')
     else:
         log = collections.defaultdict(list)
         conf = config.NetConf(
-            seed=0, dtype='float32', train_rat=0.8, num_pools_shared=2,
+            seed=0, dtype='float32', train_rat=0.8, layers=7,
             rpcn_out_dims=(64, 64), rpcn_filter_size=31,
             path=os.path.join('data', '3dflight'),
             num_epochs=0, num_samples=10
         )
-        num_layers = 7
         bw_init = None
         print(f'Restored from <{None}>')
     print('\n', conf)
@@ -282,7 +279,7 @@ def main():
     # Create the input variable, the shared network and the ORPAC.
     lrate_in = tf.placeholder(tf.float32, name='lrate')
     x_in = tf.placeholder(tf_dtype, [1, *im_dim], name='x_in')
-    net = rpcn_net.Orpac(sess, x_in, num_layers, num_classes, bw_init)
+    net = rpcn_net.Orpac(sess, x_in, conf.layers, num_classes, bw_init)
 
     # Select cost function and optimiser, then initialise the TF graph.
     cost = rpcn_net.cost(net.output())
@@ -298,6 +295,8 @@ def main():
     if restore:
         print('\nRestored Tensorflow graph from checkpoint file')
         saver.restore(sess, fnames['checkpt'])
+    else:
+        print('Starting with untrained network')
 
     print(f'\n----- Training for another {param.N} Epochs -----')
     try:

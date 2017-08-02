@@ -3,7 +3,7 @@ import collections
 
 NetConf = collections.namedtuple(
     'NetConf',
-    'seed dtype num_pools_shared rpcn_out_dims rpcn_filter_size'
+    'seed dtype layers rpcn_out_dims rpcn_filter_size'
     ' train_rat num_epochs num_samples path'
 )
 
