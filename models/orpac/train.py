@@ -240,7 +240,7 @@ def logTrainingStats(sess, log, img, ys, meta, batch, all_costs):
             bb90p = err_bbox[int(0.9 * len(err_bbox))]
             bb50p = err_bbox[int(0.5 * len(err_bbox))]
         s1 = 'BgFg=  None' if err_bgfg is None else f'BgFg={err_bgfg:5.1f}%'
-        s2 = 'BgFg=  None' if err_cls is None else f'Cls={err_cls:5.1f}%'
+        s2 = 'Cls=  None' if err_cls is None else f'Cls={err_cls:5.1f}%'
         s3 = 'BBox=  None' if bb50p is None else f'BBox=({bb50p:2.0f}, {bb90p:2.0f})'
         s_err = str.join('  ', [s1, s2, s3])
 
