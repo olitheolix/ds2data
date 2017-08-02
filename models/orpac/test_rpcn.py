@@ -329,3 +329,137 @@ class TestCost:
 
             # Ensure Tensorflow and NumPy agree.
             assert np.abs(np_cost - tf_cost) < 1E-3
+
+
+class TestNetworkSetup:
+    """Create, save and restore network."""
+    @classmethod
+    def setup_class(cls):
+        pass
+
+    @classmethod
+    def teardown_class(cls):
+        pass
+
+    def setup_method(self, method):
+        # Create Tensorflow session.
+        self.sess = tf.Session()
+
+    def teardown_method(self, method):
+        # Shutdown Tensorflow session and reset graph.
+        tf.reset_default_graph()
+        self.sess.close()
+        tf.reset_default_graph()
+
+    def test_basic_attributes(self):
+        """Setup network and check basic parameters like TF variable names,
+        number of layers, size of last feature map...
+        """
+        num_layers = 7
+        num_classes = 10
+        tf_dtype, np_dtype = tf.float32, np.float32
+
+        x_in = tf.placeholder(tf_dtype, [1, 5, 512, 512])
+        net = rpcn_net.Orpac(self.sess, x_in, num_layers, num_classes, None)
+        self.sess.run(tf.global_variables_initializer())
+
+        # The feature size must be 1/8 of the image size because the network
+        # downsamples every second layer, and we specified 7 layers.
+        assert num_layers == net.numLayers() == 7
+        assert net.featureShape() == (64, 64)
+
+        # Ensure we can query all biases and weights. Also verify the data type
+        # inside the network.
+        g = tf.get_default_graph().get_tensor_by_name
+        for i in range(num_layers):
+            # These must exist in the graph.
+            assert g(f'orpac/W{i}:0') is not None
+            assert g(f'orpac/b{i}:0') is not None
+            assert net.getBias(i).dtype == np_dtype
+            assert net.getWeight(i).dtype == np_dtype
+
+    def test_weights_and_biases(self):
+        """Create default network and test various accessor methods"""
+        num_layers = 7
+        num_classes = 10
+
+        # Create network with random weights.
+        x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
+        net = rpcn_net.Orpac(self.sess, x_in, num_layers, num_classes, None)
+        self.sess.run(tf.global_variables_initializer())
+
+        # First layer must be compatible with input.
+        assert net.getBias(0).shape == (64, 1, 1)
+        assert net.getWeight(0).shape == (3, 3, x_in.shape[1], 64)
+
+        # Number of output features to encode BBox, isFg, and Class.
+        num_out = 4 + 2 + num_classes
+
+        # The last filter is responsible for creating the various features we
+        # train the network on. Its dimension must be 33x33 to achieve a large
+        # receptive field on the input image.
+        net.getBias(num_layers - 1).shape == (num_out, 1, 1)
+        net.getWeight(num_layers - 1).shape == (33, 33, 64, num_out)
+
+        # The output layer must have the correct number of features and
+        # feature map size.
+        ft_dim = net.featureShape()
+        assert net.output().shape == (1, num_out, *ft_dim)
+
+    def test_serialise(self):
+        """ Create a network and serialise its biases and weights."""
+        num_layers = 7
+        num_classes = 10
+
+        # Setup default network. Variables are random.
+        x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
+        net = rpcn_net.Orpac(self.sess, x_in, num_layers, num_classes, None)
+        self.sess.run(tf.global_variables_initializer())
+
+        # Serialise the network biases and weights.
+        data = net.serialise()
+        assert isinstance(data, dict)
+        assert set(data.keys()) == {'weight', 'bias'}
+        assert set(data['bias'].keys()) == set(range(net.numLayers()))
+        assert set(data['weight'].keys()) == set(range(net.numLayers()))
+
+        # Verify the variables.
+        for i in range(net.numLayers()):
+            assert np.array_equal(net.getBias(i), data['bias'][i])
+            assert np.array_equal(net.getWeight(i), data['weight'][i])
+
+    def test_restore(self):
+        """ Restore a network.
+
+        This test cannot be combined with `test_serialise` because of TFs
+        idiosyncrasies with (not) sharing Tensor names. Therefore, specify
+        dummy values for three layers, pass them to the Ctor, and verify the
+        values are correct.
+        """
+        num_layers = 3
+        num_classes = 10
+        num_out = 2 + 4 + num_classes
+
+        # Dummy input tensor.
+        chan = 8
+        x_in = tf.placeholder(tf.float32, [1, chan, 512, 512])
+
+        # Create variables for first, middle and last layer. The first layer
+        # must be adapted to the input, the middle layer is always fixed, and
+        # the last layer must encode the features (ie BBox, isFg, Class).
+        bw_init = {'bias': {}, 'weight': {}}
+        bw_init['bias'][0] = 0 * np.ones((64, 1, 1), np.float32)
+        bw_init['weight'][0] = 0 * np.ones((3, 3, chan, 64), np.float32)
+        bw_init['bias'][1] = 1 * np.ones((64, 1, 1), np.float32)
+        bw_init['weight'][1] = 1 * np.ones((3, 3, 64, 64), np.float32)
+        bw_init['bias'][2] = 2 * np.ones((num_out, 1, 1), np.float32)
+        bw_init['weight'][2] = 2 * np.ones((33, 33, 64, num_out), np.float32)
+
+        # Create a new network and restore its weights.
+        net = rpcn_net.Orpac(self.sess, x_in, num_layers, num_classes, bw_init)
+        self.sess.run(tf.global_variables_initializer())
+
+        # Ensure the weights are as specified.
+        for i in range(net.numLayers()):
+            assert np.array_equal(net.getBias(i), bw_init['bias'][i])
+            assert np.array_equal(net.getWeight(i), bw_init['weight'][i])

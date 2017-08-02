@@ -168,3 +168,126 @@ def setup(fname, x_in, num_classes, filter_size, trainable):
     bwt2 = (b2, W2, trainable)
     net_out, orpac_out = model(x_in, bwt1, bwt2)
     return orpac_out
+
+
+def unpackBiasAndWeight(bw_init, b_dim, W_dim, layer, dtype):
+    """
+
+    Input:
+        bw_init: {'weight': {1: w1, 2: w2, ..}, 'bias': {0:, b0, 4: b4, ...}}
+            Initial values. If the required variable does not exist then
+            initialise the bias with a constant and the weight with Gaussian
+            distributed numbers.
+        b_dim: Tuple eg (64, 1, 1)
+            Dimensions of Bias variable.
+        W_dim: Tuple eg (3, 3, 5, 64)
+            Dimensions of Weight variable.
+        layer: Int
+            Layer number (starts at Zero).
+        dtype: NumPy data type
+
+    Returns:
+        b: Tensorflow Variable with shape `b_dim`
+        W: Tensorflow Variable with shape `W_dim`
+    """
+    # Ensure the variable names we are about to create do not yet exist.
+    g = tf.get_default_graph().get_tensor_by_name
+    try:
+        g(f'b{layer}:0'), g(f'W{layer}:0')
+        print(f'Error: variables for layer {layer} already exist')
+        assert False
+    except (ValueError, KeyError):
+        pass
+
+    # Initialise bias tensor. Initialise it with a constant value unless a
+    # specific bias tensor is available in `bw_init`.
+    try:
+        b = bw_init['bias'][layer]
+        assert b.shape == b_dim
+    except (AssertionError, IndexError, TypeError):
+        b = 0.5 + np.zeros(b_dim)
+    b = tf.Variable(b.astype(dtype), name=f'b{layer}')
+
+    # Initialise weight tensor. Initialise it with Gaussian distributed numbers
+    # unless a specific weight tensor is available in `bw_init`.
+    try:
+        W = bw_init['weight'][layer]
+        assert W.shape == W_dim
+    except (AssertionError, IndexError, TypeError):
+        W = np.random.normal(0.0, 0.1, W_dim)
+    W = tf.Variable(W.astype(dtype), name=f'W{layer}')
+    return b, W
+
+
+class Orpac:
+    def __init__(self, sess, x_in, num_layers, num_classes, bw_init):
+        # Backup basic variables.
+        self.sess = sess
+        self.num_layers = num_layers
+        self.num_classes = num_classes
+
+        # Check the data type.
+        if x_in.dtype == tf.float16:
+            dtype = np.float16
+        elif x_in.dtype == tf.float32:
+            dtype = np.float32
+        else:
+            assert False
+
+        # Convenience: shared arguments for bias, conv2d, and max-pool.
+        opts = dict(padding='SAME', data_format='NCHW')
+
+        prev = x_in
+        with tf.variable_scope('orpac'):
+            for i in range(num_layers - 1):
+                prev_shape = tuple(prev.shape.as_list())
+                b_dim = (64, 1, 1)
+                W_dim = (3, 3, prev_shape[1], 64)
+                b, W = unpackBiasAndWeight(bw_init, b_dim, W_dim, i, dtype)
+
+                # Examples dimensions assume 128x128 RGB images.
+                # Odd i : [-1, 3, 128, 128] ---> [-1, 64, 128, 128]
+                # Even i: [-1, 3, 128, 128] ---> [-1, 64, 64, 64]
+                # Kernel: 3x3  Features: 64
+                stride = [1, 1, 1, 1] if i % 2 == 0 else [1, 1, 2, 2]
+                prev = tf.nn.relu(tf.nn.conv2d(prev, W, stride, **opts) + b)
+                del i, b, W, b_dim, W_dim, stride
+
+            # Convolution layer to learn the BBoxes and class labels.
+            # Shape: [-1, 64, 33, 33] ---> [-1, 4 + 2 + num_classes, 64, 64]
+            # Kernel: 5x5
+            W_dim = (33, 33, prev.shape[1], 4 + 2 + num_classes)
+            b_dim = (4 + 2 + num_classes, 1, 1)
+            b, W = unpackBiasAndWeight(bw_init, b_dim, W_dim, num_layers - 1, dtype)
+            out = tf.add(tf.nn.conv2d(prev, W, [1, 1, 1, 1], **opts), b, name='out')
+
+        # Store the output node and feature map size.
+        self.out = out
+        self.feature_shape = tuple(out.shape.as_list()[2:])
+
+    def serialise(self):
+        out = {'weight': {}, 'bias': {}}
+        for i in range(self.num_layers):
+            out['bias'][i] = self.getBias(i)
+            out['weight'][i] = self.getWeight(i)
+        return out
+
+    def getBias(self, layer):
+        g = tf.get_default_graph().get_tensor_by_name
+        return self.sess.run(g(f'orpac/b{layer}:0'))
+
+    def getWeight(self, layer):
+        g = tf.get_default_graph().get_tensor_by_name
+        return self.sess.run(g(f'orpac/W{layer}:0'))
+
+    def numLayers(self):
+        return self.num_layers
+
+    def numClasses(self):
+        return self.num_classes
+
+    def featureShape(self):
+        return self.feature_shape
+
+    def output(self):
+        return self.out
