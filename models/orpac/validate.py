@@ -51,117 +51,116 @@ def nonMaxSuppress(sess, bb_rects, scores):
     return sess.run(g('non-max-suppression/op:0'), feed_dict=fd)
 
 
-def predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name, nms):
-    """ Compile the list of BBoxes and assoicated label that each RPCN found.
+def predictBBoxes(sess, x_in, img, true_y, int2name, nms):
+    """ Compile the list of BBoxes and their labels.
 
     Input:
         sess: Tensorflow sessions
         img: CHW image
         x_in: Tensorflow Placeholder
-        rpcn_dims: List[Tuple(ft_height, ft_width)]
-            Invoke only the RPCNs with those feature maps sizes. Each feature
-            map size must also be a key in `ys`.
-        ys: Dict[ft_dim: Tensor]
-            The keys are RPCN feature dimensions (eg (64, 64)) and the values
-            are the ground truth tensors for that particular RPCN. Set this
-            value to *None* if no ground truth data is available.
+        true_y: Tensor[?, ft_height, ft_width]
+            Ground truth, or *None* if none is available.
         nms: Bool
             Use non-maximum-suppression to filter BBoxes if True, otherwise do
             not filter and use all BBoxes.
 
     Returns:
-        preds: Dict[ft_dim: Tensor]
-            Same structure as `ys`. Contains the raw prediction data.
-        bb_rects_out: Dict[ft_dim: Array[:, 4]]
-            List of the four BBox parameters (x0, y0, x1, y1) from each RPCN.
-        pred_labels_out: Dict[ft_dim: int]
-            The predicted label for each BBox.
-        true_labels_out: Dict[ft_dim: int]
+        pred_y: Array[?, ft_height, ft_width]
+            Raw network output without the Batch dimension.
+        bb_rects_out: Int16 Array[N, 4]
+            BBox parameters (x0, y0, x1, y1).
+        pred_labels_out: Int16 Array[N]
+            Predicted label for each BBox.
+        true_labels_out: Int16 Array[N]
             The ground truth label for each BBox.
     """
     # Predict BBoxes and labels.
-    assert ys is None or isinstance(ys, dict)
+    assert true_y is None or isinstance(true_y, np.ndarray)
     assert img.ndim == 3 and img.shape[0] == 3
     im_dim = img.shape[1:]
 
     # Compile the list of RPCN output nodes.
     g = tf.get_default_graph().get_tensor_by_name
-    rpcn_out = {_: g(f'rpcn-{_[0]}x{_[1]}/rpcn_out:0') for _ in rpcn_dims}
+    rpcn_out = g(f'orpac/out:0')
 
-    # Run the input through all RPCN nodes, then strip off the batch dimension.
-    preds = sess.run(rpcn_out, feed_dict={x_in: np.expand_dims(img, 0)})
-    preds = {k: v[0] for k, v in preds.items()}
+    # Pass the input to ORPAC and strip off the batch dimension.
+    pred_y = sess.run(rpcn_out, feed_dict={x_in: np.expand_dims(img, 0)})
+
+    # Remove batch dimension.
+    pred_y = pred_y[0]
+    true_y = true_y[0]
 
     # Compute the BBox predictions from every RPCN layer.
     bb_rects_out = {}
-    true_labels_out, pred_labels_out = {}, {}
-    for layer_dim in rpcn_dims:
-        pred = preds[layer_dim]
 
-        # Unpack the tensors from the current RPCN network.
-        if ys is None:
-            true_labels = getClassLabel(pred)
-        else:
-            true_labels = getClassLabel(ys[layer_dim])
+    # Unpack the tensors from the current RPCN network.
+    if true_y is None:
+        true_labels = getClassLabel(pred_y)
+    else:
+        true_labels = getClassLabel(true_y)
 
-        isFg = getIsFg(pred)
-        bboxes = getBBoxRects(pred)
-        pred_labels = getClassLabel(pred)
+    isFg = getIsFg(pred_y)
+    bboxes = getBBoxRects(pred_y)
+    pred_labels = getClassLabel(pred_y)
 
-        # Determine all locations where the network thinks it sees background
-        # and mask those locations. This is tantamount to setting the
-        # foreground label to Zero, which is, by definition, 'None' and will be
-        # ignored in `unpackBBoxes` in the next step.
-        hard_cls = np.argmax(pred_labels, axis=0)
-        hard_fg = np.argmax(isFg, axis=0)
-        hard = hard_cls * hard_fg
+    # Determine all locations where the network thinks it sees background
+    # and mask those locations. This is tantamount to setting the
+    # foreground label to Zero, which is, by definition, 'None' and will be
+    # ignored in `unpackBBoxes` in the next step.
+    hard_cls = np.argmax(pred_labels, axis=0)
+    hard_fg = np.argmax(isFg, axis=0)
+    hard = hard_cls * hard_fg
 
-        # Compile BBox for valid FG locations from network output.
-        bb_rects, pick_yx = unpackBBoxes(im_dim, bboxes, hard)
-        del hard, hard_cls, hard_fg, bboxes, pred, isFg
+    # Compile BBox for valid FG locations from network output.
+    bb_rects, pick_yx = unpackBBoxes(im_dim, bboxes, hard)
+    del hard, hard_cls, hard_fg, bboxes, isFg
 
-        # Use Non-Maximum-Suppression to remove overlapping BBoxes.
-        # Compute a BBox score to prioritise on in the non-maximum
-        # suppression step below. In softmax as the score.
-        if nms:
-            softmax_scores = np.exp(np.clip(pred_labels, -20, 20))
-            softmax_scores = softmax_scores / np.max(softmax_scores, axis=0)
-            softmax_scores = np.max(softmax_scores, axis=0)
-            softmax_scores = softmax_scores[pick_yx]
-            assert len(softmax_scores) == len(bb_rects)
+    # Use Non-Maximum-Suppression to remove overlapping BBoxes.
+    # Compute a BBox score to prioritise on in the non-maximum
+    # suppression step below. In softmax as the score.
+    if nms:
+        softmax_scores = np.exp(np.clip(pred_labels, -20, 20))
+        softmax_scores = softmax_scores / np.max(softmax_scores, axis=0)
+        softmax_scores = np.max(softmax_scores, axis=0)
+        softmax_scores = softmax_scores[pick_yx]
+        assert len(softmax_scores) == len(bb_rects)
 
-            # Suppress overlapping BBoxes.
-            idx = nonMaxSuppress(sess, bb_rects, softmax_scores)
-            bb_rects = bb_rects[idx]
-            del idx, softmax_scores
+        # Suppress overlapping BBoxes.
+        idx = nonMaxSuppress(sess, bb_rects, softmax_scores)
+        bb_rects = bb_rects[idx]
+        del idx, softmax_scores
 
-        # Create new entry for current RPAC output.
-        bb_rects_out[layer_dim] = []
-        pred_labels_out[layer_dim] = []
-        true_labels_out[layer_dim] = []
+    # Create new entry for current RPAC output.
+    bb_rects_out = []
+    pred_labels_out = []
+    true_labels_out = []
 
-        # Compute the most likely label for every individual BBox.
-        im2ft_rat = img.shape[1] / pred_labels.shape[1]
-        for (x0, y0, x1, y1) in bb_rects:
-            # Skip invalid BBoxes.
-            if x0 >= x1 or y0 >= y1:
-                continue
+    # Compute the most likely label for every individual BBox.
+    im2ft_rat = img.shape[1] / pred_labels.shape[1]
+    for (x0, y0, x1, y1) in bb_rects:
+        # Skip invalid BBoxes.
+        if x0 >= x1 or y0 >= y1:
+            continue
 
-            # BBox coordinates in feature space.
-            x0_ft, x1_ft, y0_ft, y1_ft = np.array([x0, x1, y0, y1]) / im2ft_rat
+        # BBox coordinates in feature space.
+        x0_ft, x1_ft, y0_ft, y1_ft = np.array([x0, x1, y0, y1]) / im2ft_rat
 
-            # BBox centre in feature space.
-            x = int(np.round(np.mean([x1_ft, x0_ft])))
-            y = int(np.round(np.mean([y1_ft, y0_ft])))
-            x = np.clip(x, 0, pred_labels.shape[2] - 1)
-            y = np.clip(y, 0, pred_labels.shape[1] - 1)
+        # BBox centre in feature space.
+        x = int(np.round(np.mean([x1_ft, x0_ft])))
+        y = int(np.round(np.mean([y1_ft, y0_ft])))
+        x = np.clip(x, 0, pred_labels.shape[2] - 1)
+        y = np.clip(y, 0, pred_labels.shape[1] - 1)
 
-            # Look up the true/predicted label at the BBox centre.
-            bb_rects_out[layer_dim].append((x0, y0, x1, y1))
-            pred_labels_out[layer_dim].append(np.argmax(pred_labels[:, y, x]))
-            true_labels_out[layer_dim].append(np.argmax(true_labels[:, y, x]))
+        # Look up the true/predicted label at the BBox centre.
+        bb_rects_out.append((x0, y0, x1, y1))
+        pred_labels_out.append(np.argmax(pred_labels[:, y, x]))
+        true_labels_out.append(np.argmax(true_labels[:, y, x]))
 
-    return preds, bb_rects_out, pred_labels_out, true_labels_out
+    # Return all quantities as a NumPy array.
+    bb_rects_out = np.array(bb_rects_out, np.int16)
+    pred_labels_out = np.array(pred_labels_out, np.int16)
+    true_labels_out = np.array(true_labels_out, np.int16)
+    return pred_y, bb_rects_out, pred_labels_out, true_labels_out
 
 
 def predictImagesInEpoch(sess, ds, x_in, dst_path):
@@ -171,7 +170,6 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
     N = ds.lenOfEpoch(dset)
     int2name = ds.int2name()
     fig_opts = dict(dpi=150, transparent=True, bbox_inches='tight', pad_inches=0)
-    rpcn_dims = ds.getRpcnDimensions()
 
     # Ensure target directory exists.
     os.makedirs(dst_path, exist_ok=True)
@@ -180,20 +178,18 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
     progbar = tqdm.tqdm(range(N), total=N, desc=f'Predicting', leave=False)
 
     for i in progbar:
-        img, ys, uuid = ds.nextSingle(dset)
+        img, true_y, uuid = ds.nextSingle(dset)
         assert img is not None
 
-        # Extract the original file name. To get it, just pop one of the
-        # feature dimensions and look up the file name in the meta data.
-        meta = ds.getMeta([uuid])[uuid][rpcn_dims[0]]
+        # Extract the original file name.
+        meta = ds.getMeta([uuid])[uuid]
         fname = os.path.join(dst_path, os.path.split(meta.filename)[-1])
         del meta
 
         # Predict the BBoxes with NMS. There must be no NaNs in the output.
-        pred_nms = predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name, True)
-        preds, pred_rect, pred_cls, true_cls = pred_nms
-        for _ in preds.values():
-            assert not np.any(np.isnan(_))
+        pred_nms = predictBBoxes(sess, x_in, img, true_y, int2name, True)
+        pred_y, pred_rect, pred_cls, true_cls = pred_nms
+        assert not np.any(np.isnan(pred_y))
 
         # Draw the BBoxes over the image and save it.
         fig0 = plotPredictedBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
@@ -205,13 +201,13 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
         # predicted BBoxes (ie without NMS), as well as a label map.
         if i == 0:
             # Plot and save the label map.
-            fig1 = plotPredictedLabelMap(img, preds, ys, int2name)
+            fig1 = plotPredictedLabelMap(img, pred_y, true_y[0], int2name)
             fig1.canvas.set_window_title(fname)
             fig1.set_size_inches(20, 11)
             fig1.savefig(f'{fname}-lmap.jpg', **fig_opts)
 
             # Predict the BBoxes without NMS.
-            pred_all = predictBBoxes(sess, x_in, img, rpcn_dims, ys, int2name, False)
+            pred_all = predictBBoxes(sess, x_in, img, true_y, int2name, False)
             _, pred_rect, pred_cls, true_cls = pred_all
 
             # Draw the BBoxes over the image and save it.
@@ -222,13 +218,10 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
 
             # Create dummy costs and log dictionary, then log the error
             # statistics for the current image.
-            all_costs = {'tot': -1}
-            log = {'rpcn': {}, 'cost': []}
-            for rpcn_dim in rpcn_dims:
-                all_costs[rpcn_dim] = {'bbox': -1, 'isFg': -1, 'cls': -1, 'tot': -1}
-                log['rpcn'][rpcn_dim] = {'err': [], 'cost': []}
+            all_costs = {'total': -1, 'bbox': -1, 'isFg': -1, 'cls': -1}
+            log = {'orpac': {'err': [], 'cost': []}, 'cost': []}
             train.logTrainingStats(
-                sess, log, img, ys,
+                sess, log, img, true_y,
                 meta=ds.getMeta([uuid])[uuid], batch=0, all_costs=all_costs)
             del all_costs, log
         else:
@@ -236,48 +229,48 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
             plt.close(fig0)
 
 
-def plotPredictedLabelMap(img, preds, ys, int2name):
+def plotPredictedLabelMap(img, pred_y, true_y, int2name):
     num_classes = len(int2name)
-    num_cols, num_rows = 3, len(preds)
+    num_cols, num_rows = 3, 1
 
     fig = plt.figure()
-    for idx, ft_dim in enumerate(preds.keys()):
-        # Find out which pixels the net thinks are foreground.
-        pred_isFg = getIsFg(preds[ft_dim])
 
-        # Unpack the true foreground class labels and make hard decision.
-        true_labels = getClassLabel(ys[ft_dim])
-        true_labels = np.argmax(true_labels, axis=0)
+    # Find out which pixels the net thinks are foreground.
+    pred_isFg = getIsFg(pred_y)
 
-        # Repeat with the predicted foreground class labels. The only
-        # difference is that we need to mask out all those pixels that network
-        # thinks are background.
-        pred_labels = getClassLabel(preds[ft_dim])
-        pred_isFg = np.argmax(pred_isFg, axis=0)
-        pred_labels = pred_isFg * np.argmax(pred_labels, axis=0)
+    # Unpack the true foreground class labels and make hard decision.
+    true_labels = getClassLabel(true_y)
+    true_labels = np.argmax(true_labels, axis=0)
 
-        # Plot the true label map.
-        plt.subplot(num_rows, 3, idx * num_cols + 1)
-        plt.imshow(true_labels, clim=[0, num_classes])
-        plt.title(f'True {ft_dim}')
+    # Repeat with the predicted foreground class labels. The only
+    # difference is that we need to mask out all those pixels that network
+    # thinks are background.
+    pred_labels = getClassLabel(pred_y)
+    pred_isFg = np.argmax(pred_isFg, axis=0)
+    pred_labels = pred_isFg * np.argmax(pred_labels, axis=0)
 
-        # Show the input image for reference.
-        plt.subplot(num_rows, 3, idx * num_cols + 2)
-        plt.imshow(np.transpose(img, [1, 2, 0]))
-        plt.title('Input Image')
+    # Plot the true label map.
+    plt.subplot(num_rows, num_cols, 1)
+    plt.imshow(true_labels, clim=[0, num_classes])
+    plt.title(f'True')
 
-        # Plot the predicted label map.
-        plt.subplot(num_rows, 3, idx * num_cols + 3)
-        plt.imshow(pred_labels, clim=[0, num_classes])
-        plt.title(f'Pred {ft_dim}')
+    # Show the input image for reference.
+    plt.subplot(num_rows, num_cols, 2)
+    plt.imshow(np.transpose(img, [1, 2, 0]))
+    plt.title('Input Image')
+
+    # Plot the predicted label map.
+    plt.subplot(num_rows, num_cols, 3)
+    plt.imshow(pred_labels, clim=[0, num_classes])
+    plt.title(f'Pred')
     return fig
 
 
 def plotPredictedBBoxes(img_chw, pred_bboxes, pred_labels, true_labels, int2name):
     assert img_chw.ndim == 3 and img_chw.shape[0] == 3
-    assert isinstance(pred_bboxes, dict)
-    assert isinstance(pred_labels, dict)
-    assert isinstance(true_labels, dict)
+    assert isinstance(pred_bboxes, np.ndarray)
+    assert isinstance(pred_labels, np.ndarray)
+    assert isinstance(true_labels, np.ndarray)
     assert isinstance(int2name, dict)
     assert len(pred_bboxes) == len(pred_labels) == len(true_labels)
 
@@ -292,29 +285,26 @@ def plotPredictedBBoxes(img_chw, pred_bboxes, pred_labels, true_labels, int2name
         horizontalalignment='center', verticalalignment='center'
     )
 
-    # Show the predicted BBoxes and labels for each RPAC.
+
+    # Show the input image.
     fig = plt.figure()
-    num_cols = len(pred_bboxes)
-    for idx, layer_dim in enumerate(pred_bboxes):
-        # Show the input image.
-        ax = plt.subplot(1, num_cols, idx + 1)
-        ax.set_axis_off()
-        ax.imshow(img)
+    ax = plt.gca()
+    ax.set_axis_off()
+    ax.imshow(img)
 
-        # Add BBoxes and labels to image.
-        for i, (x0, y0, x1, y1), in enumerate(pred_bboxes[layer_dim]):
-            p_label = pred_labels[layer_dim][i]
-            t_label = true_labels[layer_dim][i]
+    # Add BBoxes and labels to image.
+    for i, (x0, y0, x1, y1), in enumerate(pred_bboxes):
+        p_label = pred_labels[i]
+        t_label = true_labels[i]
 
-            # Width/height of BBox.
-            w = x1 - x0 + 1
-            h = y1 - y0 + 1
+        # Width/height of BBox.
+        w = x1 - x0 + 1
+        h = y1 - y0 + 1
 
-            # Draw the rectangle and add the text.
-            rect_opts['edgecolor'] = 'g' if p_label == t_label else 'r'
-            ax.add_patch(patches.Rectangle((x0, y0), w, h, **rect_opts))
-            ax.text(x0 + w / 2, y0, f' {int2name[p_label]} ', **text_opts)
-        plt.title(f'RPCN Layer Size: {layer_dim[0]}x{layer_dim[1]}')
+        # Draw the rectangle and add the text.
+        rect_opts['edgecolor'] = 'g' if p_label == t_label else 'r'
+        ax.add_patch(patches.Rectangle((x0, y0), w, h, **rect_opts))
+        ax.text(x0 + w / 2, y0, f' {int2name[p_label]} ', **text_opts)
     return fig
 
 
@@ -324,8 +314,8 @@ def main():
 
     netstate_path = 'netstate'
     fnames = {
-        'meta': os.path.join(netstate_path, 'rpcn-meta.pickle'),
-        'rpcn_net': os.path.join(netstate_path, 'rpcn-net.pickle'),
+        'meta': os.path.join(netstate_path, 'orpac-meta.pickle'),
+        'rpcn_net': os.path.join(netstate_path, 'orpac-net.pickle'),
         'shared_net': os.path.join(netstate_path, 'shared-net.pickle'),
     }
 
@@ -357,13 +347,13 @@ def main():
     assert conf.dtype in ['float32', 'float16']
     tf_dtype = tf.float32 if conf.dtype == 'float32' else tf.float16
 
-    # Build the shared layers and connect it to the RPCN layers.
+    # Build the shared layers and connect it to ORPAC.
     print('\n----- Network Setup -----')
     x_in = tf.placeholder(tf_dtype, [1, *im_dim], name='x_in')
     sh_out = shared_net.setup(fnames['shared_net'], x_in, conf.num_pools_shared, True)
     rpcn_net.setup(
         fnames['rpcn_net'], sh_out, len(int2name),
-        conf.rpcn_filter_size, conf.rpcn_out_dims, True)
+        conf.rpcn_filter_size, True)
     sess.run(tf.global_variables_initializer())
 
     # Predict each image and produce a new image with BBoxes and labels in it.
