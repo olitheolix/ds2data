@@ -264,6 +264,18 @@ class Orpac:
         # Store the output node and feature map size.
         self.out = out
         self.feature_shape = tuple(out.shape.as_list()[2:])
+        self._setupNonMaxSuppression()
+
+    def _setupNonMaxSuppression(self):
+        """Create non-maximum-suppression nodes.
+
+        These are irrelevant for training but useful in the predictor to cull
+        the flood of possible bounding boxes.
+        """
+        with tf.variable_scope('non-max-suppression'):
+            r_in = tf.placeholder(tf.float32, [None, 4], name='bb_rects')
+            s_in = tf.placeholder(tf.float32, [None], name='scores')
+            tf.image.non_max_suppression(r_in, s_in, 30, 0.2, name='op')
 
     def serialise(self):
         out = {'weight': {}, 'bias': {}, 'num-layers': self.numLayers()}

@@ -465,3 +465,22 @@ class TestNetworkSetup:
         for i in range(net.numLayers()):
             assert np.array_equal(net.getBias(i), bw_init['bias'][i])
             assert np.array_equal(net.getWeight(i), bw_init['weight'][i])
+
+    def test_non_max_suppresion_setup(self):
+        """Ensure the network creates the NMS nodes."""
+        g = tf.get_default_graph().get_tensor_by_name
+
+        # NMS nodes must not yet exist.
+        try:
+            assert g('non-max-suppression/op:0') is not None
+        except KeyError:
+            pass
+
+        # Create a network (parameters do not matter).
+        x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
+        rpcn_net.Orpac(self.sess, x_in, 7, 10, None)
+
+        # All NMS nodes must now exist.
+        assert g('non-max-suppression/op:0') is not None
+        assert g('non-max-suppression/scores:0') is not None
+        assert g('non-max-suppression/bb_rects:0') is not None
