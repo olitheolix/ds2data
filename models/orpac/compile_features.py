@@ -256,7 +256,7 @@ def compileSingle(args):
 
 def main():
     param = parseCmdline()
-    rpcn_out_dims = [(64, 64), (32, 32)]
+    rpcn_out_dims = [(64, 64)]
 
     args = [(_, rpcn_out_dims) for _ in param.fnames]
 
