@@ -122,6 +122,14 @@ def trainEpoch(ds, sess, log, opt, lrate):
     dset = 'train'
     g = tf.get_default_graph().get_tensor_by_name
 
+    # Cost nodes.
+    cost_nodes = {
+        'bbox': g(f'orpac-cost/bbox:0'),
+        'isFg': g(f'orpac-cost/isFg:0'),
+        'cls': g(f'orpac-cost/cls:0'),
+        'total': g(f'orpac-cost/total:0'),
+    }
+
     # Train on one image at a time.
     ds.reset(dset)
     for batch in range(ds.lenOfEpoch(dset)):
@@ -130,41 +138,35 @@ def trainEpoch(ds, sess, log, opt, lrate):
         img, y, uuid = ds.nextSingle(dset)
         assert img is not None
         assert img.ndim == 3 and isinstance(y, np.ndarray)
-
-        # Determine how many locations to sample. We do not want to use every
-        # valid location in the image but only a random subset. The size of
-        # that subset, in this case, is 25% of the number of suitable BBox
-        # esitmation locations or 100, whichever is larger.
         meta = ds.getMeta([uuid])[uuid]
-        mask_bbox, mask_isFg, mask_cls = sampleMasks(
-            meta.mask_valid,
-            meta.mask_fg,
-            meta.mask_bbox,
-            meta.mask_cls,
-            meta.mask_objid_at_pix,
-            10,
-        )
 
-        # Feed dictionary.
-        fd = {
-            g(f'x_in:0'): np.expand_dims(img, 0),
-            g(f'lrate:0'): lrate,
-            g(f'orpac-cost/y_true:0'): y,
-            g(f'orpac-cost/mask_cls:0'): mask_cls,
-            g(f'orpac-cost/mask_bbox:0'): mask_bbox,
-            g(f'orpac-cost/mask_isFg:0'): mask_isFg,
-        }
+        # Use each image twice but with a different mask sample.
+        for i in range(2):
+            # Randomly sample the masks to create a good mix of activate
+            # regions for FG/BG, BBox and Class estimation.
+            mask_bbox, mask_isFg, mask_cls = sampleMasks(
+                meta.mask_valid,
+                meta.mask_fg,
+                meta.mask_bbox,
+                meta.mask_cls,
+                meta.mask_objid_at_pix,
+                10
+            )
 
-        # Cost nodes.
-        cost_nodes = {
-            'bbox': g(f'orpac-cost/bbox:0'),
-            'isFg': g(f'orpac-cost/isFg:0'),
-            'cls': g(f'orpac-cost/cls:0'),
-            'total': g(f'orpac-cost/total:0'),
-        }
+            # Feed dictionary.
+            fd = {
+                g(f'x_in:0'): np.expand_dims(img, 0),
+                g(f'lrate:0'): lrate,
+                g(f'orpac-cost/y_true:0'): y,
+                g(f'orpac-cost/mask_cls:0'): mask_cls,
+                g(f'orpac-cost/mask_bbox:0'): mask_bbox,
+                g(f'orpac-cost/mask_isFg:0'): mask_isFg,
+            }
 
-        # Run one optimisation step and log all costs and statistics.
-        all_costs, _ = sess.run([cost_nodes, opt], feed_dict=fd)
+            # Run one optimisation step
+            all_costs, _ = sess.run([cost_nodes, opt], feed_dict=fd)
+
+        # Log the costs and statistics from the last optimisation run.
         logTrainingStats(sess, log, img, y, meta, batch, all_costs)
 
 
