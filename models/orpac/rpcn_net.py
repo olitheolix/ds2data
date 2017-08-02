@@ -1,12 +1,12 @@
-"""Region Proposal and Classification Network (RPCN)
+"""Region Proposal and Classification Network (ORPAC)
 
-Each RPCN comprises two conv-layer. The first one acts as another hidden layer
+Each ORPAC comprises two conv-layer. The first one acts as another hidden layer
 and the second one predicts BBoxes and object label at each location.
 
-A network may have more than one RPCN. In that case, their only difference is
+A network may have more than one ORPAC. In that case, their only difference is
 the size of the input feature map. The idea is that smaller feature map
 correspond to a larger receptive field (the filter sizes are identical in all
-RPCN layers)
+ORPAC layers)
 """
 import pickle
 import numpy as np
@@ -18,10 +18,10 @@ _SCALE_ISFG = 3000
 _SCALE_CLS = 1000
 
 
-def model(x_in, name, bwt1, bwt2):
+def model(x_in, bwt1, bwt2):
     # Convenience
     conv_opts = dict(padding='SAME', data_format='NCHW')
-    with tf.variable_scope(f'rpcn-{name}'):
+    with tf.variable_scope(f'orpac'):
         # Convolution layer to downsample the feature map.
         # Shape: [-1, 64, 64, 64] ---> [-1, 64, 32, 32]
         # Kernel: 3x3
@@ -36,9 +36,9 @@ def model(x_in, name, bwt1, bwt2):
         b2 = tf.Variable(bwt2[0], trainable=bwt2[2], name='b2')
         W2 = tf.Variable(bwt2[1], trainable=bwt2[2], name='W2')
 
-        rpcn_out = tf.nn.conv2d(net_out, W2, [1, 1, 1, 1], **conv_opts)
-        rpcn_out = tf.add(rpcn_out, b2, name='rpcn_out')
-    return net_out, rpcn_out
+        orpac_out = tf.nn.conv2d(net_out, W2, [1, 1, 1, 1], **conv_opts)
+        orpac_out = tf.add(orpac_out, b2, name='out')
+    return net_out, orpac_out
 
 
 def _crossEnt(logits, labels, name=None):
@@ -48,13 +48,9 @@ def _crossEnt(logits, labels, name=None):
 
 def cost(y_pred):
     dtype = y_pred.dtype
-    y_dim = y_pred.shape.as_list()
-    mask_dim = y_dim[2:]
-    ft_height, ft_width = mask_dim
-    name = f'{ft_height}x{ft_width}'
-    del ft_height, ft_width, y_dim
+    mask_dim = y_pred.shape.as_list()[2:]
 
-    with tf.variable_scope(f'rpcn-{name}-cost'):
+    with tf.variable_scope(f'orpac-cost'):
         # Placeholder for ground truth data.
         y_true = tf.placeholder(dtype, y_pred.shape, name='y_true')
 
@@ -107,7 +103,7 @@ def cost(y_pred):
         return tf.add_n([cost_bbox, cost_isFg, cost_cls], name='total')
 
 
-def save(fname, sess, ft_dim):
+def save(fname, sess):
     """ Save the pickled network state to `fname`.
 
     Args:
@@ -118,10 +114,9 @@ def save(fname, sess, ft_dim):
     # Query the state of the shared network (weights and biases).
     g = tf.get_default_graph().get_tensor_by_name
     state = {}
-    layer_name = f'{ft_dim[0]}x{ft_dim[1]}'
-    W1, b1 = sess.run([g(f'rpcn-{layer_name}/W1:0'), g(f'rpcn-{layer_name}/b1:0')])
-    W2, b2 = sess.run([g(f'rpcn-{layer_name}/W2:0'), g(f'rpcn-{layer_name}/b2:0')])
-    state[ft_dim] = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
+    W1, b1 = sess.run([g(f'orpac/W1:0'), g(f'orpac/b1:0')])
+    W2, b2 = sess.run([g(f'orpac/W2:0'), g(f'orpac/b2:0')])
+    state = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
 
     # Save the state.
     pickle.dump(state, open(fname, 'wb'))
@@ -136,7 +131,7 @@ def setup(fname, x_in, num_classes, filter_size, ft_dim, trainable):
     dtype = np.float16 if x_in.dtype == tf.float16 else np.float32
     num_features_out = 64
 
-    print(f'RPCN ({len(ft_dim)} layers):')
+    print(f'ORPAC ({len(ft_dim)} layers):')
     print(f'  Restored from <{fname}>')
 
     # Create non-maximum-suppression nodes. This is irrelevant for training but
@@ -149,10 +144,6 @@ def setup(fname, x_in, num_classes, filter_size, ft_dim, trainable):
 
     assert isinstance(ft_dim, tuple) and len(ft_dim) == 2
     assert x_in.shape.as_list()[2:] == list(2 * np.array(ft_dim))
-
-    # Create a layer name based on the dimension. This will be the name of
-    # the Tensorflow namespace.
-    layer_name = f'{ft_dim[0]}x{ft_dim[1]}'
 
     num_features_in = x_in.shape.as_list()[1]
 
@@ -183,5 +174,5 @@ def setup(fname, x_in, num_classes, filter_size, ft_dim, trainable):
 
     bwt1 = (b1, W1, trainable)
     bwt2 = (b2, W2, trainable)
-    net_out, rpcn_out = model(x_in, layer_name, bwt1, bwt2)
-    return rpcn_out
+    net_out, orpac_out = model(x_in, bwt1, bwt2)
+    return orpac_out

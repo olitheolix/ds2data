@@ -109,6 +109,7 @@ def compileErrorStats(true_y, pred_y, mask_bbox, mask_bgfg, mask_cls):
 
 def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
     """Train network for one full epoch of data in `ds`.
+    fixme: remove unused rpcn_filter_size argument
 
     Input:
         ds: DataStore instance
@@ -126,13 +127,11 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
     x_in = g('x_in:0')
     lrate_in = g('lrate:0')
 
-    # Get the RPCN dimensions of the network and initialise the log variable
+    # Get the ORPAC dimensions of the network and initialise the log variable
     # for all of them.
     ft_dim = ds.getRpcnDimensions()
-    if 'rpcn' not in log:
-        log['rpcn'] = {'err': [], 'cost': []}
-
-    layer_name = f'{ft_dim[0]}x{ft_dim[1]}'
+    if 'orpac' not in log:
+        log['orpac'] = {'err': [], 'cost': []}
 
     # Train on one image at a time.
     ds.reset('train')
@@ -159,17 +158,17 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
 
         # Compile the feed dictionary.
         fd = {x_in: np.expand_dims(img, 0), lrate_in: lrate}
-        fd[g(f'rpcn-{layer_name}-cost/y_true:0')] = y
-        fd[g(f'rpcn-{layer_name}-cost/mask_cls:0')] = mask_cls
-        fd[g(f'rpcn-{layer_name}-cost/mask_bbox:0')] = mask_bbox
-        fd[g(f'rpcn-{layer_name}-cost/mask_isFg:0')] = mask_isFg
+        fd[g(f'orpac-cost/y_true:0')] = y
+        fd[g(f'orpac-cost/mask_cls:0')] = mask_cls
+        fd[g(f'orpac-cost/mask_bbox:0')] = mask_bbox
+        fd[g(f'orpac-cost/mask_isFg:0')] = mask_isFg
 
         # Run one optimisation step and record all costs.
         cost_nodes = {
-            'bbox': g(f'rpcn-{layer_name}-cost/bbox:0'),
-            'isFg': g(f'rpcn-{layer_name}-cost/isFg:0'),
-            'cls': g(f'rpcn-{layer_name}-cost/cls:0'),
-            'total': g(f'rpcn-{layer_name}-cost/total:0'),
+            'bbox': g(f'orpac-cost/bbox:0'),
+            'isFg': g(f'orpac-cost/isFg:0'),
+            'cls': g(f'orpac-cost/cls:0'),
+            'total': g(f'orpac-cost/total:0'),
         }
         all_costs, _ = sess.run([cost_nodes, opt], feed_dict=fd)
 
@@ -181,14 +180,13 @@ def logTrainingStats(sess, log, img, y, meta, ft_dim, batch, all_costs):
     g = tf.get_default_graph().get_tensor_by_name
     x_in = g('x_in:0')
     log['cost'].append(all_costs['total'])
-    layer_name = f'{ft_dim[0]}x{ft_dim[1]}'
 
-    # Predict the RPCN outputs for the current image and compute the error
+    # Predict the ORPAC outputs for the current image and compute the error
     # statistics. All statistics will be added to the log dictionary.
     feed_dict = {x_in: np.expand_dims(img, 0)}
 
     # Predict. Ensure there are no NaN in the output.
-    pred = sess.run(g(f'rpcn-{layer_name}/rpcn_out:0'), feed_dict=feed_dict)
+    pred = sess.run(g(f'orpac/out:0'), feed_dict=feed_dict)
     assert not np.any(np.isnan(pred))
 
     # Determine how many locations to sample. We do not want to use every
@@ -207,8 +205,8 @@ def logTrainingStats(sess, log, img, y, meta, ft_dim, batch, all_costs):
     err = compileErrorStats(y[0], pred[0], mask_bbox, mask_isFg, mask_cls)
 
     # Log training stats. The validation script will use these.
-    log['rpcn']['err'].append(err)
-    log['rpcn']['cost'].append(all_costs)
+    log['orpac']['err'].append(err)
+    log['orpac']['cost'].append(all_costs)
 
     cost_bbox = int(all_costs['bbox'])
     cost_isFg = int(all_costs['isFg'])
@@ -246,8 +244,8 @@ def main():
     netstate_path = 'netstate'
     os.makedirs(netstate_path, exist_ok=True)
     fnames = {
-        'meta': os.path.join(netstate_path, 'rpcn-meta.pickle'),
-        'rpcn_net': os.path.join(netstate_path, 'rpcn-net.pickle'),
+        'meta': os.path.join(netstate_path, 'orpac-meta.pickle'),
+        'orpac_net': os.path.join(netstate_path, 'orpac-net.pickle'),
         'shared_net': os.path.join(netstate_path, 'shared-net.pickle'),
         'checkpt': os.path.join(netstate_path, 'tf-checkpoint.pickle'),
     }
@@ -283,15 +281,15 @@ def main():
     assert conf.dtype in ['float32', 'float16']
     tf_dtype = tf.float32 if conf.dtype == 'float32' else tf.float16
 
-    # Create the input variable, the shared network and the RPCN.
+    # Create the input variable, the shared network and the ORPAC.
     lrate_in = tf.placeholder(tf.float32, name='lrate')
     x_in = tf.placeholder(tf_dtype, [1, *im_dim], name='x_in')
     shared_out = shared_net.setup(None, x_in, conf.num_pools_shared, True)
-    rpcn_out = rpcn_net.setup(
+    orpac_out = rpcn_net.setup(
         None, shared_out, len(int2name),
         conf.rpcn_filter_size, conf.rpcn_out_dims, True)
     # Select cost function and optimiser, then initialise the TF graph.
-    cost = rpcn_net.cost(rpcn_out)
+    cost = rpcn_net.cost(orpac_out)
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
     sess.run(tf.global_variables_initializer())
     del cost
@@ -316,7 +314,7 @@ def main():
             trainEpoch(ds, sess, log, opt, lrates[epoch], conf.rpcn_filter_size)
 
             # Save the network state and log data.
-            rpcn_net.save(fnames['rpcn_net'], sess, conf.rpcn_out_dims)
+            rpcn_net.save(fnames['orpac_net'], sess)
             shared_net.save(fnames['shared_net'], sess)
             conf = conf._replace(num_epochs=epoch + epoch_ofs)
             log['conf'] = conf
