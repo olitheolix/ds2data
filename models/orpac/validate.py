@@ -192,7 +192,7 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
         assert not np.any(np.isnan(pred_y))
 
         # Draw the BBoxes over the image and save it.
-        fig0 = plotPredictedBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
+        fig0 = plotBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
         fig0.set_size_inches(20, 11)
         fig0.savefig(f'{fname}-pred-nms.jpg', **fig_opts)
         fig0.canvas.set_window_title(fname)
@@ -201,7 +201,7 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
         # predicted BBoxes (ie without NMS), as well as a label map.
         if i == 0:
             # Plot and save the label map.
-            fig1 = plotPredictedLabelMap(img, pred_y, true_y[0], int2name)
+            fig1 = plotLabelMap(img, pred_y, true_y[0], int2name)
             fig1.canvas.set_window_title(fname)
             fig1.set_size_inches(20, 11)
             fig1.savefig(f'{fname}-lmap.jpg', **fig_opts)
@@ -211,7 +211,7 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
             _, pred_rect, pred_cls, true_cls = pred_all
 
             # Draw the BBoxes over the image and save it.
-            fig2 = plotPredictedBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
+            fig2 = plotBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
             fig2.set_size_inches(20, 11)
             fig2.savefig(f'{fname}-pred-all.jpg', **fig_opts)
             fig2.canvas.set_window_title(fname)
@@ -229,7 +229,7 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
             plt.close(fig0)
 
 
-def plotPredictedLabelMap(img, pred_y, true_y, int2name):
+def plotLabelMap(img, pred_y, true_y, int2name):
     num_classes = len(int2name)
     num_cols, num_rows = 3, 1
 
@@ -266,7 +266,7 @@ def plotPredictedLabelMap(img, pred_y, true_y, int2name):
     return fig
 
 
-def plotPredictedBBoxes(img_chw, pred_bboxes, pred_labels, true_labels, int2name):
+def plotBBoxes(img_chw, pred_bboxes, pred_labels, true_labels, int2name):
     assert img_chw.ndim == 3 and img_chw.shape[0] == 3
     assert isinstance(pred_bboxes, np.ndarray)
     assert isinstance(pred_labels, np.ndarray)
