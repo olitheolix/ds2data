@@ -3,8 +3,7 @@ import collections
 
 NetConf = collections.namedtuple(
     'NetConf',
-    'seed dtype layers rpcn_out_dims rpcn_filter_size'
-    ' train_rat num_epochs num_samples path'
+    'seed dtype layers rpcn_out_dims filter_size train_rat epochs samples path'
 )
 
 ErrorMetrics = collections.namedtuple(

@@ -32,7 +32,7 @@ class DataSet:
         conf.train_rat (float): 0.0-1.0
             Ratio of samples to put aside for training. For example, 0.8 means 80%
             of all samples will be in the training set, and 20% in the test set.
-        conf.num_samples (int):
+        conf.samples (int):
             Number of samples to use for each label. Use all if set to None.
     """
     MetaData = namedtuple('MetaData', 'filename')
@@ -83,7 +83,7 @@ class DataSet:
         x = np.array(x, np.float32) / 255
 
         # Limit the number of samples for each label.
-        N = conf.num_samples
+        N = conf.samples
 
         # Store the pre-processed labels.
         self.meta = meta
@@ -244,7 +244,7 @@ class ORPAC(DataSet):
 
         # Compile a list of JPG images in the source folder. Then verify that
         # a) each is a valid JPG file and b) all images have the same size.
-        fnames = self.findTrainingFiles(self.conf.num_samples)
+        fnames = self.findTrainingFiles(self.conf.samples)
         height, width = self.checkImageDimensions(fnames)
 
         # If the features have not been compiled yet, do so now.

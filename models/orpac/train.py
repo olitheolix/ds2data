@@ -255,9 +255,9 @@ def main():
         log = collections.defaultdict(list)
         conf = config.NetConf(
             seed=0, dtype='float32', train_rat=0.8, layers=7,
-            rpcn_out_dims=(64, 64), rpcn_filter_size=31,
+            rpcn_out_dims=(64, 64), filter_size=31,
             path=os.path.join('data', '3dflight'),
-            num_epochs=0, num_samples=10
+            epochs=0, samples=10
         )
         bw_init = None
         print(f'Restored from <{None}>')
@@ -300,7 +300,7 @@ def main():
 
     print(f'\n----- Training for another {param.N} Epochs -----')
     try:
-        epoch_ofs = conf.num_epochs + 1
+        epoch_ofs = conf.epochs + 1
         lrates = np.logspace(-3, -5, param.N)
         t0_all = time.time()
         for epoch in range(param.N):
@@ -313,7 +313,7 @@ def main():
 
             # Save the network state and log data.
             pickle.dump(net.serialise(), open(fnames['orpac-net'], 'wb'))
-            conf = conf._replace(num_epochs=epoch + epoch_ofs)
+            conf = conf._replace(epochs=epoch + epoch_ofs)
             meta = {'conf': conf, 'int2name': int2name, 'log': log}
             pickle.dump(meta, open(fnames['meta'], 'wb'))
             saver.save(sess, fnames['checkpt'])

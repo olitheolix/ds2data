@@ -328,7 +328,7 @@ def main():
     # 'test' set.
     conf = conf._replace(
         path=param.src,
-        num_samples=param.N,
+        samples=param.N,
         train_rat=0.0,
     )
 

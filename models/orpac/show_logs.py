@@ -112,7 +112,7 @@ def plotTrainingProgress(log, conf):
     # first is directly available from the NetConfig structure and the second
     # indirectly from the number of recorded costs since there is exactly one
     # cost per sample.
-    num_epochs = conf.num_epochs
+    num_epochs = conf.epochs
     if num_epochs < 2:
         print('Need at least 2 epochs to plot anything - Abort')
         sys.exit(1)
