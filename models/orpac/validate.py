@@ -58,15 +58,15 @@ def predictBBoxes(sess, x_in, img, true_y, int2name, nms):
         sess: Tensorflow sessions
         img: CHW image
         x_in: Tensorflow Placeholder
-        true_y: Tensor[?, ft_height, ft_width]
-            Ground truth, or *None* if none is available.
+        true_y: Tensor[1, ?, ft_height, ft_width]
+            Ground truth, or *None* if unavailable.
         nms: Bool
             Use non-maximum-suppression to filter BBoxes if True, otherwise do
             not filter and use all BBoxes.
 
     Returns:
-        pred_y: Array[?, ft_height, ft_width]
-            Raw network output without the Batch dimension.
+        pred_y: Array[1, ?, ft_height, ft_width]
+            Raw network output. Same dimension as `true_y`.
         bb_rects_out: Int16 Array[N, 4]
             BBox parameters (x0, y0, x1, y1).
         pred_labels_out: Int16 Array[N]
@@ -77,31 +77,27 @@ def predictBBoxes(sess, x_in, img, true_y, int2name, nms):
     # Predict BBoxes and labels.
     assert true_y is None or isinstance(true_y, np.ndarray)
     assert img.ndim == 3 and img.shape[0] == 3
+    assert true_y.ndim == 4 and true_y.shape[0] == 1
     im_dim = img.shape[1:]
 
     # Compile the list of RPCN output nodes.
     g = tf.get_default_graph().get_tensor_by_name
     rpcn_out = g(f'orpac/out:0')
 
-    # Pass the input to ORPAC and strip off the batch dimension.
+    # Pass the image to ORPAC and strip off the batch dimension from the result.
     pred_y = sess.run(rpcn_out, feed_dict={x_in: np.expand_dims(img, 0)})
 
-    # Remove batch dimension.
-    pred_y = pred_y[0]
-    true_y = true_y[0]
-
-    # Compute the BBox predictions from every RPCN layer.
-    bb_rects_out = {}
-
-    # Unpack the tensors from the current RPCN network.
+    # Unpack true class labels. If the caller did not provide any then use the
+    # predicted ones instead.
     if true_y is None:
-        true_labels = getClassLabel(pred_y)
+        true_labels = getClassLabel(pred_y[0])
     else:
-        true_labels = getClassLabel(true_y)
+        true_labels = getClassLabel(true_y[0])
 
-    isFg = getIsFg(pred_y)
-    bboxes = getBBoxRects(pred_y)
-    pred_labels = getClassLabel(pred_y)
+    # Unpack the tensors.
+    isFg = getIsFg(pred_y[0])
+    bboxes = getBBoxRects(pred_y[0])
+    pred_labels = getClassLabel(pred_y[0])
 
     # Determine all locations where the network thinks it sees background
     # and mask those locations. This is tantamount to setting the
@@ -167,7 +163,6 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
     # Predict the BBoxes for every image.
     dset = 'test'
     ds.reset(dset)
-    N = ds.lenOfEpoch(dset)
     int2name = ds.int2name()
     fig_opts = dict(dpi=150, transparent=True, bbox_inches='tight', pad_inches=0)
 
@@ -175,7 +170,9 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
     os.makedirs(dst_path, exist_ok=True)
 
     print('\n----- Validating Images -----')
+    N = ds.lenOfEpoch(dset)
     progbar = tqdm.tqdm(range(N), total=N, desc=f'Predicting', leave=False)
+    del N
 
     for i in progbar:
         img, true_y, uuid = ds.nextSingle(dset)
@@ -201,7 +198,7 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
         # predicted BBoxes (ie without NMS), as well as a label map.
         if i == 0:
             # Plot and save the label map.
-            fig1 = plotLabelMap(img, pred_y, true_y[0], int2name)
+            fig1 = plotLabelMap(img, pred_y[0], true_y[0], int2name)
             fig1.canvas.set_window_title(fname)
             fig1.set_size_inches(20, 11)
             fig1.savefig(f'{fname}-lmap.jpg', **fig_opts)
@@ -284,7 +281,6 @@ def plotBBoxes(img_chw, pred_bboxes, pred_labels, true_labels, int2name):
         fontdict=dict(color='white', size=12, weight='normal'),
         horizontalalignment='center', verticalalignment='center'
     )
-
 
     # Show the input image.
     fig = plt.figure()
