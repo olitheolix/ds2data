@@ -130,11 +130,6 @@ def unpackBiasAndWeight(bw_init, b_dim, W_dim, layer, dtype):
 
 class Orpac:
     def __init__(self, sess, x_in, num_layers, num_classes, bw_init):
-        # Backup basic variables.
-        self.sess = sess
-        self.num_layers = num_layers
-        self.num_classes = num_classes
-
         # Check the data type.
         if x_in.dtype == tf.float16:
             dtype = np.float16
@@ -143,37 +138,45 @@ class Orpac:
         else:
             assert False
 
+        # Backup basic variables.
+        self.sess = sess
+        self.num_layers = num_layers
+        self.num_classes = num_classes
+
+        # Setup the NMS nodes and Orpac network.
+        self._setupNonMaxSuppression()
+        with tf.variable_scope('orpac'):
+            self.out = self._setupNetwork(x_in, bw_init, dtype)
+
+        # Store the output node and feature map size.
+        self.feature_shape = tuple(self.out.shape.as_list()[2:])
+
+    def _setupNetwork(self, x_in, bw_init, dtype):
         # Convenience: shared arguments for bias, conv2d, and max-pool.
         opts = dict(padding='SAME', data_format='NCHW')
 
         prev = x_in
-        with tf.variable_scope('orpac'):
-            for i in range(num_layers - 1):
-                prev_shape = tuple(prev.shape.as_list())
-                b_dim = (64, 1, 1)
-                W_dim = (3, 3, prev_shape[1], 64)
-                b, W = unpackBiasAndWeight(bw_init, b_dim, W_dim, i, dtype)
+        for i in range(self.num_layers - 1):
+            prev_shape = tuple(prev.shape.as_list())
+            b_dim = (64, 1, 1)
+            W_dim = (3, 3, prev_shape[1], 64)
+            b, W = unpackBiasAndWeight(bw_init, b_dim, W_dim, i, dtype)
 
-                # Examples dimensions assume 128x128 RGB images.
-                # Odd i : [-1, 3, 128, 128] ---> [-1, 64, 128, 128]
-                # Even i: [-1, 3, 128, 128] ---> [-1, 64, 64, 64]
-                # Kernel: 3x3  Features: 64
-                stride = [1, 1, 1, 1] if i % 2 == 0 else [1, 1, 2, 2]
-                prev = tf.nn.relu(tf.nn.conv2d(prev, W, stride, **opts) + b)
-                del i, b, W, b_dim, W_dim, stride
+            # Examples dimensions assume 128x128 RGB images.
+            # Odd i : [-1, 3, 128, 128] ---> [-1, 64, 128, 128]
+            # Even i: [-1, 3, 128, 128] ---> [-1, 64, 64, 64]
+            # Kernel: 3x3  Features: 64
+            stride = [1, 1, 1, 1] if i % 2 == 0 else [1, 1, 2, 2]
+            prev = tf.nn.relu(tf.nn.conv2d(prev, W, stride, **opts) + b)
+            del i, b, W, b_dim, W_dim, stride
 
-            # Convolution layer to learn the BBoxes and class labels.
-            # Shape: [-1, 64, 33, 33] ---> [-1, 4 + 2 + num_classes, 64, 64]
-            # Kernel: 5x5
-            W_dim = (33, 33, prev.shape[1], 4 + 2 + num_classes)
-            b_dim = (4 + 2 + num_classes, 1, 1)
-            b, W = unpackBiasAndWeight(bw_init, b_dim, W_dim, num_layers - 1, dtype)
-            out = tf.add(tf.nn.conv2d(prev, W, [1, 1, 1, 1], **opts), b, name='out')
-
-        # Store the output node and feature map size.
-        self.out = out
-        self.feature_shape = tuple(out.shape.as_list()[2:])
-        self._setupNonMaxSuppression()
+        # Convolution layer to learn the BBoxes and class labels.
+        # Shape: [-1, 64, 33, 33] ---> [-1, 4 + 2 + num_classes, 64, 64]
+        # Kernel: 5x5
+        W_dim = (33, 33, prev.shape[1], 4 + 2 + self.num_classes)
+        b_dim = (4 + 2 + self.num_classes, 1, 1)
+        b, W = unpackBiasAndWeight(bw_init, b_dim, W_dim, self.num_layers - 1, dtype)
+        return tf.add(tf.nn.conv2d(prev, W, [1, 1, 1, 1], **opts), b, name='out')
 
     def _setupNonMaxSuppression(self):
         """Create non-maximum-suppression nodes.
