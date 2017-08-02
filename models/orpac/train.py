@@ -107,9 +107,8 @@ def compileErrorStats(true_y, pred_y, mask_bbox, mask_bgfg, mask_cls):
     )
 
 
-def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
+def trainEpoch(ds, sess, log, opt, lrate):
     """Train network for one full epoch of data in `ds`.
-    fixme: remove unused rpcn_filter_size argument
 
     Input:
         ds: DataStore instance
@@ -121,24 +120,15 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
         lrate: float
             Learning rate for this epoch.
     """
+    dset = 'train'
     g = tf.get_default_graph().get_tensor_by_name
 
-    # Get missing placeholder variables.
-    x_in = g('x_in:0')
-    lrate_in = g('lrate:0')
-
-    # Get the ORPAC dimensions of the network and initialise the log variable
-    # for all of them.
-    ft_dim = ds.getRpcnDimensions()
-    if 'orpac' not in log:
-        log['orpac'] = {'err': [], 'cost': []}
-
     # Train on one image at a time.
-    ds.reset('train')
-    for batch in range(ds.lenOfEpoch('train')):
+    ds.reset(dset)
+    for batch in range(ds.lenOfEpoch(dset)):
         # Get the next image or reset the data store if we have reached the
         # end of an epoch.
-        img, y, uuid = ds.nextSingle('train')
+        img, y, uuid = ds.nextSingle(dset)
         assert img is not None
         assert img.ndim == 3 and isinstance(y, np.ndarray)
 
@@ -156,27 +146,30 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
             10,
         )
 
-        # Compile the feed dictionary.
-        fd = {x_in: np.expand_dims(img, 0), lrate_in: lrate}
-        fd[g(f'orpac-cost/y_true:0')] = y
-        fd[g(f'orpac-cost/mask_cls:0')] = mask_cls
-        fd[g(f'orpac-cost/mask_bbox:0')] = mask_bbox
-        fd[g(f'orpac-cost/mask_isFg:0')] = mask_isFg
+        # Feed dictionary.
+        fd = {
+            g(f'x_in:0'): np.expand_dims(img, 0),
+            g(f'lrate:0'): lrate,
+            g(f'orpac-cost/y_true:0'): y,
+            g(f'orpac-cost/mask_cls:0'): mask_cls,
+            g(f'orpac-cost/mask_bbox:0'): mask_bbox,
+            g(f'orpac-cost/mask_isFg:0'): mask_isFg,
+        }
 
-        # Run one optimisation step and record all costs.
+        # Cost nodes.
         cost_nodes = {
             'bbox': g(f'orpac-cost/bbox:0'),
             'isFg': g(f'orpac-cost/isFg:0'),
             'cls': g(f'orpac-cost/cls:0'),
             'total': g(f'orpac-cost/total:0'),
         }
+
+        # Run one optimisation step and log all costs and statistics.
         all_costs, _ = sess.run([cost_nodes, opt], feed_dict=fd)
+        logTrainingStats(sess, log, img, y, meta, batch, all_costs)
 
-        logTrainingStats(sess, log, img, y, meta, ft_dim, batch, all_costs)
 
-
-def logTrainingStats(sess, log, img, y, meta, ft_dim, batch, all_costs):
-    # fixme: remove ft_dim argument once layer name is a constant.
+def logTrainingStats(sess, log, img, y, meta, batch, all_costs):
     g = tf.get_default_graph().get_tensor_by_name
     x_in = g('x_in:0')
     log['cost'].append(all_costs['total'])
@@ -204,7 +197,9 @@ def logTrainingStats(sess, log, img, y, meta, ft_dim, batch, all_costs):
 
     err = compileErrorStats(y[0], pred[0], mask_bbox, mask_isFg, mask_cls)
 
-    # Log training stats. The validation script will use these.
+    # Log training stats for eg the validation script.
+    if 'orpac' not in log:
+        log['orpac'] = {'err': [], 'cost': []}
     log['orpac']['err'].append(err)
     log['orpac']['cost'].append(all_costs)
 
@@ -311,7 +306,7 @@ def main():
             print(f'\nEpoch {tot_epoch} ({epoch+1}/{param.N} in this training cycle)')
 
             ds.reset()
-            trainEpoch(ds, sess, log, opt, lrates[epoch], conf.rpcn_filter_size)
+            trainEpoch(ds, sess, log, opt, lrates[epoch])
 
             # Save the network state and log data.
             rpcn_net.save(fnames['orpac_net'], sess)
