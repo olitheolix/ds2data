@@ -311,14 +311,14 @@ def main():
     netstate_path = 'netstate'
     fnames = {
         'meta': os.path.join(netstate_path, 'orpac-meta.pickle'),
-        'rpcn_net': os.path.join(netstate_path, 'orpac-net.pickle'),
-        'shared_net': os.path.join(netstate_path, 'shared-net.pickle'),
+        'orpac-net': os.path.join(netstate_path, 'orpac-net.pickle'),
     }
 
     # Load configuration file for latest network.
     fname = fnames['meta']
     try:
         conf = pickle.load(open(fname, 'rb'))['conf']
+        bw_init = pickle.load(open(fnames['orpac-net'], 'rb'))
     except FileNotFoundError:
         print(f'\nError: Configuration {fname} does not exist.')
         return
@@ -336,7 +336,7 @@ def main():
     print('\n----- Data Set -----')
     ds = data_loader.ORPAC(conf)
     ds.printSummary()
-    int2name = ds.int2name()
+    num_classes = len(ds.int2name())
     im_dim = ds.imageDimensions().tolist()
 
     # Precision.
@@ -346,10 +346,7 @@ def main():
     # Build the shared layers and connect it to ORPAC.
     print('\n----- Network Setup -----')
     x_in = tf.placeholder(tf_dtype, [1, *im_dim], name='x_in')
-    sh_out = shared_net.setup(fnames['shared_net'], x_in, conf.num_pools_shared, True)
-    rpcn_net.setup(
-        fnames['rpcn_net'], sh_out, len(int2name),
-        conf.rpcn_filter_size, True)
+    net = rpcn_net.Orpac(sess, x_in, conf.layers, num_classes, bw_init)
     sess.run(tf.global_variables_initializer())
 
     # Predict each image and produce a new image with BBoxes and labels in it.
