@@ -134,7 +134,9 @@ def plotTrainingProgress(log):
     min_cost = 10 ** np.floor(np.log10(max(1, min_cost)) - 1)
     max_cost = 10 ** np.ceil(np.log10(max_cost))
 
+    # Common x-axis for all plots.
     vec_x = np.arange(num_epochs)
+
     # Plot overall cost.
     plt.semilogy(vec_x, cost_90p, '-b', label='90%')
     plt.fill_between(vec_x, 1, cost_90p, facecolor='b', alpha=0.2)
@@ -148,74 +150,75 @@ def plotTrainingProgress(log):
     plt.xlabel('Epochs')
     del cost
 
-    # Plot statistics for every RPCN.
+    # Plot ORPAC statistics.
     plt.figure()
     num_cols = 4
-    num_rows = len(log['conf'].rpcn_out_dims)
+    num_rows = 1
     pfill = plt.fill_between
-    for idx, layer_dim in enumerate(log['conf'].rpcn_out_dims):
-        data = compileStatistics(log['rpcn'][layer_dim], num_epochs, samples_per_epoch)
+    ft_dim = log['conf'].rpcn_out_dims
 
-        # Cost of Fg/Bg decision.
-        plt.subplot(num_rows, num_cols, num_cols * idx + 1)
-        plt.semilogy(vec_x, data['100p']['cost_isFg'], '-r', label='BG/FG')
-        plt.semilogy(vec_x, data['100p']['cost_cls'], '-g', label='Class')
-        plt.semilogy(vec_x, data['100p']['cost_bbox'], '-b', label='BBox')
+    data = compileStatistics(log['orpac'], num_epochs, samples_per_epoch)
 
-        plt.xlim(min(vec_x), max(vec_x))
-        plt.ylim(min_cost, max_cost)
-        plt.grid()
-        plt.legend(loc='best')
-        plt.title(f'Costs (Feature Size: {layer_dim[0]}x{layer_dim[1]})')
+    # Cost of Fg/Bg decision.
+    plt.subplot(num_rows, num_cols, 1)
+    plt.semilogy(vec_x, data['100p']['cost_isFg'], '-r', label='BG/FG')
+    plt.semilogy(vec_x, data['100p']['cost_cls'], '-g', label='Class')
+    plt.semilogy(vec_x, data['100p']['cost_bbox'], '-b', label='BBox')
 
-        # Classification error rate.
-        plt.subplot(num_rows, num_cols, num_cols * idx + 2)
-        plt.plot(vec_x, data['90p']['label_err'], '-b', label='90%')
-        plt.plot(vec_x, data['50p']['label_err'], '--b', label='Median')
-        pfill(vec_x, 0, data['90p']['label_err'], facecolor='b', alpha=0.2)
-        pfill(vec_x, 0, data['50p']['label_err'], facecolor='b', alpha=0.2)
+    plt.xlim(min(vec_x), max(vec_x))
+    plt.ylim(min_cost, max_cost)
+    plt.grid()
+    plt.legend(loc='best')
+    plt.title(f'Costs (Feature Size: {ft_dim[0]}x{ft_dim[1]})')
 
-        plt.grid()
-        plt.xlim(min(vec_x), max(vec_x))
-        plt.ylim(0, 100)
-        plt.ylabel('Percent')
-        plt.legend(loc='best')
-        plt.title(f'Class Error Rate')
+    # Classification error rate.
+    plt.subplot(num_rows, num_cols, 2)
+    plt.plot(vec_x, data['90p']['label_err'], '-b', label='90%')
+    plt.plot(vec_x, data['50p']['label_err'], '--b', label='Median')
+    pfill(vec_x, 0, data['90p']['label_err'], facecolor='b', alpha=0.2)
+    pfill(vec_x, 0, data['50p']['label_err'], facecolor='b', alpha=0.2)
 
-        # BBox position error in x-dimension.
-        plt.subplot(num_rows, num_cols, num_cols * idx + 3)
-        plt.plot(vec_x, data['90p']['bb_err_all'], '-b', label='90%')
-        plt.plot(vec_x, data['50p']['bb_err_all'], '--b', label='Median')
-        pfill(vec_x, 0, data['90p']['bb_err_all'], facecolor='b', alpha=0.2)
-        pfill(vec_x, 0, data['50p']['bb_err_all'], facecolor='b', alpha=0.2)
+    plt.grid()
+    plt.xlim(min(vec_x), max(vec_x))
+    plt.ylim(0, 100)
+    plt.ylabel('Percent')
+    plt.legend(loc='best')
+    plt.title(f'Class Error Rate')
 
-        plt.xlim(min(vec_x), max(vec_x))
-        plt.ylim(0, 100)
-        plt.grid()
-        plt.legend(loc='best')
-        plt.title('BBox Position Error')
+    # BBox position error in x-dimension.
+    plt.subplot(num_rows, num_cols, 3)
+    plt.plot(vec_x, data['90p']['bb_err_all'], '-b', label='90%')
+    plt.plot(vec_x, data['50p']['bb_err_all'], '--b', label='Median')
+    pfill(vec_x, 0, data['90p']['bb_err_all'], facecolor='b', alpha=0.2)
+    pfill(vec_x, 0, data['50p']['bb_err_all'], facecolor='b', alpha=0.2)
 
-        # False positive for background and foreground.
-        plt.subplot(num_rows, num_cols, num_cols * idx + 4)
-        plt.plot(vec_x, data['99p']['bg_falsepos'], '-b', label='Background (99%)')
-        plt.plot(vec_x, data['99p']['fg_falsepos'], '-r', label='Foreground (99%)')
-        pfill(vec_x, 0, data['99p']['bg_falsepos'], facecolor='b', alpha=0.1)
-        pfill(vec_x, 0, data['99p']['fg_falsepos'], facecolor='r', alpha=0.1)
-        plt.plot(vec_x, data['50p']['bg_falsepos'], '--b', label='Background (Median)')
-        plt.plot(vec_x, data['50p']['fg_falsepos'], '--r', label='Foreground (Median)')
-        pfill(vec_x, 0, data['50p']['bg_falsepos'], facecolor='b', alpha=0.2)
-        pfill(vec_x, 0, data['50p']['fg_falsepos'], facecolor='r', alpha=0.2)
+    plt.xlim(min(vec_x), max(vec_x))
+    plt.ylim(0, 100)
+    plt.grid()
+    plt.legend(loc='best')
+    plt.title('BBox Position Error')
 
-        plt.xlim(min(vec_x), max(vec_x))
-        plt.ylim(0, 100)
-        plt.grid()
-        plt.ylabel('Percent')
-        plt.legend(loc='best')
-        plt.title('False Positive')
+    # False positive for background and foreground.
+    plt.subplot(num_rows, num_cols, 4)
+    plt.plot(vec_x, data['99p']['bg_falsepos'], '-b', label='Background (99%)')
+    plt.plot(vec_x, data['99p']['fg_falsepos'], '-r', label='Foreground (99%)')
+    pfill(vec_x, 0, data['99p']['bg_falsepos'], facecolor='b', alpha=0.1)
+    pfill(vec_x, 0, data['99p']['fg_falsepos'], facecolor='r', alpha=0.1)
+    plt.plot(vec_x, data['50p']['bg_falsepos'], '--b', label='Background (Median)')
+    plt.plot(vec_x, data['50p']['fg_falsepos'], '--r', label='Foreground (Median)')
+    pfill(vec_x, 0, data['50p']['bg_falsepos'], facecolor='b', alpha=0.2)
+    pfill(vec_x, 0, data['50p']['fg_falsepos'], facecolor='r', alpha=0.2)
+
+    plt.xlim(min(vec_x), max(vec_x))
+    plt.ylim(0, 100)
+    plt.grid()
+    plt.ylabel('Percent')
+    plt.legend(loc='best')
+    plt.title('False Positive')
 
 
 def main():
-    fname = os.path.join('netstate', 'rpcn-meta.pickle')
+    fname = os.path.join('netstate', 'orpac-meta.pickle')
     log = pickle.load(open(fname, 'rb'))['log']
 
     # Plot the learning progress and other debug plots like masks and an image
