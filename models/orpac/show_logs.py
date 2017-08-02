@@ -107,12 +107,12 @@ def compileStatistics(layer_log, num_epochs, samples_per_epoch):
     return stats
 
 
-def plotTrainingProgress(log):
+def plotTrainingProgress(log, conf):
     # Determine the number of epochs and number of samples per epoch. The
     # first is directly available from the NetConfig structure and the second
     # indirectly from the number of recorded costs since there is exactly one
     # cost per sample.
-    num_epochs = log['conf'].num_epochs
+    num_epochs = conf.num_epochs
     if num_epochs < 2:
         print('Need at least 2 epochs to plot anything - Abort')
         sys.exit(1)
@@ -155,7 +155,7 @@ def plotTrainingProgress(log):
     num_cols = 4
     num_rows = 1
     pfill = plt.fill_between
-    ft_dim = log['conf'].rpcn_out_dims
+    ft_dim = conf.rpcn_out_dims
 
     data = compileStatistics(log['orpac'], num_epochs, samples_per_epoch)
 
@@ -219,11 +219,12 @@ def plotTrainingProgress(log):
 
 def main():
     fname = os.path.join('netstate', 'orpac-meta.pickle')
-    log = pickle.load(open(fname, 'rb'))['log']
+    data = pickle.load(open(fname, 'rb'))
+    log, conf = data['log'], data['conf']
 
     # Plot the learning progress and other debug plots like masks and an image
     # with predicted BBoxes.
-    plotTrainingProgress(log)
+    plotTrainingProgress(log, conf)
     plt.show()
 
 

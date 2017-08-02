@@ -314,7 +314,6 @@ def main():
             # Save the network state and log data.
             pickle.dump(net.serialise(), open(fnames['orpac-net'], 'wb'))
             conf = conf._replace(num_epochs=epoch + epoch_ofs)
-            log['conf'] = conf
             meta = {'conf': conf, 'int2name': int2name, 'log': log}
             pickle.dump(meta, open(fnames['meta'], 'wb'))
             saver.save(sess, fnames['checkpt'])
