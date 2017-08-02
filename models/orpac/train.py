@@ -254,9 +254,9 @@ def main():
     else:
         log = collections.defaultdict(list)
         conf = config.NetConf(
-            seed=0, dtype='float32', train_rat=0.8, layers=7,
-            rpcn_out_dims=(64, 64), filter_size=31,
+            seed=0, dtype='float32', train_rat=0.8,
             path=os.path.join('data', '3dflight'),
+            ft_dim=(64, 64), filter_size=31, layers=7,
             epochs=0, samples=10
         )
         bw_init = None
@@ -290,6 +290,7 @@ def main():
     # Ensure the feature size of the network matches the feature size.
     assert net.output().shape.as_list()[2:] == list(ds.getFeatureSize())
     assert net.featureShape() == ds.getFeatureSize()
+    print('Output feature map size: ', net.featureShape())
 
     # Restore the network from Tensorflow's checkpoint file.
     saver = tf.train.Saver()

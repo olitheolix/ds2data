@@ -155,7 +155,6 @@ def plotTrainingProgress(log, conf):
     num_cols = 4
     num_rows = 1
     pfill = plt.fill_between
-    ft_dim = conf.rpcn_out_dims
 
     data = compileStatistics(log['orpac'], num_epochs, samples_per_epoch)
 
@@ -169,7 +168,7 @@ def plotTrainingProgress(log, conf):
     plt.ylim(min_cost, max_cost)
     plt.grid()
     plt.legend(loc='best')
-    plt.title(f'Costs (Feature Size: {ft_dim[0]}x{ft_dim[1]})')
+    plt.title(f'Costs (Feature Size: {conf.ft_dim[0]}x{conf.ft_dim[1]})')
 
     # Classification error rate.
     plt.subplot(num_rows, num_cols, 2)

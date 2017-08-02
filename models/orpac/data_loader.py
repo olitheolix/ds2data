@@ -40,10 +40,10 @@ class DataSet:
     def __init__(self, conf):
         # Sanity check.
         assert isinstance(conf, NetConf)
-        assert isinstance(conf.rpcn_out_dims, tuple)
-        assert len(conf.rpcn_out_dims) == 2
-        assert isinstance(conf.rpcn_out_dims[0], int)
-        assert isinstance(conf.rpcn_out_dims[1], int)
+        assert isinstance(conf.ft_dim, tuple)
+        assert len(conf.ft_dim) == 2
+        assert isinstance(conf.ft_dim[0], int)
+        assert isinstance(conf.ft_dim[1], int)
         self.conf = conf
 
         # Set the random number generator.
@@ -240,7 +240,7 @@ class ORPAC(DataSet):
 
     def loadRawData(self):
         # Store the feature map sizes for which we have data.
-        self.rpcn_dims = self.conf.rpcn_out_dims
+        self.rpcn_dims = self.conf.ft_dim
 
         # Compile a list of JPG images in the source folder. Then verify that
         # a) each is a valid JPG file and b) all images have the same size.
