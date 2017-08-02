@@ -215,7 +215,7 @@ class ORPAC(DataSet):
     )
 
     def getFeatureSize(self):
-        return tuple(self.rpcn_dims)
+        return tuple(self.ft_dim)
 
     def nextSingle(self, dset):
         """Return next image and corresponding training vectors from `dset`.
@@ -240,7 +240,7 @@ class ORPAC(DataSet):
 
     def loadRawData(self):
         # Store the feature map sizes for which we have data.
-        self.rpcn_dims = self.conf.ft_dim
+        self.ft_dim = self.conf.ft_dim
 
         # Compile a list of JPG images in the source folder. Then verify that
         # a) each is a valid JPG file and b) all images have the same size.
@@ -287,7 +287,7 @@ class ORPAC(DataSet):
         for fname in fnames:
             try:
                 tmp = pickle.load(open(fname + '-compiled.pickle', 'rb'))
-                assert self.rpcn_dims in tmp.keys()
+                assert self.ft_dim in tmp.keys()
             except (pickle.UnpicklingError, FileNotFoundError, AssertionError):
                 missing.append(fname)
 
@@ -297,7 +297,7 @@ class ORPAC(DataSet):
             for fname in progbar:
                 img = Image.open(fname + '.jpg').convert('RGB')
                 img = np.array(img)
-                out = compile_features.generate(fname, img, self.rpcn_dims)
+                out = compile_features.generate(fname, img, self.ft_dim)
                 pickle.dump(out, open(fname + '-compiled.pickle', 'wb'))
 
     def loadTrainingData(self, fnames, im_width, im_height):
@@ -319,7 +319,6 @@ class ORPAC(DataSet):
             del img, img_chw
 
             # All pre-compiled features must use the same label map.
-            # fixme: rename 'self.rpcn_dims' to 'self.ft_dim'.
             data = pickle.load(open(fname + '-compiled.pickle', 'rb'))
             if num_cls is None:
                 int2name = data['int2name']
@@ -327,7 +326,7 @@ class ORPAC(DataSet):
             assert int2name == data['int2name']
 
             # Crate the training output for the selected feature map size.
-            data = data[self.rpcn_dims]
+            data = data[self.ft_dim]
             y, meta = self.compileTrainingOutput(data, im_shape, num_cls)
             del data
 
