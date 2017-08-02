@@ -326,7 +326,7 @@ class ORPAC(DataSet):
                 num_cls = len(int2name)
             assert int2name == data['int2name']
 
-            # Crate the training output for different feature sizes.
+            # Crate the training output for the selected feature map size.
             data = data[self.rpcn_dims]
             y, meta = self.compileTrainingOutput(data, self.rpcn_dims, im_shape, num_cls)
             del data

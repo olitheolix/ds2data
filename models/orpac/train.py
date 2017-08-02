@@ -289,6 +289,7 @@ def main():
 
     # Ensure the feature size of the network matches the feature size.
     assert net.output().shape.as_list()[2:] == list(ds.getFeatureSize())
+    assert net.featureShape() == ds.getFeatureSize()
 
     # Restore the network from Tensorflow's checkpoint file.
     saver = tf.train.Saver()
