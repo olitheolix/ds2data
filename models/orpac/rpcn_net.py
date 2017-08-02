@@ -107,7 +107,7 @@ def cost(y_pred):
         return tf.add_n([cost_bbox, cost_isFg, cost_cls], name='total')
 
 
-def save(fname, sess, ft_out_dims):
+def save(fname, sess, ft_dim):
     """ Save the pickled network state to `fname`.
 
     Args:
@@ -118,11 +118,10 @@ def save(fname, sess, ft_out_dims):
     # Query the state of the shared network (weights and biases).
     g = tf.get_default_graph().get_tensor_by_name
     state = {}
-    for layer_dim in ft_out_dims:
-        layer_name = f'{layer_dim[0]}x{layer_dim[1]}'
-        W1, b1 = sess.run([g(f'rpcn-{layer_name}/W1:0'), g(f'rpcn-{layer_name}/b1:0')])
-        W2, b2 = sess.run([g(f'rpcn-{layer_name}/W2:0'), g(f'rpcn-{layer_name}/b2:0')])
-        state[layer_dim] = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
+    layer_name = f'{ft_dim[0]}x{ft_dim[1]}'
+    W1, b1 = sess.run([g(f'rpcn-{layer_name}/W1:0'), g(f'rpcn-{layer_name}/b1:0')])
+    W2, b2 = sess.run([g(f'rpcn-{layer_name}/W2:0'), g(f'rpcn-{layer_name}/b2:0')])
+    state[ft_dim] = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
 
     # Save the state.
     pickle.dump(state, open(fname, 'wb'))
@@ -132,13 +131,12 @@ def load(fname):
     return pickle.load(open(fname, 'rb'))
 
 
-def setup(fname, x_in, num_classes, filter_size, ft_out_dims, trainable):
+def setup(fname, x_in, num_classes, filter_size, ft_dim, trainable):
     assert x_in.dtype in [tf.float16, tf.float32]
     dtype = np.float16 if x_in.dtype == tf.float16 else np.float32
     num_features_out = 64
 
-    out = []
-    print(f'RPCN ({len(ft_out_dims)} layers):')
+    print(f'RPCN ({len(ft_dim)} layers):')
     print(f'  Restored from <{fname}>')
 
     # Create non-maximum-suppression nodes. This is irrelevant for training but
@@ -149,45 +147,41 @@ def setup(fname, x_in, num_classes, filter_size, ft_out_dims, trainable):
         s_in = tf.placeholder(tf.float32, [None], name='scores')
         tf.image.non_max_suppression(r_in, s_in, 30, 0.2, name='op')
 
-    for layer_dim in ft_out_dims:
-        assert isinstance(layer_dim, tuple) and len(layer_dim) == 2
-        assert x_in.shape.as_list()[2:] == list(2 * np.array(layer_dim))
+    assert isinstance(ft_dim, tuple) and len(ft_dim) == 2
+    assert x_in.shape.as_list()[2:] == list(2 * np.array(ft_dim))
 
-        # Create a layer name based on the dimension. This will be the name of
-        # the Tensorflow namespace.
-        layer_name = f'{layer_dim[0]}x{layer_dim[1]}'
+    # Create a layer name based on the dimension. This will be the name of
+    # the Tensorflow namespace.
+    layer_name = f'{ft_dim[0]}x{ft_dim[1]}'
 
-        num_features_in = x_in.shape.as_list()[1]
+    num_features_in = x_in.shape.as_list()[1]
 
-        W1_dim = (3, 3, num_features_in, num_features_out)
-        b1_dim = (num_features_out, 1, 1)
-        W2_dim = (filter_size, filter_size, num_features_out, 4 + 2 + num_classes)
-        b2_dim = (4 + 2 + num_classes, 1, 1)
+    W1_dim = (3, 3, num_features_in, num_features_out)
+    b1_dim = (num_features_out, 1, 1)
+    W2_dim = (filter_size, filter_size, num_features_out, 4 + 2 + num_classes)
+    b2_dim = (4 + 2 + num_classes, 1, 1)
 
-        if fname is None:
-            b1 = 0.5 + np.zeros(b1_dim).astype(dtype)
-            W1 = np.random.normal(0.0, 0.1, W1_dim).astype(dtype)
-            b2 = 0.5 + np.zeros(b2_dim).astype(dtype)
-            W2 = np.random.normal(0.0, 0.1, W2_dim).astype(dtype)
-        else:
-            net = load(fname)
-            b1, W1 = net[layer_dim]['b1'], net[layer_dim]['W1']
-            b2, W2 = net[layer_dim]['b2'], net[layer_dim]['W2']
+    if fname is None:
+        b1 = 0.5 + np.zeros(b1_dim).astype(dtype)
+        W1 = np.random.normal(0.0, 0.1, W1_dim).astype(dtype)
+        b2 = 0.5 + np.zeros(b2_dim).astype(dtype)
+        W2 = np.random.normal(0.0, 0.1, W2_dim).astype(dtype)
+    else:
+        net = load(fname)
+        b1, W1 = net['b1'], net['W1']
+        b2, W2 = net['b2'], net['W2']
 
-        # Compute receptive field based on a 512x512 input image.
-        rf = int(W2_dim[0] * (512 / layer_dim[0]))
-        print(f'  Feature size: {layer_dim}  '
-              f'  Receptive field on 512x512 image: {rf}x{rf}')
+    # Compute receptive field based on a 512x512 input image.
+    rf = int(W2_dim[0] * (512 / ft_dim[0]))
+    print(f'  Feature size: {ft_dim}  '
+          f'  Receptive field on 512x512 image: {rf}x{rf}')
 
-        assert b1.dtype == W1.dtype == dtype
-        assert b1.shape == b1_dim and W1.shape == W1_dim
-        assert b2.dtype == W2.dtype == dtype
-        assert b2.shape == b2_dim and W2.shape == W2_dim
+    assert b1.dtype == W1.dtype == dtype
+    assert b1.shape == b1_dim and W1.shape == W1_dim
+    assert b2.dtype == W2.dtype == dtype
+    assert b2.shape == b2_dim and W2.shape == W2_dim
 
-        bwt1 = (b1, W1, trainable)
-        bwt2 = (b2, W2, trainable)
-        net_out, rpcn_out = model(x_in, layer_name, bwt1, bwt2)
-        out.append(rpcn_out)
-
-        x_in = net_out
-    return out
+    bwt1 = (b1, W1, trainable)
+    bwt2 = (b2, W2, trainable)
+    net_out, rpcn_out = model(x_in, layer_name, bwt1, bwt2)
+    return rpcn_out

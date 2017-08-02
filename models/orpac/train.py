@@ -128,124 +128,114 @@ def trainEpoch(ds, sess, log, opt, lrate, rpcn_filter_size):
 
     # Get the RPCN dimensions of the network and initialise the log variable
     # for all of them.
-    rpcn_dims = ds.getRpcnDimensions()
+    ft_dim = ds.getRpcnDimensions()
     if 'rpcn' not in log:
-        log['rpcn'] = {ft_dim: {'err': [], 'cost': []} for ft_dim in rpcn_dims}
+        log['rpcn'] = {'err': [], 'cost': []}
+
+    layer_name = f'{ft_dim[0]}x{ft_dim[1]}'
 
     # Train on one image at a time.
     ds.reset('train')
     for batch in range(ds.lenOfEpoch('train')):
         # Get the next image or reset the data store if we have reached the
         # end of an epoch.
-        img, ys, uuid = ds.nextSingle('train')
+        img, y, uuid = ds.nextSingle('train')
         assert img is not None
-        assert img.ndim == 3 and isinstance(ys, dict)
-
-        meta = ds.getMeta([uuid])[uuid]
-
-        # Compile the feed dictionary so that we can train all RPCNs.
-        fd = {x_in: np.expand_dims(img, 0), lrate_in: lrate}
-        for rpcn_dim, y in ys.items():
-            # Determine how many locations to sample. We do not want to use every
-            # valid location in the image but only a random subset. The size of
-            # that subset, in this case, is 25% of the number of suitable BBox
-            # esitmation locations or 100, whichever is larger.
-            N = meta[rpcn_dim].mask_bbox * meta[rpcn_dim].mask_valid
-            N = np.count_nonzero(N)
-            mask_bbox, mask_isFg, mask_cls = sampleMasks(
-                meta[rpcn_dim].mask_valid,
-                meta[rpcn_dim].mask_fg,
-                meta[rpcn_dim].mask_bbox,
-                meta[rpcn_dim].mask_cls,
-                meta[rpcn_dim].mask_objid_at_pix,
-                10,
-            )
-
-            # Fetch the variables and assign them the current values. We need
-            # to add the batch dimensions for Tensorflow.
-            layer_name = f'{rpcn_dim[0]}x{rpcn_dim[1]}'
-            fd[g(f'rpcn-{layer_name}-cost/y_true:0')] = np.expand_dims(y, 0)
-            fd[g(f'rpcn-{layer_name}-cost/mask_cls:0')] = mask_cls
-            fd[g(f'rpcn-{layer_name}-cost/mask_bbox:0')] = mask_bbox
-            fd[g(f'rpcn-{layer_name}-cost/mask_isFg:0')] = mask_isFg
-
-        # Run one optimisation step and record all costs.
-        cost_nodes = {'tot': g('cost:0')}
-        for rpcn_dim in rpcn_dims:
-            layer_name = f'{rpcn_dim[0]}x{rpcn_dim[1]}'
-            cost_nodes[rpcn_dim] = {
-                'bbox': g(f'rpcn-{layer_name}-cost/bbox:0'),
-                'isFg': g(f'rpcn-{layer_name}-cost/isFg:0'),
-                'cls': g(f'rpcn-{layer_name}-cost/cls:0'),
-            }
-        all_costs, _ = sess.run([cost_nodes, opt], feed_dict=fd)
-
-        logTrainingStats(sess, log, img, ys, meta, batch, all_costs)
-
-
-def logTrainingStats(sess, log, img, ys, meta, batch, all_costs):
-    g = tf.get_default_graph().get_tensor_by_name
-    x_in = g('x_in:0')
-    log['cost'].append(all_costs['tot'])
-
-    # Predict the RPCN outputs for the current image and compute the error
-    # statistics. All statistics will be added to the log dictionary.
-    feed_dict = {x_in: np.expand_dims(img, 0)}
-    for rpcn_dim, y in ys.items():
-        layer_name = f'{rpcn_dim[0]}x{rpcn_dim[1]}'
-
-        # Predict. Ensure there are no NaN in the output.
-        pred = sess.run(g(f'rpcn-{layer_name}/rpcn_out:0'), feed_dict=feed_dict)
-        assert not np.any(np.isnan(pred))
+        assert img.ndim == 3 and isinstance(y, np.ndarray)
 
         # Determine how many locations to sample. We do not want to use every
         # valid location in the image but only a random subset. The size of
         # that subset, in this case, is 25% of the number of suitable BBox
         # esitmation locations or 100, whichever is larger.
-        N = meta[rpcn_dim].mask_bbox * meta[rpcn_dim].mask_valid
-        N = np.count_nonzero(N)
+        meta = ds.getMeta([uuid])[uuid]
         mask_bbox, mask_isFg, mask_cls = sampleMasks(
-            meta[rpcn_dim].mask_valid,
-            meta[rpcn_dim].mask_fg,
-            meta[rpcn_dim].mask_bbox,
-            meta[rpcn_dim].mask_cls,
-            meta[rpcn_dim].mask_objid_at_pix,
+            meta.mask_valid,
+            meta.mask_fg,
+            meta.mask_bbox,
+            meta.mask_cls,
+            meta.mask_objid_at_pix,
             10,
         )
 
-        err = compileErrorStats(y, pred[0], mask_bbox, mask_isFg, mask_cls)
+        # Compile the feed dictionary.
+        fd = {x_in: np.expand_dims(img, 0), lrate_in: lrate}
+        fd[g(f'rpcn-{layer_name}-cost/y_true:0')] = y
+        fd[g(f'rpcn-{layer_name}-cost/mask_cls:0')] = mask_cls
+        fd[g(f'rpcn-{layer_name}-cost/mask_bbox:0')] = mask_bbox
+        fd[g(f'rpcn-{layer_name}-cost/mask_isFg:0')] = mask_isFg
 
-        # Log training stats. The validation script will use these.
-        rpcn_cost = all_costs[rpcn_dim]
-        log['rpcn'][rpcn_dim]['err'].append(err)
-        log['rpcn'][rpcn_dim]['cost'].append(rpcn_cost)
+        # Run one optimisation step and record all costs.
+        cost_nodes = {
+            'bbox': g(f'rpcn-{layer_name}-cost/bbox:0'),
+            'isFg': g(f'rpcn-{layer_name}-cost/isFg:0'),
+            'cls': g(f'rpcn-{layer_name}-cost/cls:0'),
+            'total': g(f'rpcn-{layer_name}-cost/total:0'),
+        }
+        all_costs, _ = sess.run([cost_nodes, opt], feed_dict=fd)
 
-        cost_bbox = int(rpcn_cost['bbox'])
-        cost_isFg = int(rpcn_cost['isFg'])
-        cost_cls = int(rpcn_cost['cls'])
-        s_cost = f'BgFg={cost_isFg:6,}  Cls={cost_cls:6,}  BBox={cost_bbox:6,}'
+        logTrainingStats(sess, log, img, y, meta, ft_dim, batch, all_costs)
 
-        # Compute error rate for Bg/Fg estimation.
-        num_bgfg = err.num_Bg + err.num_Fg
-        err_bgfg = 100 * err.BgFg / num_bgfg if num_bgfg >= 10 else None
-        err_cls = 100 * err.label / err.num_labels if err.num_labels >= 10 else None
 
-        # Compute median/90% percentile for the BBox errors. If this feature map
-        # had no BBoxes then report None. NOTE: the `bbox_err` shape is (4, N)
-        # where N is the number of BBoxes.
-        if np.count_nonzero(mask_bbox) < 10:
-            bb90p = bb50p = None
-        else:
-            err_bbox = np.sort(err.bbox.flatten())
-            bb90p = err_bbox[int(0.9 * len(err_bbox))]
-            bb50p = err_bbox[int(0.5 * len(err_bbox))]
-        s1 = 'BgFg=  None' if err_bgfg is None else f'BgFg={err_bgfg:5.1f}%'
-        s2 = 'Cls=  None' if err_cls is None else f'Cls={err_cls:5.1f}%'
-        s3 = 'BBox=  None' if bb50p is None else f'BBox=({bb50p:2.0f}, {bb90p:2.0f})'
-        s_err = str.join('  ', [s1, s2, s3])
+def logTrainingStats(sess, log, img, y, meta, ft_dim, batch, all_costs):
+    # fixme: remove ft_dim argument once layer name is a constant.
+    g = tf.get_default_graph().get_tensor_by_name
+    x_in = g('x_in:0')
+    log['cost'].append(all_costs['total'])
+    layer_name = f'{ft_dim[0]}x{ft_dim[1]}'
 
-        fname = os.path.split(meta[rpcn_dim].filename)[-1]
-        print(f'  {batch:,} | {fname} | ' + s_cost + ' | ' + s_err)
+    # Predict the RPCN outputs for the current image and compute the error
+    # statistics. All statistics will be added to the log dictionary.
+    feed_dict = {x_in: np.expand_dims(img, 0)}
+
+    # Predict. Ensure there are no NaN in the output.
+    pred = sess.run(g(f'rpcn-{layer_name}/rpcn_out:0'), feed_dict=feed_dict)
+    assert not np.any(np.isnan(pred))
+
+    # Determine how many locations to sample. We do not want to use every
+    # valid location in the image but only a random subset. The size of
+    # that subset, in this case, is 25% of the number of suitable BBox
+    # esitmation locations or 100, whichever is larger.
+    mask_bbox, mask_isFg, mask_cls = sampleMasks(
+        meta.mask_valid,
+        meta.mask_fg,
+        meta.mask_bbox,
+        meta.mask_cls,
+        meta.mask_objid_at_pix,
+        10,
+    )
+
+    err = compileErrorStats(y[0], pred[0], mask_bbox, mask_isFg, mask_cls)
+
+    # Log training stats. The validation script will use these.
+    log['rpcn']['err'].append(err)
+    log['rpcn']['cost'].append(all_costs)
+
+    cost_bbox = int(all_costs['bbox'])
+    cost_isFg = int(all_costs['isFg'])
+    cost_cls = int(all_costs['cls'])
+    s_cost = f'BgFg={cost_isFg:6,}  Cls={cost_cls:6,}  BBox={cost_bbox:6,}'
+
+    # Compute error rate for Bg/Fg estimation.
+    num_bgfg = err.num_Bg + err.num_Fg
+    err_bgfg = 100 * err.BgFg / num_bgfg if num_bgfg >= 10 else None
+    err_cls = 100 * err.label / err.num_labels if err.num_labels >= 10 else None
+
+    # Compute median/90% percentile for the BBox errors. If this feature map
+    # had no BBoxes then report None. NOTE: the `bbox_err` shape is (4, N)
+    # where N is the number of BBoxes.
+    if np.count_nonzero(mask_bbox) < 10:
+        bb90p = bb50p = None
+    else:
+        err_bbox = np.sort(err.bbox.flatten())
+        bb90p = err_bbox[int(0.9 * len(err_bbox))]
+        bb50p = err_bbox[int(0.5 * len(err_bbox))]
+    s1 = 'BgFg=  None' if err_bgfg is None else f'BgFg={err_bgfg:5.1f}%'
+    s2 = 'Cls=  None' if err_cls is None else f'Cls={err_cls:5.1f}%'
+    s3 = 'BBox=  None' if bb50p is None else f'BBox=({bb50p:2.0f}, {bb90p:2.0f})'
+    s_err = str.join('  ', [s1, s2, s3])
+
+    fname = os.path.split(meta.filename)[-1]
+    print(f'  {batch:,} | {fname} | ' + s_cost + ' | ' + s_err)
 
 
 def main():
@@ -274,9 +264,9 @@ def main():
         log = collections.defaultdict(list)
         conf = config.NetConf(
             seed=0, dtype='float32', train_rat=0.8, num_pools_shared=2,
-            rpcn_out_dims=[(64, 64), (32, 32)], rpcn_filter_size=31,
+            rpcn_out_dims=(64, 64), rpcn_filter_size=31,
             path=os.path.join('data', '3dflight'),
-            num_epochs=0, num_samples=None
+            num_epochs=0, num_samples=10
         )
         print(f'Restored from <{None}>')
     print(conf)
@@ -300,10 +290,8 @@ def main():
     rpcn_out = rpcn_net.setup(
         None, shared_out, len(int2name),
         conf.rpcn_filter_size, conf.rpcn_out_dims, True)
-
     # Select cost function and optimiser, then initialise the TF graph.
-    cost = [rpcn_net.cost(_) for _ in rpcn_out]
-    cost = tf.add_n(cost, name='cost')
+    cost = rpcn_net.cost(rpcn_out)
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
     sess.run(tf.global_variables_initializer())
     del cost
