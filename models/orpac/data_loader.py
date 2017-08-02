@@ -328,7 +328,7 @@ class ORPAC(DataSet):
 
             # Crate the training output for the selected feature map size.
             data = data[self.rpcn_dims]
-            y, meta = self.compileTrainingOutput(data, self.rpcn_dims, im_shape, num_cls)
+            y, meta = self.compileTrainingOutput(data, im_shape, num_cls)
             del data
 
             # Collect the training data.
@@ -338,21 +338,22 @@ class ORPAC(DataSet):
         # Return image, network output, label mapping, and meta data.
         return all_x, all_y, im_shape, int2name, all_meta
 
-    def compileTrainingOutput(self, training_data, ft_dim, im_dim, num_classes):
+    def compileTrainingOutput(self, training_data, im_dim, num_classes):
         height, width = im_dim[1:]
-
-        # Allocate the array for the expected network outputs (one for each
-        # feature dimension size).
-        # fixme: remove hard coded numbers
-        y = np.zeros((1, 4 + 2 + num_classes, *ft_dim))
 
         # Populate the training output with the BBox data and one-hot-label.
         # Unpack pixel labels.
         label_ap = training_data['label_at_pixel']
         objID_ap = training_data['objID_at_pixel']
         bbox_rects = training_data['bboxes']
-        assert label_ap.dtype == np.int32 and label_ap.shape == ft_dim
+        assert label_ap.dtype == np.int32 and label_ap.ndim == 2
         assert 0 <= np.amin(label_ap) <= np.amax(label_ap) < num_classes
+
+        # Allocate the array for the expected network outputs (one for each
+        # feature dimension size).
+        # fixme: remove hard coded numbers
+        ft_dim = label_ap.shape
+        y = np.zeros((1, 4 + 2 + num_classes, *ft_dim))
 
         # Compute binary mask that is 1 at every foreground pixel.
         isFg = np.zeros(ft_dim)
