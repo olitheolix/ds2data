@@ -5,7 +5,6 @@ import config
 import datetime
 import rpcn_net
 import argparse
-import shared_net
 import data_loader
 import collections
 import numpy as np
@@ -240,8 +239,7 @@ def main():
     os.makedirs(netstate_path, exist_ok=True)
     fnames = {
         'meta': os.path.join(netstate_path, 'orpac-meta.pickle'),
-        'orpac_net': os.path.join(netstate_path, 'orpac-net.pickle'),
-        'shared_net': os.path.join(netstate_path, 'shared-net.pickle'),
+        'orpac-net': os.path.join(netstate_path, 'orpac-net.pickle'),
         'checkpt': os.path.join(netstate_path, 'tf-checkpoint.pickle'),
     }
     del netstate_path
@@ -252,6 +250,8 @@ def main():
     if restore:
         meta = pickle.load(open(fnames['meta'], 'rb'))
         conf, log = meta['conf'], meta['log']
+        bw_init = pickle.load(open(fnames['orpac-net'], 'rb'))
+        num_layers = bw_init['num-layers']
         print(f'Restored from <{fnames["meta"]}>')
     else:
         log = collections.defaultdict(list)
@@ -261,14 +261,17 @@ def main():
             path=os.path.join('data', '3dflight'),
             num_epochs=0, num_samples=10
         )
+        num_layers = 7
+        bw_init = None
         print(f'Restored from <{None}>')
-    print(conf)
+    print('\n', conf)
 
     # Load the BBox training data.
     print('\n----- Data Set -----')
     ds = data_loader.ORPAC(conf)
     ds.printSummary()
     int2name = ds.int2name()
+    num_classes = len(int2name)
     im_dim = ds.imageDimensions().tolist()
 
     # Input/output/parameter tensors for network.
@@ -279,18 +282,16 @@ def main():
     # Create the input variable, the shared network and the ORPAC.
     lrate_in = tf.placeholder(tf.float32, name='lrate')
     x_in = tf.placeholder(tf_dtype, [1, *im_dim], name='x_in')
-    shared_out = shared_net.setup(None, x_in, conf.num_pools_shared, True)
-    orpac_out = rpcn_net.setup(
-        None, shared_out, len(int2name),
-        conf.rpcn_filter_size, True)
+    net = rpcn_net.Orpac(sess, x_in, num_layers, num_classes, bw_init)
+
     # Select cost function and optimiser, then initialise the TF graph.
-    cost = rpcn_net.cost(orpac_out)
+    cost = rpcn_net.cost(net.output())
     opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
     sess.run(tf.global_variables_initializer())
     del cost
 
     # Ensure the feature size of the network matches the feature size.
-    assert orpac_out.shape.as_list()[2:] == list(ds.getFeatureSize())
+    assert net.output().shape.as_list()[2:] == list(ds.getFeatureSize())
 
     # Restore the network from Tensorflow's checkpoint file.
     saver = tf.train.Saver()
@@ -312,8 +313,7 @@ def main():
             trainEpoch(ds, sess, log, opt, lrates[epoch])
 
             # Save the network state and log data.
-            rpcn_net.save(fnames['orpac_net'], sess)
-            shared_net.save(fnames['shared_net'], sess)
+            pickle.dump(net.serialise(), open(fnames['orpac-net'], 'wb'))
             conf = conf._replace(num_epochs=epoch + epoch_ofs)
             log['conf'] = conf
             meta = {'conf': conf, 'int2name': int2name, 'log': log}
