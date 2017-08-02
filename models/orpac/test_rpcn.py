@@ -24,7 +24,7 @@ class TestCost:
 
         # Get the placeholder for the true input (see above).
         g = tf.get_default_graph().get_tensor_by_name
-        cls.y_true_in = g('rpcn-2x2-cost/y_true:0')
+        cls.y_true_in = g('orpac-cost/y_true:0')
 
         # Create Tensorflow session.
         cls.sess = tf.Session()
@@ -85,19 +85,19 @@ class TestCost:
         y_true_in = self.y_true_in
         y_pred_in = self.y_pred_in
 
-        cost_isFg = g('rpcn-2x2-cost/isFg:0')
-        cost_isFg_full = g('rpcn-2x2-cost/isFg_full:0')
-        mask_isFg_in = g('rpcn-2x2-cost/mask_isFg:0')
+        cost_isFg = g('orpac-cost/isFg:0')
+        cost_isFg_full = g('orpac-cost/isFg_full:0')
+        mask_isFg_in = g('orpac-cost/mask_isFg:0')
 
-        cost_cls = g('rpcn-2x2-cost/cls:0')
-        cost_cls_full = g('rpcn-2x2-cost/cls_full:0')
-        mask_cls_in = g('rpcn-2x2-cost/mask_cls:0')
+        cost_cls = g('orpac-cost/cls:0')
+        cost_cls_full = g('orpac-cost/cls_full:0')
+        mask_cls_in = g('orpac-cost/mask_cls:0')
 
-        cost_bbox = g('rpcn-2x2-cost/bbox:0')
-        cost_bbox_full = g('rpcn-2x2-cost/bbox_full:0')
-        mask_bbox_in = g('rpcn-2x2-cost/mask_bbox:0')
+        cost_bbox = g('orpac-cost/bbox:0')
+        cost_bbox_full = g('orpac-cost/bbox_full:0')
+        mask_bbox_in = g('orpac-cost/mask_bbox:0')
 
-        cost_total = g('rpcn-2x2-cost/total:0')
+        cost_total = g('orpac-cost/total:0')
         assert cost_total.shape == tuple()
 
         assert y_true_in.dtype == y_pred_in.dtype == tf.float32
@@ -125,11 +125,11 @@ class TestCost:
         The cost function for the is-foreground label is the cross-entropy.
         """
         g = tf.get_default_graph().get_tensor_by_name
-        cost = g('rpcn-2x2-cost/isFg:0')
-        cost_full = g('rpcn-2x2-cost/isFg_full:0')
+        cost = g('orpac-cost/isFg:0')
+        cost_full = g('orpac-cost/isFg_full:0')
         assert cost_full.shape == (1, *self.ft_dim)
 
-        mask_in = g('rpcn-2x2-cost/mask_isFg:0')
+        mask_in = g('orpac-cost/mask_isFg:0')
         fd = {self.y_pred_in: y_pred, self.y_true_in: y_true, mask_in: mask}
         out_full, out = self.sess.run([cost_full, cost], feed_dict=fd)
 
@@ -176,11 +176,11 @@ class TestCost:
         The cost function for the is-foreground label is the cross-entropy.
         """
         g = tf.get_default_graph().get_tensor_by_name
-        cost = g('rpcn-2x2-cost/cls:0')
-        cost_full = g('rpcn-2x2-cost/cls_full:0')
+        cost = g('orpac-cost/cls:0')
+        cost_full = g('orpac-cost/cls_full:0')
         assert cost_full.shape == (1, *self.ft_dim)
 
-        mask_in = g('rpcn-2x2-cost/mask_cls:0')
+        mask_in = g('orpac-cost/mask_cls:0')
         fd = {self.y_pred_in: y_pred, self.y_true_in: y_true, mask_in: mask}
         out_full, out = self.sess.run([cost_full, cost], feed_dict=fd)
 
@@ -226,11 +226,11 @@ class TestCost:
         tensor has shape [4, height, width] and the output [height, width].
         """
         g = tf.get_default_graph().get_tensor_by_name
-        cost = g('rpcn-2x2-cost/bbox:0')
-        cost_full = g('rpcn-2x2-cost/bbox_full:0')
+        cost = g('orpac-cost/bbox:0')
+        cost_full = g('orpac-cost/bbox_full:0')
         assert cost_full.shape == (1, *self.ft_dim)
 
-        mask_in = g('rpcn-2x2-cost/mask_bbox:0')
+        mask_in = g('orpac-cost/mask_bbox:0')
         fd = {self.y_pred_in: y_pred, self.y_true_in: y_true, mask_in: mask}
         out_full, out = self.sess.run([cost_full, cost], feed_dict=fd)
 
@@ -315,15 +315,15 @@ class TestCost:
             # Fetch the cost node by name and verify that it is, in fact, the
             # one returned by the cost creation function.
             g = tf.get_default_graph().get_tensor_by_name
-            cost = g('rpcn-2x2-cost/total:0')
+            cost = g('orpac-cost/total:0')
             assert cost is self.total_cost
 
             # Compute the total cost via Tensorflow.
             fd = {
                 self.y_pred_in: y_pred, self.y_true_in: y_true,
-                g('rpcn-2x2-cost/mask_isFg:0'): mask_isFg,
-                g('rpcn-2x2-cost/mask_cls:0'): mask_cls,
-                g('rpcn-2x2-cost/mask_bbox:0'): mask_bbox,
+                g('orpac-cost/mask_isFg:0'): mask_isFg,
+                g('orpac-cost/mask_cls:0'): mask_cls,
+                g('orpac-cost/mask_bbox:0'): mask_bbox,
             }
             tf_cost = self.sess.run(cost, feed_dict=fd)
 
