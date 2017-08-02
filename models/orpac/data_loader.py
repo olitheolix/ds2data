@@ -40,6 +40,10 @@ class DataSet:
     def __init__(self, conf):
         # Sanity check.
         assert isinstance(conf, NetConf)
+        assert isinstance(conf.rpcn_out_dims, tuple)
+        assert len(conf.rpcn_out_dims) == 2
+        assert isinstance(conf.rpcn_out_dims[0], int)
+        assert isinstance(conf.rpcn_out_dims[1], int)
         self.conf = conf
 
         # Set the random number generator.
@@ -283,7 +287,7 @@ class ORPAC(DataSet):
         for fname in fnames:
             try:
                 tmp = pickle.load(open(fname + '-compiled.pickle', 'rb'))
-                assert set(self.rpcn_dims).issubset(tmp.keys())
+                assert self.rpcn_dims in tmp.keys()
             except (pickle.UnpicklingError, FileNotFoundError, AssertionError):
                 missing.append(fname)
 
@@ -315,6 +319,7 @@ class ORPAC(DataSet):
             del img, img_chw
 
             # All pre-compiled features must use the same label map.
+            # fixme: rename 'self.rpcn_dims' to 'self.ft_dim'.
             data = pickle.load(open(fname + '-compiled.pickle', 'rb'))
             if num_cls is None:
                 int2name = data['int2name']
@@ -322,60 +327,55 @@ class ORPAC(DataSet):
             assert int2name == data['int2name']
 
             # Crate the training output for different feature sizes.
-            y, m = self.compileTrainingOutput(data, self.rpcn_dims, im_shape, num_cls)
-
-            # Replace the file name in all MetaData instances.
-            m = {k: v._replace(filename=fname) for k, v in m.items()}
+            data = data[self.rpcn_dims]
+            y, meta = self.compileTrainingOutput(data, self.rpcn_dims, im_shape, num_cls)
+            del data
 
             # Collect the training data.
             all_y.append(y)
-            all_meta.append(m)
+            all_meta.append(meta._replace(filename=fname))
 
         # Return image, network output, label mapping, and meta data.
         return all_x, all_y, im_shape, int2name, all_meta
 
-    def compileTrainingOutput(self, training_data, ft_dims, im_dim, num_classes):
+    def compileTrainingOutput(self, training_data, ft_dim, im_dim, num_classes):
         height, width = im_dim[1:]
 
         # Allocate the array for the expected network outputs (one for each
         # feature dimension size).
-        meta = {}
-        y_out = {_: np.zeros((1, 4 + 2 + num_classes, *_)) for _ in ft_dims}
+        # fixme: remove hard coded numbers
+        y = np.zeros((1, 4 + 2 + num_classes, *ft_dim))
 
         # Populate the training output with the BBox data and one-hot-label.
-        for ft_dim in ft_dims:
-            y = y_out[ft_dim]
+        # Unpack pixel labels.
+        label_ap = training_data['label_at_pixel']
+        objID_ap = training_data['objID_at_pixel']
+        bbox_rects = training_data['bboxes']
+        assert label_ap.dtype == np.int32 and label_ap.shape == ft_dim
+        assert 0 <= np.amin(label_ap) <= np.amax(label_ap) < num_classes
 
-            # Unpack pixel labels.
-            label_ap = training_data[ft_dim]['label_at_pixel']
-            objID_ap = training_data[ft_dim]['objID_at_pixel']
-            bbox_rects = training_data[ft_dim]['bboxes']
-            assert label_ap.dtype == np.int32 and label_ap.shape == ft_dim
-            assert 0 <= np.amin(label_ap) <= np.amax(label_ap) < num_classes
+        # Compute binary mask that is 1 at every foreground pixel.
+        isFg = np.zeros(ft_dim)
+        isFg[np.nonzero(label_ap)] = 1
 
-            # Compute binary mask that is 1 at every foreground pixel.
-            isFg = np.zeros(ft_dim)
-            isFg[np.nonzero(label_ap)] = 1
+        # Insert BBox parameter and hot-labels into the feature tensor.
+        y[0] = setBBoxRects(y[0], bbox_rects)
+        y[0] = setIsFg(y[0], oneHotEncoder(isFg, 2))
+        y[0] = setClassLabel(y[0], oneHotEncoder(label_ap, num_classes))
 
-            # Insert BBox parameter and hot-labels into the feature tensor.
-            y[0] = setBBoxRects(y[0], bbox_rects)
-            y[0] = setIsFg(y[0], oneHotEncoder(isFg, 2))
-            y[0] = setClassLabel(y[0], oneHotEncoder(label_ap, num_classes))
+        meta = self.MetaData(
+            filename=None,
+            mask_fg=training_data['mask_fg'],
+            mask_bbox=training_data['mask_bbox'],
+            mask_valid=training_data['mask_valid'],
+            mask_cls=training_data['mask_cls'],
+            mask_objid_at_pix=objID_ap,
+        )
 
-            meta[ft_dim] = self.MetaData(
-                filename=None,
-                mask_fg=training_data[ft_dim]['mask_fg'],
-                mask_bbox=training_data[ft_dim]['mask_bbox'],
-                mask_valid=training_data[ft_dim]['mask_valid'],
-                mask_cls=training_data[ft_dim]['mask_cls'],
-                mask_objid_at_pix=objID_ap,
-            )
-
-            # Sanity check: masks must be binary with correct shape.
-            for field in ['fg', 'bbox', 'cls', 'valid']:
-                tmp = getattr(meta[ft_dim], 'mask_' + field)
-                assert tmp.dtype == np.uint8, field
-                assert tmp.shape == ft_dim, field
-                assert set(np.unique(tmp)).issubset({0, 1}), field
-            y_out[ft_dim] = y[0]
-        return y_out, meta
+        # Sanity check: masks must be binary with correct shape.
+        for field in ['fg', 'bbox', 'cls', 'valid']:
+            tmp = getattr(meta, 'mask_' + field)
+            assert tmp.dtype == np.uint8, field
+            assert tmp.shape == ft_dim, field
+            assert set(np.unique(tmp)).issubset({0, 1}), field
+        return y, meta
