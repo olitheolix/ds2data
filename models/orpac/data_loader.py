@@ -214,7 +214,7 @@ class ORPAC(DataSet):
         'filename mask_fg mask_bbox mask_cls mask_valid mask_objid_at_pix '
     )
 
-    def getRpcnDimensions(self):
+    def getFeatureSize(self):
         return tuple(self.rpcn_dims)
 
     def nextSingle(self, dset):

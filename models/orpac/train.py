@@ -289,6 +289,9 @@ def main():
     sess.run(tf.global_variables_initializer())
     del cost
 
+    # Ensure the feature size of the network matches the feature size.
+    assert orpac_out.shape.as_list()[2:] == list(ds.getFeatureSize())
+
     # Restore the network from Tensorflow's checkpoint file.
     saver = tf.train.Saver()
     if restore:
