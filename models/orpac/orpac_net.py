@@ -155,6 +155,11 @@ class Orpac:
         # Convenience: shared arguments for bias, conv2d, and max-pool.
         opts = dict(padding='SAME', data_format='NCHW')
 
+        # Add conv layers. Every second layer downsamples by 2.
+        # Examples dimensions assume 128x128 RGB images.
+        # Odd i : [-1, 3, 128, 128] ---> [-1, 64, 128, 128]
+        # Even i: [-1, 3, 128, 128] ---> [-1, 64, 64, 64]
+        # Kernel: 3x3  Features: 64
         prev = x_in
         for i in range(self.num_layers - 1):
             prev_shape = tuple(prev.shape.as_list())
@@ -162,17 +167,13 @@ class Orpac:
             W_dim = (3, 3, prev_shape[1], 64)
             b, W = unpackBiasAndWeight(bw_init, b_dim, W_dim, i, dtype)
 
-            # Examples dimensions assume 128x128 RGB images.
-            # Odd i : [-1, 3, 128, 128] ---> [-1, 64, 128, 128]
-            # Even i: [-1, 3, 128, 128] ---> [-1, 64, 64, 64]
-            # Kernel: 3x3  Features: 64
             stride = [1, 1, 1, 1] if i % 2 == 0 else [1, 1, 2, 2]
             prev = tf.nn.relu(tf.nn.conv2d(prev, W, stride, **opts) + b)
             del i, b, W, b_dim, W_dim, stride
 
         # Convolution layer to learn the BBoxes and class labels.
-        # Shape: [-1, 64, 33, 33] ---> [-1, 4 + 2 + num_classes, 64, 64]
-        # Kernel: 5x5
+        # Shape: [-1, 64, 64, 64] ---> [-1, num_out, 64, 64]
+        # Kernel: 33x33
         num_out = 4 + 2 + self.num_classes
         prev_shape = tuple(prev.shape.as_list())
         b_dim = (num_out, 1, 1)
