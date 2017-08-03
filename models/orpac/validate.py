@@ -174,16 +174,17 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
     del N
 
     for i in progbar:
-        img, true_y, uuid = ds.nextSingle(dset)
-        assert img is not None
+        x, true_y, uuid = ds.nextSingle(dset)
+        assert x is not None
 
         # Extract the original file name.
         meta = ds.getMeta(uuid)
         fname = os.path.join(dst_path, os.path.split(meta.filename)[-1])
+        img = meta.img
         del meta
 
         # Predict the BBoxes with NMS. There must be no NaNs in the output.
-        pred_nms = predictBBoxes(sess, x_in, img, true_y, int2name, True)
+        pred_nms = predictBBoxes(sess, x_in, x, true_y, int2name, True)
         pred_y, pred_rect, pred_cls, true_cls = pred_nms
         assert not np.any(np.isnan(pred_y))
 
@@ -203,7 +204,7 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
             fig1.savefig(f'{fname}-lmap.jpg', **fig_opts)
 
             # Predict the BBoxes without NMS.
-            pred_all = predictBBoxes(sess, x_in, img, true_y, int2name, False)
+            pred_all = predictBBoxes(sess, x_in, x, true_y, int2name, False)
             _, pred_rect, pred_cls, true_cls = pred_all
 
             # Draw the BBoxes over the image and save it.
@@ -217,7 +218,7 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
             all_costs = {'total': -1, 'bbox': -1, 'isFg': -1, 'cls': -1}
             log = {'orpac': {'err': [], 'cost': []}, 'cost': []}
             train.logTrainingStats(
-                sess, log, img, true_y,
+                sess, log, x, true_y,
                 meta=ds.getMeta(uuid), batch=0, all_costs=all_costs)
             del all_costs, log
         else:
@@ -252,7 +253,7 @@ def plotLabelMap(img, pred_y, true_y, int2name):
 
     # Show the input image for reference.
     plt.subplot(num_rows, num_cols, 2)
-    plt.imshow(np.transpose(img, [1, 2, 0]))
+    plt.imshow(img)
     plt.title('Input Image')
 
     # Plot the predicted label map.
@@ -262,16 +263,12 @@ def plotLabelMap(img, pred_y, true_y, int2name):
     return fig
 
 
-def plotBBoxes(img_chw, pred_bboxes, pred_labels, true_labels, int2name):
-    assert img_chw.ndim == 3 and img_chw.shape[0] == 3
+def plotBBoxes(img, pred_bboxes, pred_labels, true_labels, int2name):
     assert isinstance(pred_bboxes, np.ndarray)
     assert isinstance(pred_labels, np.ndarray)
     assert isinstance(true_labels, np.ndarray)
     assert isinstance(int2name, dict)
     assert len(pred_bboxes) == len(pred_labels) == len(true_labels)
-
-    # Convert image to HWC format for Matplotlib.
-    img = np.transpose(img_chw, [1, 2, 0])
 
     # Matplotlib parameters for pretty boxes and text.
     rect_opts = dict(linewidth=1, facecolor='none', edgecolor=None)

@@ -146,9 +146,8 @@ def main(data_path=None):
     print(f'Loaded dataset in {etime:,.1f}s')
     ds.printSummary()
 
-    x, y, uuid = ds.nextSingle('train')
-    assert x.ndim == 3 and x.shape[0] == 3
-    img = np.transpose(x, [1, 2, 0])
+    _, y, uuid = ds.nextSingle('train')
+    img = ds.getMeta(uuid).img
 
     plotMasksAndFeatures(img, y, ds.getMeta(uuid), ds.int2name(), conf.ft_dim)
     plt.show()
