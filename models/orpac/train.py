@@ -135,9 +135,9 @@ def trainEpoch(ds, sess, log, opt, lrate):
     for batch in range(ds.lenOfEpoch(dset)):
         # Get the next image or reset the data store if we have reached the
         # end of an epoch.
-        img, y, uuid = ds.nextSingle(dset)
-        assert img is not None
-        assert img.ndim == 3 and isinstance(y, np.ndarray)
+        x, y, uuid = ds.nextSingle(dset)
+        assert x is not None
+        assert x.ndim == 3 and isinstance(y, np.ndarray)
         meta = ds.getMeta(uuid)
 
         # Randomly sample the masks to create a good mix of activate
@@ -153,7 +153,7 @@ def trainEpoch(ds, sess, log, opt, lrate):
 
         # Feed dictionary.
         fd = {
-            g(f'x_in:0'): np.expand_dims(img, 0),
+            g(f'x_in:0'): np.expand_dims(x, 0),
             g(f'lrate:0'): lrate,
             g(f'orpac-cost/y_true:0'): y,
             g(f'orpac-cost/mask_cls:0'): mask_cls,
@@ -163,17 +163,16 @@ def trainEpoch(ds, sess, log, opt, lrate):
 
         # Run one optimisation step and log cost and statistics.
         all_costs, _ = sess.run([cost_nodes, opt], feed_dict=fd)
-        logTrainingStats(sess, log, img, y, meta, batch, all_costs)
+        logTrainingStats(sess, log, x, y, meta, batch, all_costs)
 
 
-def logTrainingStats(sess, log, img, y, meta, batch, all_costs):
+def logTrainingStats(sess, log, x, y, meta, batch, all_costs):
     g = tf.get_default_graph().get_tensor_by_name
-    x_in = g('x_in:0')
     log['cost'].append(all_costs['total'])
 
     # Predict the ORPAC outputs for the current image and compute the error
     # statistics. All statistics will be added to the log dictionary.
-    feed_dict = {x_in: np.expand_dims(img, 0)}
+    feed_dict = {g('x_in:0'): np.expand_dims(x, 0)}
 
     # Predict. Ensure there are no NaN in the output.
     pred = sess.run(g(f'orpac/out:0'), feed_dict=feed_dict)
