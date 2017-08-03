@@ -124,9 +124,9 @@ def trainEpoch(ds, sess, log, opt, lrate):
 
     # Cost nodes.
     cost_nodes = {
+        'cls': g(f'orpac-cost/cls:0'),
         'bbox': g(f'orpac-cost/bbox:0'),
         'isFg': g(f'orpac-cost/isFg:0'),
-        'cls': g(f'orpac-cost/cls:0'),
         'total': g(f'orpac-cost/total:0'),
     }
 
@@ -140,33 +140,29 @@ def trainEpoch(ds, sess, log, opt, lrate):
         assert img.ndim == 3 and isinstance(y, np.ndarray)
         meta = ds.getMeta([uuid])[uuid]
 
-        # Use each image twice but with a different mask sample.
-        for i in range(2):
-            # Randomly sample the masks to create a good mix of activate
-            # regions for FG/BG, BBox and Class estimation.
-            mask_bbox, mask_isFg, mask_cls = sampleMasks(
-                meta.mask_valid,
-                meta.mask_fg,
-                meta.mask_bbox,
-                meta.mask_cls,
-                meta.mask_objid_at_pix,
-                10
-            )
+        # Randomly sample the masks to create a good mix of activate
+        # regions for FG/BG, BBox and Class estimation.
+        mask_bbox, mask_isFg, mask_cls = sampleMasks(
+            meta.mask_valid,
+            meta.mask_fg,
+            meta.mask_bbox,
+            meta.mask_cls,
+            meta.mask_objid_at_pix,
+            10
+        )
 
-            # Feed dictionary.
-            fd = {
-                g(f'x_in:0'): np.expand_dims(img, 0),
-                g(f'lrate:0'): lrate,
-                g(f'orpac-cost/y_true:0'): y,
-                g(f'orpac-cost/mask_cls:0'): mask_cls,
-                g(f'orpac-cost/mask_bbox:0'): mask_bbox,
-                g(f'orpac-cost/mask_isFg:0'): mask_isFg,
-            }
+        # Feed dictionary.
+        fd = {
+            g(f'x_in:0'): np.expand_dims(img, 0),
+            g(f'lrate:0'): lrate,
+            g(f'orpac-cost/y_true:0'): y,
+            g(f'orpac-cost/mask_cls:0'): mask_cls,
+            g(f'orpac-cost/mask_bbox:0'): mask_bbox,
+            g(f'orpac-cost/mask_isFg:0'): mask_isFg,
+        }
 
-            # Run one optimisation step
-            all_costs, _ = sess.run([cost_nodes, opt], feed_dict=fd)
-
-        # Log the costs and statistics from the last optimisation run.
+        # Run one optimisation step and log cost and statistics.
+        all_costs, _ = sess.run([cost_nodes, opt], feed_dict=fd)
         logTrainingStats(sess, log, img, y, meta, batch, all_costs)
 
 
