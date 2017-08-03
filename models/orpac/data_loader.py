@@ -37,7 +37,7 @@ class ORPAC:
     # Define the MetaData container for this data set.
     MetaData = namedtuple(
         'MetaData',
-        'filename mask_fg mask_bbox mask_cls mask_valid mask_objid_at_pix '
+        'filename mask_fg mask_bbox mask_cls mask_valid mask_objid_at_pix img'
     )
 
     def __init__(self, conf):
@@ -281,7 +281,7 @@ class ORPAC:
 
             # Store image in CHW format.
             all_x[i] = img_chw
-            del img, img_chw
+            del img_chw
 
             # All pre-compiled features must use the same label map.
             data = pickle.load(open(fname + '-compiled.pickle', 'rb'))
@@ -292,7 +292,7 @@ class ORPAC:
 
             # Crate the training output for the selected feature map size.
             data = data[self.ft_dim]
-            y, meta = self.compileTrainingOutput(data, im_shape, num_cls)
+            y, meta = self.compileTrainingOutput(data, img, num_cls)
             del data
 
             # Collect the training data.
@@ -302,8 +302,8 @@ class ORPAC:
         # Return image, network output, label mapping, and meta data.
         return all_x, all_y, im_shape, int2name, all_meta
 
-    def compileTrainingOutput(self, training_data, im_dim, num_classes):
-        height, width = im_dim[1:]
+    def compileTrainingOutput(self, training_data, img, num_classes):
+        assert img.dtype == np.uint8 and img.ndim == 3 and img.shape[2] == 3
 
         # Populate the training output with the BBox data and one-hot-label.
         # Unpack pixel labels.
@@ -330,6 +330,7 @@ class ORPAC:
 
         meta = self.MetaData(
             filename=None,
+            img=img,
             mask_fg=training_data['mask_fg'],
             mask_bbox=training_data['mask_bbox'],
             mask_valid=training_data['mask_valid'],
