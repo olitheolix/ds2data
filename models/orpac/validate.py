@@ -50,13 +50,12 @@ def nonMaxSuppress(sess, bb_rects, scores):
     return sess.run(g('non-max-suppression/op:0'), feed_dict=fd)
 
 
-def predictBBoxes(sess, x_in, img, true_y, int2name, nms):
+def predictBBoxes(sess, img, true_y, int2name, nms):
     """ Compile the list of BBoxes and their labels.
 
     Input:
         sess: Tensorflow sessions
         img: CHW image
-        x_in: Tensorflow Placeholder
         true_y: Tensor[1, ?, ft_height, ft_width]
             Ground truth, or *None* if unavailable.
         nms: Bool
@@ -81,10 +80,9 @@ def predictBBoxes(sess, x_in, img, true_y, int2name, nms):
 
     # Compile the list of RPCN output nodes.
     g = tf.get_default_graph().get_tensor_by_name
-    orpac_out = g(f'orpac/out:0')
 
     # Pass the image to ORPAC and strip off the batch dimension from the result.
-    pred_y = sess.run(orpac_out, feed_dict={x_in: np.expand_dims(img, 0)})
+    pred_y = sess.run(g(f'orpac/out:0'), feed_dict={g('x_in:0'): np.expand_dims(img, 0)})
 
     # Unpack true class labels. If the caller did not provide any then use the
     # predicted ones instead.
@@ -158,7 +156,7 @@ def predictBBoxes(sess, x_in, img, true_y, int2name, nms):
     return pred_y, bb_rects_out, pred_labels_out, true_labels_out
 
 
-def predictImagesInEpoch(sess, ds, x_in, dst_path):
+def predictImagesInEpoch(sess, ds, dst_path):
     # Predict the BBoxes for every image.
     dset = 'test'
     ds.reset(dset)
@@ -184,7 +182,7 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
         del meta
 
         # Predict the BBoxes with NMS. There must be no NaNs in the output.
-        pred_nms = predictBBoxes(sess, x_in, x, true_y, int2name, True)
+        pred_nms = predictBBoxes(sess, x, true_y, int2name, True)
         pred_y, pred_rect, pred_cls, true_cls = pred_nms
         assert not np.any(np.isnan(pred_y))
 
@@ -204,7 +202,7 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
             fig1.savefig(f'{fname}-lmap.jpg', **fig_opts)
 
             # Predict the BBoxes without NMS.
-            pred_all = predictBBoxes(sess, x_in, x, true_y, int2name, False)
+            pred_all = predictBBoxes(sess, x, true_y, int2name, False)
             _, pred_rect, pred_cls, true_cls = pred_all
 
             # Draw the BBoxes over the image and save it.
@@ -348,7 +346,7 @@ def main():
 
     # Predict each image and produce a new image with BBoxes and labels in it.
     try:
-        predictImagesInEpoch(sess, ds, x_in, param.dst)
+        predictImagesInEpoch(sess, ds, param.dst)
         plt.show()
     except KeyboardInterrupt:
         print('User Abort')
