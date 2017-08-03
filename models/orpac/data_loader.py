@@ -150,11 +150,6 @@ class ORPAC:
         assert dset in self.handles, f'Unknown data set <{dset}>'
         return len(self.handles[dset])
 
-    def posInEpoch(self, dset):
-        """Return position in current `dset` epoch."""
-        assert dset in self.ofs, f'Unknown data set <{dset}>'
-        return self.ofs[dset]
-
     def imageDimensions(self):
         """Return image dimensions, eg (3, 64, 64)"""
         return np.array(self.image_dims, np.uint32)
