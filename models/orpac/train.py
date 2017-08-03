@@ -138,7 +138,7 @@ def trainEpoch(ds, sess, log, opt, lrate):
         img, y, uuid = ds.nextSingle(dset)
         assert img is not None
         assert img.ndim == 3 and isinstance(y, np.ndarray)
-        meta = ds.getMeta([uuid])[uuid]
+        meta = ds.getMeta(uuid)
 
         # Randomly sample the masks to create a good mix of activate
         # regions for FG/BG, BBox and Class estimation.

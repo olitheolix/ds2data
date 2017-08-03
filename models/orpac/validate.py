@@ -178,7 +178,7 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
         assert img is not None
 
         # Extract the original file name.
-        meta = ds.getMeta([uuid])[uuid]
+        meta = ds.getMeta(uuid)
         fname = os.path.join(dst_path, os.path.split(meta.filename)[-1])
         del meta
 
@@ -218,7 +218,7 @@ def predictImagesInEpoch(sess, ds, x_in, dst_path):
             log = {'orpac': {'err': [], 'cost': []}, 'cost': []}
             train.logTrainingStats(
                 sess, log, img, true_y,
-                meta=ds.getMeta([uuid])[uuid], batch=0, all_costs=all_costs)
+                meta=ds.getMeta(uuid), batch=0, all_costs=all_costs)
             del all_costs, log
         else:
             # Close the window with the predicted BBoxes.

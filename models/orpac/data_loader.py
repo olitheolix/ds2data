@@ -1,5 +1,6 @@
 """ A uniform interface to request images."""
 import os
+import copy
 import glob
 import tqdm
 import pickle
@@ -154,8 +155,10 @@ class ORPAC:
         """Return image dimensions, eg (3, 64, 64)"""
         return np.array(self.image_dims, np.uint32)
 
-    def getMeta(self, meta_idx):
-        return {k: self.meta[k] for k in meta_idx}
+    def getMeta(self, uuid: int):
+        if not (0 <= uuid < len(self.meta)):
+            return None
+        return copy.deepcopy(self.meta[uuid])
 
     def getFeatureSize(self):
         return tuple(self.ft_dim)

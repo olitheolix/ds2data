@@ -150,9 +150,7 @@ def main(data_path=None):
     assert x.ndim == 3 and x.shape[0] == 3
     img = np.transpose(x, [1, 2, 0])
 
-    meta = ds.getMeta([uuid])[uuid]
-    plotMasksAndFeatures(img, y, meta, ds.int2name(), conf.ft_dim)
-
+    plotMasksAndFeatures(img, y, ds.getMeta(uuid), ds.int2name(), conf.ft_dim)
     plt.show()
 
 
