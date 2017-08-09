@@ -300,7 +300,7 @@ def main():
     print(f'\n----- Training for another {param.N} Epochs -----')
     try:
         epoch_ofs = conf.epochs + 1
-        lrates = np.logspace(-3, -5, param.N)
+        lrates = np.logspace(-4.2, -4.2, param.N)
         t0_all = time.time()
         for epoch in range(param.N):
             t0_epoch = time.time()
