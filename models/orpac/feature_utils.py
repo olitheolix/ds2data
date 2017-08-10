@@ -2,6 +2,16 @@ import random
 import numpy as np
 
 
+def downsampleMatrix(mat, ft_dim):
+    if not isinstance(mat, np.ndarray):
+        mat = np.array(mat)
+    x = np.linspace(0, mat.shape[1] - 1, ft_dim[1])
+    y = np.linspace(0, mat.shape[0] - 1, ft_dim[0])
+    x = np.round(x).astype(np.int64)
+    y = np.round(y).astype(np.int64)
+    return mat[y][:, x]
+
+
 def ft2im(val, ft_dim: int, im_dim: int):
     """Return `val` in image coordinates.
 
@@ -202,16 +212,6 @@ def setClassLabel(y, val):
 def getClassLabel(y):
     assert y.ndim == 3
     return y[6:]
-
-
-def downsampleMatrix(mat, ft_dim):
-    if not isinstance(mat, np.ndarray):
-        mat = np.array(mat)
-    x = np.linspace(0, mat.shape[1] - 1, ft_dim[1])
-    y = np.linspace(0, mat.shape[0] - 1, ft_dim[0])
-    x = np.round(x).astype(np.int64)
-    y = np.round(y).astype(np.int64)
-    return mat[y][:, x]
 
 
 def unpackBBoxes(im_dim, bb_rects, bb_labels):
