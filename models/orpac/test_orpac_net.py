@@ -1,6 +1,8 @@
+import pytest
 import orpac_net
 import numpy as np
 import tensorflow as tf
+import unittest.mock as mock
 
 from feature_utils import getIsFg, getBBoxRects, getClassLabel
 from feature_utils import setIsFg, setBBoxRects, setClassLabel
@@ -350,6 +352,55 @@ class TestNetworkSetup:
         tf.reset_default_graph()
         self.sess.close()
         tf.reset_default_graph()
+
+    @mock.patch.object(orpac_net, 'cost')
+    def test_not_trainable(self, m_cost):
+        """Create an untrainable network.
+
+        This is purley the feed forward network for prediction purposes and
+        contains no optimisation nodes.
+
+        """
+        train = False
+        num_layers = 7
+        num_classes = 10
+        x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
+
+        # Must not create cost nodes.
+        assert not m_cost.called
+        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, train)
+        assert not m_cost.called
+
+        # Further sanity checks.
+        assert net.trainable() is False
+        assert net.costNodes() == {}
+
+        # Training must be impossible.
+        with pytest.raises(AssertionError):
+            net.train(None, None, None, None, None, None)
+
+    def test_trainable(self):
+        """Create an untrainable network.
+
+        This class must contain the feed forward network for prediction
+        purposes *and* the optimisation and cost nodes.
+
+        """
+        train = True
+        num_layers = 7
+        num_classes = 10
+        x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
+
+        # Must call 'cost' function to create cost nodes.
+        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, train)
+
+        # Network must identify itself as trainable and return the cost nodes.
+        assert net.trainable() is True
+        assert set(net.costNodes().keys()) == {'cls', 'bbox', 'isFg', 'total'}
+
+        # Training must not abort.
+        with pytest.raises(NotImplementedError):
+            net.train(None, None, None, None, None, None)
 
     def test_basic_attributes(self):
         """Setup network and check basic parameters like TF variable names,

@@ -129,7 +129,7 @@ def unpackBiasAndWeight(bw_init, b_dim, W_dim, layer, dtype):
 
 
 class Orpac:
-    def __init__(self, sess, x_in, num_layers, num_classes, bw_init):
+    def __init__(self, sess, x_in, num_layers, num_classes, bw_init, train):
         # Check the data type.
         if x_in.dtype == tf.float16:
             dtype = np.float16
@@ -137,6 +137,10 @@ class Orpac:
             dtype = np.float32
         else:
             assert False
+
+        # Decide if we want to create cost nodes or not.
+        assert isinstance(train, bool)
+        self._trainable = train
 
         # Backup basic variables.
         self.sess = sess
@@ -150,6 +154,30 @@ class Orpac:
 
         # Store the output node and feature map size.
         self.feature_shape = tuple(self.out.shape.as_list()[2:])
+
+        # Define the cost nodes and compile them into a dictionary if this
+        # network is trainable, otherwise do nothing.
+        if self._trainable:
+            cost(self.out)
+            g = tf.get_default_graph().get_tensor_by_name
+            self._cost_nodes = {
+                'cls': g(f'orpac-cost/cls:0'),
+                'bbox': g(f'orpac-cost/bbox:0'),
+                'isFg': g(f'orpac-cost/isFg:0'),
+                'total': g(f'orpac-cost/total:0'),
+            }
+        else:
+            self._cost_nodes = {}
+
+    def trainable(self):
+        return self._trainable
+
+    def costNodes(self):
+        return dict(self._cost_nodes)
+
+    def train(self, img, y, lrate, mask_cls, mask_bbox, mask_isFg):
+        assert self._trainable
+        raise NotImplementedError
 
     def _setupNetwork(self, x_in, bw_init, dtype):
         # Convenience: shared arguments for bias, conv2d, and max-pool.
