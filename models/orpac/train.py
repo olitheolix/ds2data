@@ -242,11 +242,9 @@ def main():
 
     # Input/output/parameter tensors for network.
     print('\n----- Network Setup -----')
-    assert conf.dtype in ['float32', 'float16']
-    tf_dtype = tf.float32 if conf.dtype == 'float32' else tf.float16
 
     # Create input tensor and trainable ORPAC net.
-    x_in = tf.placeholder(tf_dtype, [1, *im_dim], name='x_in')
+    x_in = tf.placeholder(tf.float32, [1, *im_dim], name='x_in')
     net = orpac_net.Orpac(sess, x_in, conf.layers, num_classes, bw_init, True)
 
     # Select cost function and optimiser, then initialise the TF graph.

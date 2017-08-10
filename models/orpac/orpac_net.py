@@ -130,13 +130,6 @@ def unpackBiasAndWeight(bw_init, b_dim, W_dim, layer, dtype):
 
 class Orpac:
     def __init__(self, sess, x_in, num_layers, num_classes, bw_init, train):
-        # Check the data type.
-        if x_in.dtype == tf.float16:
-            dtype = np.float16
-        elif x_in.dtype == tf.float32:
-            dtype = np.float32
-        else:
-            assert False
         self._xin = x_in
 
         # Decide if we want to create cost nodes or not.
@@ -151,7 +144,7 @@ class Orpac:
         # Setup the NMS nodes and Orpac network.
         self._setupNonMaxSuppression()
         with tf.variable_scope('orpac'):
-            self.out = self._setupNetwork(x_in, bw_init, dtype)
+            self.out = self._setupNetwork(x_in, bw_init, np.float32)
 
         # Store the output node and feature map size.
         self.feature_shape = tuple(self.out.shape.as_list())

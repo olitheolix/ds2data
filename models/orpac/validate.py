@@ -308,13 +308,9 @@ def main():
     num_classes = len(ds.int2name())
     im_dim = ds.imageDimensions().tolist()
 
-    # Precision.
-    assert conf.dtype in ['float32', 'float16']
-    tf_dtype = tf.float32 if conf.dtype == 'float32' else tf.float16
-
     # Build the shared layers and connect it to ORPAC.
     print('\n----- Network Setup -----')
-    x_in = tf.placeholder(tf_dtype, [1, *im_dim], name='x_in')
+    x_in = tf.placeholder(tf.float32, [1, *im_dim], name='x_in')
     net = orpac_net.Orpac(sess, x_in, conf.layers, num_classes, bw_init, False)
     sess.run(tf.global_variables_initializer())
     print('Output feature map size: ', net.featureShape())
