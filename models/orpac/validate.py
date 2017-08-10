@@ -66,12 +66,14 @@ def nonMaxSuppress(sess, bb_rects, scores):
     return sess.run(g('non-max-suppression/op:0'), feed_dict=fd)
 
 
-def predictBBoxes(sess, img, true_y, int2name, nms):
+def predictBBoxes(sess, img, x, true_y, int2name, nms):
     """ Compile the list of BBoxes and their labels.
 
     Input:
         sess: Tensorflow sessions
-        img: CHW image
+        img: HWC image [height, width, 3]
+        x: Tensor [1, chan, height, width]
+            Network input, ie a pre-processed image.
         true_y: Tensor[1, ?, ft_height, ft_width]
             Ground truth, or *None* if unavailable.
         nms: Bool
@@ -90,15 +92,15 @@ def predictBBoxes(sess, img, true_y, int2name, nms):
     """
     # Predict BBoxes and labels.
     assert true_y is None or isinstance(true_y, np.ndarray)
-    assert img.ndim == 3 and img.shape[0] == 3
+    assert img.ndim == 3 and img.shape[2] == 3
     assert true_y.ndim == 4 and true_y.shape[0] == 1
-    im_dim = img.shape[1:]
+    im_dim = img.shape[:2]
 
     # Compile the list of RPCN output nodes.
     g = tf.get_default_graph().get_tensor_by_name
 
     # Pass the image to ORPAC and strip off the batch dimension from the result.
-    pred_y = sess.run(g(f'orpac/out:0'), feed_dict={g('x_in:0'): np.expand_dims(img, 0)})
+    pred_y = sess.run(g(f'orpac/out:0'), feed_dict={g('x_in:0'): x})
 
     # Unpack true class labels. If the caller did not provide any then use the
     # predicted ones instead.
@@ -114,7 +116,7 @@ def predictBBoxes(sess, img, true_y, int2name, nms):
 
     # Determine all locations where the network thinks it sees background
     # and mask those locations. This is tantamount to setting the
-    # foreground label to Zero, which is, by definition, 'None' and will be
+    # foreground label to Zero which is, by definition, 'None' and will be
     # ignored in `unpackBBoxes` in the next step.
     hard_cls = np.argmax(pred_labels, axis=0)
     hard_fg = np.argmax(isFg, axis=0)
@@ -190,6 +192,7 @@ def predictImagesInEpoch(sess, ds, dst_path):
     for i in progbar:
         x, true_y, uuid = ds.nextSingle(dset)
         assert x is not None
+        x = np.expand_dims(x, 0)
 
         # Extract the original file name.
         meta = ds.getMeta(uuid)
@@ -198,7 +201,7 @@ def predictImagesInEpoch(sess, ds, dst_path):
         del meta
 
         # Predict the BBoxes with NMS. There must be no NaNs in the output.
-        pred_nms = predictBBoxes(sess, x, true_y, int2name, True)
+        pred_nms = predictBBoxes(sess, img, x, true_y, int2name, True)
         pred_y, pred_rect, pred_cls, true_cls = pred_nms
         assert not np.any(np.isnan(pred_y))
 
@@ -218,7 +221,7 @@ def predictImagesInEpoch(sess, ds, dst_path):
             fig1.savefig(f'{fname}-lmap.jpg', **fig_opts)
 
             # Predict the BBoxes without NMS.
-            pred_all = predictBBoxes(sess, x, true_y, int2name, False)
+            pred_all = predictBBoxes(sess, img, x, true_y, int2name, False)
             _, pred_rect, pred_cls, true_cls = pred_all
 
             # Draw the BBoxes over the image and save it.
