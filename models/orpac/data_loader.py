@@ -26,7 +26,7 @@ class ORPAC:
             Height and width of training feature map (ie the size of the last
             network output layer).
         seed: int
-            Seed for Numpy random generator.
+            Seed for NumPy random generator.
         num_samples: int
             Number of images to load.
 
@@ -37,10 +37,9 @@ class ORPAC:
         'img y filename mask_fg mask_bbox mask_cls mask_valid mask_objid_at_pix'
     )
 
-    def __init__(self, path, ft_dim, seed, num_samples):
-        # Sanity check.
-        assert isinstance(ft_dim, tuple)
-        assert len(ft_dim) == 2
+    def __init__(self, path: str, ft_dim, seed: int, num_samples: int):
+        # Sanity checks.
+        assert isinstance(ft_dim, tuple) and len(ft_dim) == 2
         assert isinstance(ft_dim[0], int) and isinstance(ft_dim[1], int)
 
         # Set the random number generator.
@@ -48,7 +47,6 @@ class ORPAC:
             np.random.seed(seed)
 
         # Load the features and labels.
-        self.ft_dim = ft_dim
         dims, label2name, metas = self.loadRawData(path, ft_dim, num_samples)
 
         # Images must have three dimensions. The second and third dimensions
@@ -56,29 +54,28 @@ class ORPAC:
         # dimensions corresponds to the colour channels and must be either 1
         # (gray scale) or 3 (RGB).
         dims = np.array(dims, np.uint32)
-        assert len(dims) == 3 and dims.shape[0] in [1, 3]
-        self.image_dims = dims
+        assert len(dims) == 3 and dims.shape[0] == 3
 
-        # Store the pre-processed labels.
-        self.metas = metas
-        self.label2name = label2name
-        p = np.random.permutation(len(metas))[:num_samples]
+        if num_samples is not None:
+            metas = metas[:num_samples]
 
-        # Case 1: no data -> print warning, Case 2: only single file -> add
-        # it to training and test set irrespective of training ratio, Case 3:
-        # partition the data into test/training sets.
         if len(metas) == 0:
             print('Warning: data set is empty')
-        self.handles = p
+
+        self.ft_dim = ft_dim
+        self.image_dims = dims
+        self.label2name = label2name
+        self.epoch_ofs = 0
+        self.samples = metas
+        self.uuids = np.random.permutation(len(metas))
 
         # Initialise the ofs in the current epoch for training/test data.
-        self.epoch_ofs = 0
         self.reset()
 
     def printSummary(self):
         """Print a summary to screen."""
         print('Data Set Summary:')
-        print(f'  Samples: {len(self.handles):,}')
+        print(f'  Samples: {len(self.uuids):,}')
 
         if self.label2name is not None:
             tmp = [_[1] for _ in sorted(self.label2name.items())]
@@ -103,7 +100,7 @@ class ORPAC:
 
     def lenOfEpoch(self):
         """Return number of samples in entire full epoch."""
-        return len(self.handles)
+        return len(self.uuids)
 
     def imageDimensions(self):
         """Return image dimensions, eg (3, 64, 64)"""
@@ -149,10 +146,10 @@ class ORPAC:
                 UUID to query meta information via `getMeta`.
         """
         try:
-            uuid = self.handles[self.epoch_ofs]
+            uuid = self.uuids[self.epoch_ofs]
             self.epoch_ofs += 1
 
-            return self.metas[uuid], uuid
+            return self.samples[uuid], uuid
         except IndexError:
             return None, None, None
 
