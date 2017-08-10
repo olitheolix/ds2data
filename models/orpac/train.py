@@ -251,8 +251,8 @@ def main():
 
     # Ensure the feature size of the network matches the feature size returned
     # by the loader.
-    assert net.output().shape.as_list()[2:] == list(ds.getFeatureSize())
-    assert net.featureHeightWidth() == ds.getFeatureSize()
+    assert net.output().shape.as_list()[2:] == list(ds.featureHeightWidth())
+    assert net.featureHeightWidth() == ds.featureHeightWidth()
     print('Output feature map size: ', net.featureShape())
 
     # Restore the network from Tensorflow's checkpoint file.

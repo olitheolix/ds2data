@@ -106,7 +106,7 @@ class ORPAC:
             return None
         return copy.deepcopy(self.meta[uuid])
 
-    def getFeatureSize(self):
+    def featureHeightWidth(self):
         return tuple(self.ft_dim)
 
     def loadRawData(self, path, ft_dim, num_samples):
