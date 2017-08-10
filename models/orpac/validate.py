@@ -43,14 +43,12 @@ def parseCmdline():
     return parser.parse_args()
 
 
-def predictBBoxes(net, img, x, true_y, int2name, nms):
+def predictBBoxes(net, img, true_y, int2name, nms):
     """ Compile the list of BBoxes and their labels.
 
     Input:
         net: Orpac network
         img: HWC image [height, width, 3]
-        x: Tensor [1, chan, height, width]
-            Network input, ie a pre-processed image.
         true_y: Tensor[1, ?, ft_height, ft_width]
             Ground truth, or *None* if unavailable.
         nms: Bool
@@ -163,6 +161,7 @@ def predictImagesInEpoch(net, ds, dst_path):
     for i in progbar:
         x, true_y, uuid = ds.next()
         assert x is not None
+        del x
 
         # Extract the original file name.
         meta = ds.getMeta(uuid)
@@ -171,7 +170,7 @@ def predictImagesInEpoch(net, ds, dst_path):
         del meta
 
         # Predict the BBoxes with NMS. There must be no NaNs in the output.
-        pred_nms = predictBBoxes(net, img, x, true_y, int2name, True)
+        pred_nms = predictBBoxes(net, img, true_y, int2name, True)
         pred_y, pred_rect, pred_cls, true_cls = pred_nms
         assert not np.any(np.isnan(pred_y))
 
@@ -191,7 +190,7 @@ def predictImagesInEpoch(net, ds, dst_path):
             fig1.savefig(f'{fname}-lmap.jpg', **fig_opts)
 
             # Predict the BBoxes without NMS.
-            pred_all = predictBBoxes(net, img, x, true_y, int2name, False)
+            pred_all = predictBBoxes(net, img, true_y, int2name, False)
             _, pred_rect, pred_cls, true_cls = pred_all
 
             # Draw the BBoxes over the image and save it.
