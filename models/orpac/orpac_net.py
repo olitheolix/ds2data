@@ -158,16 +158,22 @@ class Orpac:
         # Define the cost nodes and compile them into a dictionary if this
         # network is trainable, otherwise do nothing.
         if self._trainable:
-            cost(self.out)
-            g = tf.get_default_graph().get_tensor_by_name
-            self._cost_nodes = {
-                'cls': g(f'orpac-cost/cls:0'),
-                'bbox': g(f'orpac-cost/bbox:0'),
-                'isFg': g(f'orpac-cost/isFg:0'),
-                'total': g(f'orpac-cost/total:0'),
-            }
+            self._cost_nodes, self._optimiser = self._addOptimiser()
         else:
-            self._cost_nodes = {}
+            self._cost_nodes, self._optimiser = {}, None
+
+    def _addOptimiser(self):
+        c = cost(self.out)
+        g = tf.get_default_graph().get_tensor_by_name
+        lrate_in = tf.placeholder(tf.float32, name='lrate')
+        opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(c)
+        nodes = {
+            'cls': g(f'orpac-cost/cls:0'),
+            'bbox': g(f'orpac-cost/bbox:0'),
+            'isFg': g(f'orpac-cost/isFg:0'),
+            'total': g(f'orpac-cost/total:0'),
+        }
+        return nodes, opt
 
     def trainable(self):
         return self._trainable

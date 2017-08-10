@@ -353,7 +353,7 @@ class TestNetworkSetup:
         self.sess.close()
         tf.reset_default_graph()
 
-    @mock.patch.object(orpac_net, 'cost')
+    @mock.patch.object(orpac_net.Orpac, '_addOptimiser')
     def test_not_trainable(self, m_cost):
         """Create an untrainable network.
 
@@ -361,14 +361,14 @@ class TestNetworkSetup:
         contains no optimisation nodes.
 
         """
-        train = False
+        sess = self.sess
         num_layers = 7
         num_classes = 10
         x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
 
         # Must not create cost nodes.
         assert not m_cost.called
-        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, train)
+        net = orpac_net.Orpac(sess, x_in, num_layers, num_classes, None, train=False)
         assert not m_cost.called
 
         # Further sanity checks.
@@ -378,13 +378,23 @@ class TestNetworkSetup:
         # Training must be impossible.
         with pytest.raises(AssertionError):
             net.train(None, None, None, None, None, None)
+        del net
 
-    def test_trainable(self):
-        """Create an untrainable network.
+        # Must create cost nodes.
+        m_cost.return_value = (None, None)
+        assert not m_cost.called
+        net = orpac_net.Orpac(sess, x_in, num_layers, num_classes, None, train=True)
+        assert m_cost.called
 
-        This class must contain the feed forward network for prediction
-        purposes *and* the optimisation and cost nodes.
+        # Further sanity checks.
+        assert net.trainable() is True
 
+        # Training must be possible.
+        with pytest.raises(NotImplementedError):
+            net.train(None, None, None, None, None, None)
+
+    def test_addOptimiser(self):
+        """Create an trainable network and ensure the cost nodes exist.
         """
         train = True
         num_layers = 7
@@ -397,10 +407,6 @@ class TestNetworkSetup:
         # Network must identify itself as trainable and return the cost nodes.
         assert net.trainable() is True
         assert set(net.costNodes().keys()) == {'cls', 'bbox', 'isFg', 'total'}
-
-        # Training must not abort.
-        with pytest.raises(NotImplementedError):
-            net.train(None, None, None, None, None, None)
 
     def test_basic_attributes(self):
         """Setup network and check basic parameters like TF variable names,
