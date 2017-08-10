@@ -536,6 +536,36 @@ class TestOrpac:
         assert isinstance(costs, dict)
         assert set(costs.keys()) == {'cls', 'bbox', 'isFg', 'total'}
 
+    def test_predict(self):
+        """Ensure the 'predict' method succeeds.
+
+        This test does not assess the numerical output but merely ensures the
+        method works when the provided parameters have the correct shape and
+        type.
+
+        """
+        chan = 3
+        num_layers = 7
+        num_classes = 10
+
+        # Image dimensions and network input tensor shape.
+        im_dim = (64, 64)
+        x_dim = (1, chan, *im_dim)
+
+        # Create predictor-only network with random weights.
+        x_in = tf.placeholder(tf.float32, x_dim)
+        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, False)
+        self.sess.run(tf.global_variables_initializer())
+        assert net.trainable() is not True
+
+        # Create dummy learning rate, image and training output.
+        img = np.random.randint(0, 256, (*im_dim, chan)).astype(np.uint8)
+
+        # 'Train' method must complete without error and return the costs.
+        y = net.predict(img)
+        assert isinstance(y, np.ndarray) and y.dtype == np.float32
+        assert y.shape == net.featureShape()
+
 
 class TestSerialiseRestore:
     @classmethod

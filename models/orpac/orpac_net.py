@@ -208,6 +208,17 @@ class Orpac:
         costs, _ = self.sess.run(nodes, feed_dict=fd)
         return costs
 
+    def predict(self, img):
+        assert img.ndim == 3 and img.shape[2] == 3 and img.dtype == np.uint8
+
+        # Network input must be normalised image.
+        img = img.astype(np.float32) / 255
+        x = np.expand_dims(np.transpose(img, [2, 0, 1]), 0)
+
+        # Run predictor network.
+        g = tf.get_default_graph().get_tensor_by_name
+        return self.sess.run(g(f'orpac/out:0'), feed_dict={self._xin: x})
+
     def _setupNetwork(self, x_in, bw_init, dtype):
         # Convenience: shared arguments for bias, conv2d, and max-pool.
         opts = dict(padding='SAME', data_format='NCHW')
