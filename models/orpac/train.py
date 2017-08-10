@@ -273,7 +273,7 @@ def main():
     assert conf.dtype in ['float32', 'float16']
     tf_dtype = tf.float32 if conf.dtype == 'float32' else tf.float16
 
-    # Create the input variable, the shared network and the ORPAC.
+    # Create input variable and ORPAC net.
     lrate_in = tf.placeholder(tf.float32, name='lrate')
     x_in = tf.placeholder(tf_dtype, [1, *im_dim], name='x_in')
     net = orpac_net.Orpac(sess, x_in, conf.layers, num_classes, bw_init)
