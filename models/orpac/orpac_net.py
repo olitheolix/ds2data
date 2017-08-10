@@ -153,7 +153,7 @@ class Orpac:
             self.out = self._setupNetwork(x_in, bw_init, dtype)
 
         # Store the output node and feature map size.
-        self.feature_shape = tuple(self.out.shape.as_list()[2:])
+        self.feature_shape = tuple(self.out.shape.as_list())
 
         # Define the cost nodes and compile them into a dictionary if this
         # network is trainable, otherwise do nothing.
@@ -253,6 +253,9 @@ class Orpac:
 
     def featureShape(self):
         return self.feature_shape
+
+    def featureHeightWidth(self):
+        return tuple(self.feature_shape[2:])
 
     def output(self):
         return self.out

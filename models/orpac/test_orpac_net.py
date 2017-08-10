@@ -443,7 +443,7 @@ class TestNetworkSetup:
         # The feature size must be 1/8 of the image size because the network
         # downsamples every second layer, and we specified 7 layers.
         assert num_layers == net.numLayers() == 7
-        assert net.featureShape() == (64, 64)
+        assert net.featureHeightWidth() == (64, 64)
 
         # Ensure we can query all biases and weights. Also verify the data type
         # inside the network.
@@ -480,8 +480,8 @@ class TestNetworkSetup:
 
         # The output layer must have the correct number of features and
         # feature map size.
-        ft_dim = net.featureShape()
-        assert net.output().shape == (1, num_out, *ft_dim)
+        ft_dim = net.featureHeightWidth()
+        assert net.output().shape == net.featureShape() == (1, num_out, *ft_dim)
 
     def test_non_max_suppresion_setup(self):
         """Ensure the network creates the NMS nodes."""
