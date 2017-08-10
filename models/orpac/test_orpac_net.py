@@ -361,13 +361,12 @@ class TestNetworkOptimisationSetup:
 
         """
         sess = self.sess
-        num_layers = 7
-        num_classes = 10
-        x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
+        im_dim_hw = (512, 512)
+        num_cls, num_layers = 10, 7
 
         # Must not create cost nodes.
         assert not m_cost.called
-        net = orpac_net.Orpac(sess, x_in, num_layers, num_classes, None, train=False)
+        net = orpac_net.Orpac(sess, im_dim_hw, num_layers, num_cls, None, train=False)
         assert not m_cost.called
 
         # Further sanity checks.
@@ -382,7 +381,7 @@ class TestNetworkOptimisationSetup:
         # Must create cost nodes.
         m_cost.return_value = (None, None)
         assert not m_cost.called
-        net = orpac_net.Orpac(sess, x_in, num_layers, num_classes, None, train=True)
+        net = orpac_net.Orpac(sess, im_dim_hw, num_layers, num_cls, None, train=True)
         assert m_cost.called
 
         # Network must consider itself trainable.
@@ -392,12 +391,11 @@ class TestNetworkOptimisationSetup:
         """Create an trainable network and ensure the cost nodes exist.
         """
         train = True
-        num_layers = 7
-        num_classes = 10
-        x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
+        im_dim_hw = (512, 512)
+        num_cls, num_layers = 10, 7
 
         # Must call 'cost' function to create cost nodes.
-        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, train)
+        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_cls, None, train)
 
         # Network must identify itself as trainable and return the cost nodes.
         assert net.trainable() is True
@@ -427,12 +425,10 @@ class TestOrpac:
         """Setup network and check basic parameters like TF variable names,
         number of layers, size of last feature map...
         """
-        num_layers = 7
-        num_classes = 10
-        tf_dtype, np_dtype = tf.float32, np.float32
+        im_dim_hw = (512, 512)
+        num_cls, num_layers = 10, 7
 
-        x_in = tf.placeholder(tf_dtype, [1, 5, 512, 512])
-        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, False)
+        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_cls, None, False)
         self.sess.run(tf.global_variables_initializer())
         assert net.session() is self.sess
 
@@ -448,25 +444,24 @@ class TestOrpac:
             # These must exist in the graph.
             assert g(f'orpac/W{i}:0') is not None
             assert g(f'orpac/b{i}:0') is not None
-            assert net.getBias(i).dtype == np_dtype
-            assert net.getWeight(i).dtype == np_dtype
+            assert net.getBias(i).dtype == np.float32
+            assert net.getWeight(i).dtype == np.float32
 
     def test_weights_and_biases(self):
         """Create default network and test various accessor methods"""
-        num_layers = 7
-        num_classes = 10
+        im_dim_hw = (512, 512)
+        num_cls, num_layers = 10, 7
 
         # Create network with random weights.
-        x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
-        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, False)
+        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_cls, None, False)
         self.sess.run(tf.global_variables_initializer())
 
         # First layer must be compatible with input.
         assert net.getBias(0).shape == (64, 1, 1)
-        assert net.getWeight(0).shape == (3, 3, x_in.shape[1], 64)
+        assert net.getWeight(0).shape == (3, 3, net._xin.shape[1], 64)
 
         # Number of output features to encode BBox, isFg, and Class.
-        num_out = 4 + 2 + num_classes
+        num_out = 4 + 2 + num_cls
 
         # The last filter is responsible for creating the various features we
         # train the network on. Its dimension must be 33x33 to achieve a large
@@ -481,6 +476,7 @@ class TestOrpac:
 
     def test_non_max_suppresion_setup(self):
         """Ensure the network creates the NMS nodes."""
+        im_dim_hw = (512, 512)
         g = tf.get_default_graph().get_tensor_by_name
 
         # NMS nodes must not yet exist.
@@ -490,8 +486,7 @@ class TestOrpac:
             pass
 
         # Create a network (parameters do not matter).
-        x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
-        orpac_net.Orpac(self.sess, x_in, 7, 10, None, False)
+        orpac_net.Orpac(self.sess, im_dim_hw, 7, 10, None, False)
 
         # All NMS nodes must now exist.
         assert g('non-max-suppression/op:0') is not None
@@ -504,8 +499,7 @@ class TestOrpac:
         img = 100 * np.ones((64, 64, 3), np.uint8)
 
         # Create a network (parameters do not matter).
-        x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
-        net = orpac_net.Orpac(self.sess, x_in, 7, 10, None, False)
+        net = orpac_net.Orpac(self.sess, (512, 512), 7, 10, None, False)
 
         # Image must be converted to float32 CHW image with leading
         # batch dimension of 1. All values must have been divided by 255.
@@ -526,12 +520,10 @@ class TestOrpac:
         num_classes = 10
 
         # Image dimensions and network input tensor shape.
-        im_dim = (64, 64)
-        x_dim = (1, chan, *im_dim)
+        im_dim_hw = (64, 64)
 
         # Create trainable network with random weights.
-        x_in = tf.placeholder(tf.float32, x_dim)
-        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, True)
+        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_classes, None, True)
         self.sess.run(tf.global_variables_initializer())
         assert net.trainable() is True
 
@@ -539,7 +531,7 @@ class TestOrpac:
         lrate = 1E-5
         y_dim = net.featureShape()
         y = np.random.uniform(0, 256, y_dim).astype(np.uint8)
-        img = np.random.randint(0, 256, (*im_dim, chan)).astype(np.uint8)
+        img = np.random.randint(0, 256, (*im_dim_hw, chan)).astype(np.uint8)
 
         # Create dummy masks.
         ft_hw = net.featureHeightWidth()
@@ -565,17 +557,15 @@ class TestOrpac:
         num_classes = 10
 
         # Image dimensions and network input tensor shape.
-        im_dim = (64, 64)
-        x_dim = (1, chan, *im_dim)
+        im_dim_hw = (64, 64)
 
         # Create predictor-only network with random weights.
-        x_in = tf.placeholder(tf.float32, x_dim)
-        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, False)
+        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_classes, None, False)
         self.sess.run(tf.global_variables_initializer())
         assert net.trainable() is not True
 
         # Create dummy learning rate, image and training output.
-        img = np.random.randint(0, 256, (*im_dim, chan)).astype(np.uint8)
+        img = np.random.randint(0, 256, (*im_dim_hw, chan)).astype(np.uint8)
 
         # 'Train' method must complete without error and return the costs.
         y = net.predict(img)
@@ -590,10 +580,10 @@ class TestOrpac:
         """
         num_layers = 7
         num_classes = 10
+        im_dim_hw = (64, 64)
 
         # Create predictor network (parameters do not matter).
-        x_in = tf.placeholder(tf.float32, (1, 3, 64, 64))
-        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, False)
+        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_classes, None, False)
 
         # Dummy input for NMS.
         N = 100
@@ -634,10 +624,10 @@ class TestSerialiseRestore:
         """ Create a network and serialise its biases and weights."""
         num_layers = 7
         num_classes = 10
+        im_dim_hw = (512, 512)
 
         # Setup default network. Variables are random.
-        x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
-        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, False)
+        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_classes, None, False)
         self.sess.run(tf.global_variables_initializer())
 
         # Serialise the network biases and weights.
@@ -664,17 +654,14 @@ class TestSerialiseRestore:
         num_layers = 3
         num_classes = 10
         num_out = 2 + 4 + num_classes
-
-        # Dummy input tensor.
-        chan = 8
-        x_in = tf.placeholder(tf.float32, [1, chan, 512, 512])
+        im_dim_hw = (512, 512)
 
         # Create variables for first, middle and last layer. The first layer
         # must be adapted to the input, the middle layer is always fixed, and
         # the last layer must encode the features (ie BBox, isFg, Class).
         bw_init = {'bias': {}, 'weight': {}}
         bw_init['bias'][0] = 0 * np.ones((64, 1, 1), np.float32)
-        bw_init['weight'][0] = 0 * np.ones((3, 3, chan, 64), np.float32)
+        bw_init['weight'][0] = 0 * np.ones((3, 3, 3, 64), np.float32)
         bw_init['bias'][1] = 1 * np.ones((64, 1, 1), np.float32)
         bw_init['weight'][1] = 1 * np.ones((3, 3, 64, 64), np.float32)
         bw_init['bias'][2] = 2 * np.ones((num_out, 1, 1), np.float32)
@@ -682,7 +669,7 @@ class TestSerialiseRestore:
         bw_init['num-layers'] = 3
 
         # Create a new network and restore its weights.
-        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes,
+        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_classes,
                               bw_init, False)
         self.sess.run(tf.global_variables_initializer())
 
