@@ -201,22 +201,15 @@ class ORPAC:
                 pickle.dump(out, open(fname + '-compiled.pickle', 'wb'))
 
     def loadTrainingData(self, fnames, im_width, im_height, ft_dim):
-        im_shape = (3, im_height, im_width)
-
-        num_cls = None
         all_meta = []
-        all_x = np.zeros((len(fnames), *im_shape), np.uint8)
+        num_cls = None
 
         # Load each image and associated features.
         for i, fname in enumerate(fnames):
             # Load image as RGB and convert to Numpy.
             img = np.array(Image.open(fname + '.jpg').convert('RGB'), np.uint8)
             img_chw = np.transpose(img, [2, 0, 1])
-            assert img_chw.shape == im_shape
-
-            # Store image in CHW format.
-            all_x[i] = img_chw
-            del img_chw
+            assert img_chw.shape == (3, im_height, im_width)
 
             # All pre-compiled features must use the same label map.
             data = pickle.load(open(fname + '-compiled.pickle', 'rb'))
