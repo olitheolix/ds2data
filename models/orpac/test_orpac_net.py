@@ -22,7 +22,7 @@ class TestCost:
         cls.y_pred_in = tf.placeholder(tf.float32, out_dim, name='y_pred')
 
         # Setup cost computation. This will create a node for `y_true`.
-        cls.total_cost = orpac_net.cost(cls.y_pred_in)
+        cls.total_cost = orpac_net.createCostNodes(cls.y_pred_in)
 
         # Get the placeholder for the true input (see above).
         g = tf.get_default_graph().get_tensor_by_name

@@ -22,7 +22,7 @@ def _crossEnt(logits, labels, name=None):
     return tf.add(ce, 0, name=name)
 
 
-def cost(y_pred):
+def createCostNodes(y_pred):
     dtype = y_pred.dtype
     mask_dim = y_pred.shape.as_list()[2:]
 
@@ -163,10 +163,10 @@ class Orpac:
             self._cost_nodes, self._optimiser = {}, None
 
     def _addOptimiser(self):
-        c = cost(self.out)
+        cost = createCostNodes(self.out)
         g = tf.get_default_graph().get_tensor_by_name
         lrate_in = tf.placeholder(tf.float32, name='lrate')
-        opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(c)
+        opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
         nodes = {
             'cls': g(f'orpac-cost/cls:0'),
             'bbox': g(f'orpac-cost/bbox:0'),
