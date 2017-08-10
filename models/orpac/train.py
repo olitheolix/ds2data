@@ -137,7 +137,7 @@ def trainEpoch(ds, sess, log, opt, lrate):
         # end of an epoch.
         x, y, uuid = ds.nextSingle(dset)
         assert x is not None
-        assert x.ndim == 3 and isinstance(y, np.ndarray)
+        assert x.ndim == 4 and isinstance(y, np.ndarray)
         meta = ds.getMeta(uuid)
 
         # Randomly sample the masks to create a good mix of activate
@@ -153,7 +153,7 @@ def trainEpoch(ds, sess, log, opt, lrate):
 
         # Feed dictionary.
         fd = {
-            g(f'x_in:0'): np.expand_dims(x, 0),
+            g(f'x_in:0'): x,
             g(f'lrate:0'): lrate,
             g(f'orpac-cost/y_true:0'): y,
             g(f'orpac-cost/mask_cls:0'): mask_cls,
@@ -172,10 +172,7 @@ def logTrainingStats(sess, log, x, y, meta, batch, all_costs):
 
     # Predict the ORPAC outputs for the current image and compute the error
     # statistics. All statistics will be added to the log dictionary.
-    feed_dict = {g('x_in:0'): np.expand_dims(x, 0)}
-
-    # Predict. Ensure there are no NaN in the output.
-    pred = sess.run(g(f'orpac/out:0'), feed_dict=feed_dict)
+    pred = sess.run(g(f'orpac/out:0'), feed_dict={g('x_in:0'): x})
     assert not np.any(np.isnan(pred))
 
     # Determine how many locations to sample. We do not want to use every

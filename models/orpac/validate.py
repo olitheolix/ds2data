@@ -191,7 +191,6 @@ def predictImagesInEpoch(sess, ds, dst_path):
     for i in progbar:
         x, true_y, uuid = ds.nextSingle(dset)
         assert x is not None
-        x = np.expand_dims(x, 0)
 
         # Extract the original file name.
         meta = ds.getMeta(uuid)

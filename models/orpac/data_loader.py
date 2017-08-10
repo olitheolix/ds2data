@@ -201,20 +201,22 @@ class ORPAC:
         """Return next image and corresponding training vectors from `dset`.
 
         Returns:
-            img: NumPy
-                The input image in CHW format.
+            x: NumPy [1, chan, height, width]
+                Network input.
             labels: dict
                 Each key denotes a feature size and each value holds the
                 corresponding training data.
-            idx: int
-                Index into data set.
+            UUID: int
+                UUID to query meta information via `getMeta`.
         """
         assert dset in self.handles, f'Unknown data set <{dset}>'
 
         try:
-            idx = self.handles[dset][self.ofs[dset]]
+            uuid = self.handles[dset][self.ofs[dset]]
             self.ofs[dset] += 1
-            return self.features[idx], self.labels[idx], idx
+            x = np.expand_dims(self.features[uuid], 0)
+            y = self.labels[uuid]
+            return x, y, uuid
         except IndexError:
             return None, None, None
 
