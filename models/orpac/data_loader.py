@@ -102,7 +102,7 @@ class ORPAC:
         """Return number of samples in entire full epoch."""
         return len(self.uuids)
 
-    def imageDimensions(self):
+    def imageHeightWidth(self):
         """Return image dimensions as (height, width), eg (64, 64)"""
         return tuple(self.im_dim_hw)
 
