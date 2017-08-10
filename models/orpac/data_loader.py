@@ -42,30 +42,25 @@ class ORPAC:
         assert isinstance(ft_dim, tuple) and len(ft_dim) == 2
         assert isinstance(ft_dim[0], int) and isinstance(ft_dim[1], int)
 
-        # Set the random number generator.
+        # Seed the random number generator.
         if seed is not None:
             np.random.seed(seed)
 
-        # Load the features and labels.
+        # Load images and training output.
         im_dim_hw, label2name, metas = self.loadRawData(path, ft_dim, num_samples)
 
-        # Images must have three dimensions. The second and third dimensions
-        # correspond to the height and width, respectively, whereas the first
-        # dimensions corresponds to the colour channels and must be either 1
-        # (gray scale) or 3 (RGB).
-        im_dim_hw = np.array(im_dim_hw, np.uint32)
-        assert len(im_dim_hw) == 2
-
+        # Cull the list of samples, if necessary.
         if num_samples is not None:
             metas = metas[:num_samples]
-
         if len(metas) == 0:
             print('Warning: data set is empty')
 
+        # Admin state.
         self.ft_dim = ft_dim
         self.im_dim_hw = im_dim_hw
         self.label2name = label2name
-        self.epoch_ofs = 0
+
+        # The MetaData samples and their retrieval order.
         self.samples = metas
         self.uuids = np.random.permutation(len(metas))
 
