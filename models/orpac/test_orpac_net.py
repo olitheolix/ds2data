@@ -497,16 +497,17 @@ class TestOrpac:
     def test_imageToInput(self):
         """Pass uint8 image and verify that it becomes a valid network input.
         """
-        img = 100 * np.ones((64, 64, 3), np.uint8)
+        height, width = (64, 64)
+        img = 100 * np.ones((height, width, 3), np.uint8)
 
         # Create a network (parameters do not matter).
-        net = orpac_net.Orpac(self.sess, (512, 512), 7, 10, None, False)
+        net = orpac_net.Orpac(self.sess, (height, width), 7, 10, None, False)
 
         # Image must be converted to float32 CHW image with leading
         # batch dimension of 1. All values must have been divided by 255.
         out = net._imageToInput(img)
         assert out.dtype == np.float32
-        assert out.shape == (1, 3, 64, 64)
+        assert out.shape == (1, 3, height, width)
         assert np.array_equal(out, 100 * np.ones_like(out) / 255)
 
     def test_train(self):

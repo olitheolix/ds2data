@@ -178,8 +178,9 @@ class Orpac:
         return dict(self._cost_nodes)
 
     def _imageToInput(self, img):
-        assert isinstance(img, np.ndarray) and img.ndim == 3
-        assert img.shape[2] == 3
+        assert isinstance(img, np.ndarray) and img.dtype == np.uint8
+        height, width = self.imageHeightWidth()
+        assert img.shape == (height, width, 3)
 
         img = img.astype(np.float32) / 255
         return np.expand_dims(np.transpose(img, [2, 0, 1]), 0)
