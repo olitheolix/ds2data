@@ -144,20 +144,14 @@ def trainEpoch(ds, net, log, lrate):
 
         # Run one optimisation step and log cost and statistics.
         costs = net.train(meta.img, y, lrate, mask_cls, mask_bbox, mask_isFg)
-        logTrainingStats(net, log, x, y, meta, batch, costs)
+        logTrainingStats(net, log, meta.img, y, meta, batch, costs)
 
 
-def logTrainingStats(net, log, x, y, meta, batch, all_costs):
-    g = tf.get_default_graph().get_tensor_by_name
-    log['cost'].append(all_costs['total'])
-
-    # fixme: remove once 'predict' method exists.
-    sess = net.session()
-
-    # Predict the ORPAC outputs for the current image and compute the error
-    # statistics. All statistics will be added to the log dictionary.
-    pred = sess.run(g(f'orpac/out:0'), feed_dict={g('x_in:0'): x})
+def logTrainingStats(net, log, img, y, meta, batch, costs):
+    # Run image through predictor network.
+    pred = net.predict(img)
     assert not np.any(np.isnan(pred))
+    del img
 
     # Determine how many locations to sample. We do not want to use every
     # valid location in the image but only a random subset. The size of
@@ -178,11 +172,13 @@ def logTrainingStats(net, log, x, y, meta, batch, all_costs):
     if 'orpac' not in log:
         log['orpac'] = {'err': [], 'cost': []}
     log['orpac']['err'].append(err)
-    log['orpac']['cost'].append(all_costs)
 
-    cost_bbox = int(all_costs['bbox'])
-    cost_isFg = int(all_costs['isFg'])
-    cost_cls = int(all_costs['cls'])
+    log['cost'].append(costs['total'])
+    log['orpac']['cost'].append(costs)
+
+    cost_bbox = int(costs['bbox'])
+    cost_isFg = int(costs['isFg'])
+    cost_cls = int(costs['cls'])
     s_cost = f'BgFg={cost_isFg:6,}  Cls={cost_cls:6,}  BBox={cost_bbox:6,}'
 
     # Compute error rate for Bg/Fg estimation.
