@@ -182,12 +182,18 @@ class Orpac:
     def costNodes(self):
         return dict(self._cost_nodes)
 
+    def _imageToInput(self, img):
+        assert isinstance(img, np.ndarray) and img.ndim == 3
+        assert img.shape[2] == 3
+
+        img = img.astype(np.float32) / 255
+        return np.expand_dims(np.transpose(img, [2, 0, 1]), 0)
+
     def train(self, img, y, lrate, mask_cls, mask_bbox, mask_isFg):
         assert self._trainable
 
         # Sanity checks
         assert lrate > 0
-        assert img.ndim == 3 and img.shape[2] == 3
         assert mask_cls.shape == mask_bbox.shape == mask_isFg.shape
         assert y.shape == self.featureShape()
         assert y.shape[2:] == mask_cls.shape
@@ -195,7 +201,7 @@ class Orpac:
         # Feed dictionary.
         g = tf.get_default_graph().get_tensor_by_name
         fd = {
-            self._xin: np.expand_dims(np.transpose(img, [2, 0, 1]), 0),
+            self._xin: self._imageToInput(img),
             g(f'lrate:0'): lrate,
             g(f'orpac-cost/y_true:0'): y,
             g(f'orpac-cost/mask_cls:0'): mask_cls,
@@ -209,15 +215,10 @@ class Orpac:
         return costs
 
     def predict(self, img):
-        assert img.ndim == 3 and img.shape[2] == 3 and img.dtype == np.uint8
-
-        # Network input must be normalised image.
-        img = img.astype(np.float32) / 255
-        x = np.expand_dims(np.transpose(img, [2, 0, 1]), 0)
-
         # Run predictor network.
         g = tf.get_default_graph().get_tensor_by_name
-        return self.sess.run(g(f'orpac/out:0'), feed_dict={self._xin: x})
+        return self.sess.run(
+            g(f'orpac/out:0'), feed_dict={self._xin: self._imageToInput(img)})
 
     def _setupNetwork(self, x_in, bw_init, dtype):
         # Convenience: shared arguments for bias, conv2d, and max-pool.

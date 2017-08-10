@@ -498,6 +498,22 @@ class TestOrpac:
         assert g('non-max-suppression/scores:0') is not None
         assert g('non-max-suppression/bb_rects:0') is not None
 
+    def test_imageToInput(self):
+        """Pass uint8 image and verify that it becomes a valid network input.
+        """
+        img = 100 * np.ones((64, 64, 3), np.uint8)
+
+        # Create a network (parameters do not matter).
+        x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
+        net = orpac_net.Orpac(self.sess, x_in, 7, 10, None, False)
+
+        # Image must be converted to float32 CHW image with leading
+        # batch dimension of 1. All values must have been divided by 255.
+        out = net._imageToInput(img)
+        assert out.dtype == np.float32
+        assert out.shape == (1, 3, 64, 64)
+        assert np.array_equal(out, 100 * np.ones_like(out) / 255)
+
     def test_train(self):
         """Ensure the 'train' method succeeds.
 
