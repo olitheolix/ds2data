@@ -189,7 +189,7 @@ def predictImagesInEpoch(sess, ds, dst_path):
     del N
 
     for i in progbar:
-        x, true_y, uuid = ds.nextSingle(dset)
+        x, true_y, uuid = ds.next(dset)
         assert x is not None
 
         # Extract the original file name.

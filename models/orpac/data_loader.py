@@ -197,7 +197,7 @@ class ORPAC:
         # Load the compiled training data alongside each image.
         return self.loadTrainingData(fnames, width, height)
 
-    def nextSingle(self, dset):
+    def next(self, dset):
         """Return next image and corresponding training vectors from `dset`.
 
         Returns:

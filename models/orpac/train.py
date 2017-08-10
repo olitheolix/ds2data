@@ -135,7 +135,7 @@ def trainEpoch(ds, sess, log, opt, lrate):
     for batch in range(ds.lenOfEpoch(dset)):
         # Get the next image or reset the data store if we have reached the
         # end of an epoch.
-        x, y, uuid = ds.nextSingle(dset)
+        x, y, uuid = ds.next(dset)
         assert x is not None
         assert x.ndim == 4 and isinstance(y, np.ndarray)
         meta = ds.getMeta(uuid)
