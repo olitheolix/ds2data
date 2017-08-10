@@ -1,6 +1,5 @@
 import os
 import tqdm
-import train
 import pickle
 import textwrap
 import argparse
@@ -229,15 +228,6 @@ def predictImagesInEpoch(sess, ds, dst_path):
             fig2.set_size_inches(20, 11)
             fig2.savefig(f'{fname}-pred-all.jpg', **fig_opts)
             fig2.canvas.set_window_title(fname)
-
-            # Create dummy costs and log dictionary, then log the error
-            # statistics for the current image.
-            all_costs = {'total': -1, 'bbox': -1, 'isFg': -1, 'cls': -1}
-            log = {'orpac': {'err': [], 'cost': []}, 'cost': []}
-            train.logTrainingStats(
-                sess, log, x, true_y,
-                meta=ds.getMeta(uuid), batch=0, all_costs=all_costs)
-            del all_costs, log
         else:
             # Close the window with the predicted BBoxes.
             plt.close(fig0)
