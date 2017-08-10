@@ -47,14 +47,14 @@ class ORPAC:
             np.random.seed(seed)
 
         # Load the features and labels.
-        dims, label2name, metas = self.loadRawData(path, ft_dim, num_samples)
+        im_dim_hw, label2name, metas = self.loadRawData(path, ft_dim, num_samples)
 
         # Images must have three dimensions. The second and third dimensions
         # correspond to the height and width, respectively, whereas the first
         # dimensions corresponds to the colour channels and must be either 1
         # (gray scale) or 3 (RGB).
-        dims = np.array(dims, np.uint32)
-        assert len(dims) == 3 and dims.shape[0] == 3
+        im_dim_hw = np.array(im_dim_hw, np.uint32)
+        assert len(im_dim_hw) == 2
 
         if num_samples is not None:
             metas = metas[:num_samples]
@@ -63,7 +63,7 @@ class ORPAC:
             print('Warning: data set is empty')
 
         self.ft_dim = ft_dim
-        self.image_dims = dims
+        self.im_dim_hw = im_dim_hw
         self.label2name = label2name
         self.epoch_ofs = 0
         self.samples = metas
@@ -82,8 +82,8 @@ class ORPAC:
             tmp = str.join(', ', tmp)
         else:
             tmp = 'None'
-        d, h, w = self.image_dims
-        print(f'  Image  : {d} x {h} x {w}')
+        h, w = self.im_dim_hw
+        print(f'  Image  : {h} x {w}')
         print(f'  Labels : {tmp}')
 
     def reset(self):
@@ -103,8 +103,8 @@ class ORPAC:
         return len(self.uuids)
 
     def imageDimensions(self):
-        """Return image dimensions, eg (3, 64, 64)"""
-        return np.array(self.image_dims, np.uint32)
+        """Return image dimensions as (height, width), eg (64, 64)"""
+        return tuple(self.im_dim_hw)
 
     def getMeta(self, uuid: int):
         if not (0 <= uuid < len(self.meta)):
