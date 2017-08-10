@@ -43,33 +43,11 @@ def parseCmdline():
     return parser.parse_args()
 
 
-def nonMaxSuppress(sess, bb_rects, scores):
-    """ Wrapper around Tensorflow's non-max-suppression function.
-
-    Input:
-        sess: Tensorflow sessions
-        bb_rects: Array[N, 4]
-            BBox rectangles, one per column.
-        scores: Array[N]
-            One scalar score for each BBox.
-
-    Returns:
-        idx: Array
-            List of BBox indices that survived the operation.
-    """
-    g = tf.get_default_graph().get_tensor_by_name
-    fd = {
-        g('non-max-suppression/scores:0'): scores,
-        g('non-max-suppression/bb_rects:0'): bb_rects,
-    }
-    return sess.run(g('non-max-suppression/op:0'), feed_dict=fd)
-
-
-def predictBBoxes(sess, img, x, true_y, int2name, nms):
+def predictBBoxes(net, img, x, true_y, int2name, nms):
     """ Compile the list of BBoxes and their labels.
 
     Input:
-        sess: Tensorflow sessions
+        net: Orpac network
         img: HWC image [height, width, 3]
         x: Tensor [1, chan, height, width]
             Network input, ie a pre-processed image.
@@ -95,14 +73,9 @@ def predictBBoxes(sess, img, x, true_y, int2name, nms):
     assert true_y.ndim == 4 and true_y.shape[0] == 1
     im_dim = img.shape[:2]
 
-    # Compile the list of RPCN output nodes.
-    g = tf.get_default_graph().get_tensor_by_name
-
-    # Pass the image to ORPAC and strip off the batch dimension from the result.
-    pred_y = sess.run(g(f'orpac/out:0'), feed_dict={g('x_in:0'): x})
-
-    # Unpack true class labels. If the caller did not provide any then use the
-    # predicted ones instead.
+    # Analyse the image and unpack true class labels. If the caller did not
+    # provide any then use the predicted ones instead.
+    pred_y = net.predict(img)
     if true_y is None:
         true_labels = getClassLabel(pred_y[0])
     else:
@@ -136,7 +109,7 @@ def predictBBoxes(sess, img, x, true_y, int2name, nms):
         assert len(softmax_scores) == len(bb_rects)
 
         # Suppress overlapping BBoxes.
-        idx = nonMaxSuppress(sess, bb_rects, softmax_scores)
+        idx = net.nonMaxSuppression(bb_rects, softmax_scores)
         bb_rects = bb_rects[idx]
         del idx, softmax_scores
 
@@ -173,7 +146,7 @@ def predictBBoxes(sess, img, x, true_y, int2name, nms):
     return pred_y, bb_rects_out, pred_labels_out, true_labels_out
 
 
-def predictImagesInEpoch(sess, ds, dst_path):
+def predictImagesInEpoch(net, ds, dst_path):
     # Predict the BBoxes for every image.
     dset = 'test'
     ds.reset(dset)
@@ -199,7 +172,7 @@ def predictImagesInEpoch(sess, ds, dst_path):
         del meta
 
         # Predict the BBoxes with NMS. There must be no NaNs in the output.
-        pred_nms = predictBBoxes(sess, img, x, true_y, int2name, True)
+        pred_nms = predictBBoxes(net, img, x, true_y, int2name, True)
         pred_y, pred_rect, pred_cls, true_cls = pred_nms
         assert not np.any(np.isnan(pred_y))
 
@@ -219,7 +192,7 @@ def predictImagesInEpoch(sess, ds, dst_path):
             fig1.savefig(f'{fname}-lmap.jpg', **fig_opts)
 
             # Predict the BBoxes without NMS.
-            pred_all = predictBBoxes(sess, img, x, true_y, int2name, False)
+            pred_all = predictBBoxes(net, img, x, true_y, int2name, False)
             _, pred_rect, pred_cls, true_cls = pred_all
 
             # Draw the BBoxes over the image and save it.
@@ -348,13 +321,13 @@ def main():
     # Build the shared layers and connect it to ORPAC.
     print('\n----- Network Setup -----')
     x_in = tf.placeholder(tf_dtype, [1, *im_dim], name='x_in')
-    net = orpac_net.Orpac(sess, x_in, conf.layers, num_classes, bw_init)
+    net = orpac_net.Orpac(sess, x_in, conf.layers, num_classes, bw_init, False)
     sess.run(tf.global_variables_initializer())
     print('Output feature map size: ', net.featureShape())
 
     # Predict each image and produce a new image with BBoxes and labels in it.
     try:
-        predictImagesInEpoch(sess, ds, param.dst)
+        predictImagesInEpoch(net, ds, param.dst)
         plt.show()
     except KeyboardInterrupt:
         print('User Abort')
