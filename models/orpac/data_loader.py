@@ -37,7 +37,7 @@ class ORPAC:
     # Define the MetaData container for this data set.
     MetaData = namedtuple(
         'MetaData',
-        'filename mask_fg mask_bbox mask_cls mask_valid mask_objid_at_pix img'
+        'img y filename mask_fg mask_bbox mask_cls mask_valid mask_objid_at_pix'
     )
 
     def __init__(self, conf):
@@ -54,8 +54,7 @@ class ORPAC:
             np.random.seed(conf.seed)
 
         # Load the features and labels.
-        x, y, dims, label2name, meta = self.loadRawData()
-        assert len(x) == len(y) == len(meta)
+        dims, label2name, metas = self.loadRawData()
 
         # Images must have three dimensions. The second and third dimensions
         # correspond to the height and width, respectively, whereas the first
@@ -65,32 +64,15 @@ class ORPAC:
         assert len(dims) == 3 and dims.shape[0] in [1, 3]
         self.image_dims = dims
 
-        # Sanity checks: all images must be NumPy arrays.
-        assert isinstance(x, np.ndarray)
-        assert x.dtype == np.uint8, x.dtype
-
-        # Sanity check: images must be a 4-D tensor, and there must be as many
-        # labels as there are features (images).
-        assert x.ndim == 4
-
-        # Sanity check: to comply with the NCHW format, the second to fourth
-        # dimension must match the `dims` returned by `loadRawData`.
-        assert all(x.shape[1:] == self.image_dims)
-
-        # Convert the images from uint8 to to floating point.
-        x = np.array(x, np.float32) / 255
-
         # Store the pre-processed labels.
-        self.meta = meta
-        self.features = x
-        self.labels = y
+        self.metas = metas
         self.label2name = label2name
-        p = np.random.permutation(len(y))[:conf.samples]
+        p = np.random.permutation(len(metas))[:conf.samples]
 
         # Case 1: no data -> print warning, Case 2: only single file -> add
         # it to training and test set irrespective of training ratio, Case 3:
         # partition the data into test/training sets.
-        if len(y) == 0:
+        if len(metas) == 0:
             print('Warning: data set is empty')
         self.handles = p
 
@@ -144,21 +126,13 @@ class ORPAC:
         """Return feature and label vector for data set of choice.
 
         Returns:
-            images: UInt8 Array[N:chan:height:width]
-                Images in CHW format
-            feature map: N-List[Dict[ft_dim: Array[*, ft_dim[0], ft_dim[1]]]]
-                One entry for each image. Each entry is a dictionary with the
-                supported feature dimension (typically (64, 64) and (32, 32)).
-                Each of those keys references a 3D NumPy array. The first
-                dimension encodes the features (eg BBox, isFg, labels) whereas
-                the shape of the remaining two dimension must match `ft_dim`.
             dims: Array[3]
                 Image shape in CHW format, eg (3, 512, 512).
             int: dict[int:str]
                 A LUT to translate machine labels to human readable strings.
                 For instance {0: 'None', 1: 'Cube 0', 2: 'Cube 1'}.
-            meta: N-List[Dict[ft_dim: MetaData]]
-                One MetaData structure for each image and feature size.
+            meta: N-List[MetaData]
+                MetaData tuple for each sample.
         """
         # Store the feature map sizes for which we have data.
         self.ft_dim = self.conf.ft_dim
@@ -178,11 +152,7 @@ class ORPAC:
         """Return next training image and labels.
 
         Returns:
-            x: NumPy [1, chan, height, width]
-                Network input.
-            labels: dict
-                Each key denotes a feature size and each value holds the
-                corresponding training data.
+            meta: Named tuple
             UUID: int
                 UUID to query meta information via `getMeta`.
         """
@@ -190,9 +160,7 @@ class ORPAC:
             uuid = self.handles[self.epoch_ofs]
             self.epoch_ofs += 1
 
-            x = np.expand_dims(self.features[uuid], 0)
-            y = self.labels[uuid]
-            return x, y, uuid
+            return self.metas[uuid], uuid
         except IndexError:
             return None, None, None
 
@@ -247,7 +215,7 @@ class ORPAC:
         im_shape = (3, im_height, im_width)
 
         num_cls = None
-        all_y, all_meta = [], []
+        all_meta = []
         all_x = np.zeros((len(fnames), *im_shape), np.uint8)
 
         # Load each image and associated features.
@@ -269,16 +237,13 @@ class ORPAC:
             assert int2name == data['int2name']
 
             # Crate the training output for the selected feature map size.
-            data = data[self.ft_dim]
-            y, meta = self.compileTrainingOutput(data, img, num_cls)
-            del data
+            meta = self.compileTrainingOutput(data[self.ft_dim], img, num_cls)
 
             # Collect the training data.
-            all_y.append(y)
             all_meta.append(meta._replace(filename=fname))
 
         # Return image, network output, label mapping, and meta data.
-        return all_x, all_y, im_shape, int2name, all_meta
+        return im_shape, int2name, all_meta
 
     def compileTrainingOutput(self, training_data, img, num_classes):
         assert img.dtype == np.uint8 and img.ndim == 3 and img.shape[2] == 3
@@ -307,8 +272,9 @@ class ORPAC:
         y[0] = setClassLabel(y[0], oneHotEncoder(label_ap, num_classes))
 
         meta = self.MetaData(
-            filename=None,
             img=img,
+            y=y,
+            filename=None,
             mask_fg=training_data['mask_fg'],
             mask_bbox=training_data['mask_bbox'],
             mask_valid=training_data['mask_valid'],
@@ -322,4 +288,4 @@ class ORPAC:
             assert tmp.dtype == np.uint8, field
             assert tmp.shape == ft_dim, field
             assert set(np.unique(tmp)).issubset({0, 1}), field
-        return y, meta
+        return meta
