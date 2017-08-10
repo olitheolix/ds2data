@@ -189,6 +189,27 @@ class Orpac:
         img = img.astype(np.float32) / 255
         return np.expand_dims(np.transpose(img, [2, 0, 1]), 0)
 
+    def nonMaxSuppression(self, bb_rects, scores):
+        """ Wrapper around Tensorflow's non-max-suppression function.
+
+        Input:
+            sess: Tensorflow sessions
+            bb_rects: Array[N, 4]
+                BBox rectangles, one per column.
+            scores: Array[N]
+                One scalar score for each BBox.
+
+        Returns:
+            idx: Array
+                List of BBox indices that survived the operation.
+        """
+        g = tf.get_default_graph().get_tensor_by_name
+        fd = {
+            g('non-max-suppression/scores:0'): scores,
+            g('non-max-suppression/bb_rects:0'): bb_rects,
+        }
+        return self.sess.run(g('non-max-suppression/op:0'), feed_dict=fd)
+
     def train(self, img, y, lrate, mask_cls, mask_bbox, mask_isFg):
         assert self._trainable
 

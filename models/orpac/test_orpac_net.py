@@ -582,6 +582,34 @@ class TestOrpac:
         assert isinstance(y, np.ndarray) and y.dtype == np.float32
         assert y.shape == net.featureShape()
 
+    def test_nonMaxSuppression(self):
+        """Ensure the 'nonMaxSuppression' method succeeds.
+
+        This test does not assess the numerical output but merely ensures the
+        method works when provided with valid parameters shapes and types.
+        """
+        num_layers = 7
+        num_classes = 10
+
+        # Create predictor network (parameters do not matter).
+        x_in = tf.placeholder(tf.float32, (1, 3, 64, 64))
+        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, False)
+
+        # Dummy input for NMS.
+        N = 100
+        bb_rects = np.random.uniform(-10, 10, (N, 4)).astype(np.float32)
+        scores = np.random.uniform(0, 1, N).astype(np.float32)
+
+        # Function must return a list of integers. Each integer is an index
+        # into the first bb_rects dimension to indicate which ones survived the
+        # NMS operation.
+        out = net.nonMaxSuppression(bb_rects, scores)
+        assert out.dtype == np.int32
+        assert 0 <= len(out) < N
+
+        # All indices must be unique.
+        assert len(set(out)) == len(out)
+
 
 class TestSerialiseRestore:
     @classmethod
