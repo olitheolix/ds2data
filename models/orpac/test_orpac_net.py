@@ -15,10 +15,10 @@ class TestCost:
     def setup_class(cls):
         # Size of last layer and number of unique classes.
         cls.ft_dim = (2, 2)
-        cls.num_classes = 10
+        cls.num_cls = 10
 
         # Feature tensor.
-        out_dim = (1, 4 + 2 + cls.num_classes, *cls.ft_dim)
+        out_dim = (1, 4 + 2 + cls.num_cls, *cls.ft_dim)
         cls.y_pred_in = tf.placeholder(tf.float32, out_dim, name='y_pred')
 
         # Setup cost computation. This will create a node for `y_true`.
@@ -103,7 +103,7 @@ class TestCost:
         assert cost_total.shape == tuple()
 
         assert y_true_in.dtype == y_pred_in.dtype == tf.float32
-        assert y_pred_in.shape == [1, 2 + 4 + self.num_classes, *self.ft_dim]
+        assert y_pred_in.shape == [1, 2 + 4 + self.num_cls, *self.ft_dim]
         assert y_pred_in.shape == y_true_in.shape
 
         assert mask_isFg_in.shape == self.ft_dim
@@ -199,7 +199,7 @@ class TestCost:
         return out
 
     def test_cost_classLabels(self):
-        """Cost function for the num_classes possible class labels."""
+        """Cost function for the num_cls possible class labels."""
         # Activate two locations in 2x2 mask.
         mask = np.zeros(self.ft_dim, np.float32)
         mask[0, 0] = mask[1, 1] = 1
@@ -208,8 +208,8 @@ class TestCost:
         y_pred = np.zeros(self.y_true_in.shape, np.float32)
 
         # Create a random class label for each location.
-        dim = (self.num_classes, *self.ft_dim)
-        cls_labels = np.random.randint(0, self.num_classes, dim)
+        dim = (self.num_cls, *self.ft_dim)
+        cls_labels = np.random.randint(0, self.num_cls, dim)
 
         # Perfect estimate: the true and predicted labels match.
         y_pred[0] = setClassLabel(y_pred[0], cls_labels)
@@ -278,7 +278,7 @@ class TestCost:
         y_true = np.zeros_like(y_pred)
 
         # Convenience
-        num_cls = self.num_classes
+        num_cls = self.num_cls
         np.random.seed(0)
 
         # Test several random inputs.
@@ -515,15 +515,14 @@ class TestOrpac:
         method works when the provided parameters have the correct shape and
         type.
         """
-        chan = 3
         num_layers = 7
-        num_classes = 10
+        num_cls = 10
 
         # Image dimensions and network input tensor shape.
         im_dim_hw = (64, 64)
 
         # Create trainable network with random weights.
-        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_classes, None, True)
+        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_cls, None, True)
         self.sess.run(tf.global_variables_initializer())
         assert net.trainable() is True
 
@@ -531,7 +530,7 @@ class TestOrpac:
         lrate = 1E-5
         y_dim = net.featureShape()
         y = np.random.uniform(0, 256, y_dim).astype(np.uint8)
-        img = np.random.randint(0, 256, (*im_dim_hw, chan)).astype(np.uint8)
+        img = np.random.randint(0, 256, (*im_dim_hw, 3)).astype(np.uint8)
 
         # Create dummy masks.
         ft_hw = net.featureHeightWidth()
@@ -552,20 +551,19 @@ class TestOrpac:
         type.
 
         """
-        chan = 3
         num_layers = 7
-        num_classes = 10
+        num_cls = 10
 
         # Image dimensions and network input tensor shape.
         im_dim_hw = (64, 64)
 
         # Create predictor-only network with random weights.
-        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_classes, None, False)
+        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_cls, None, False)
         self.sess.run(tf.global_variables_initializer())
         assert net.trainable() is not True
 
         # Create dummy learning rate, image and training output.
-        img = np.random.randint(0, 256, (*im_dim_hw, chan)).astype(np.uint8)
+        img = np.random.randint(0, 256, (*im_dim_hw, 3)).astype(np.uint8)
 
         # 'Train' method must complete without error and return the costs.
         y = net.predict(img)
@@ -579,11 +577,11 @@ class TestOrpac:
         method works when provided with valid parameters shapes and types.
         """
         num_layers = 7
-        num_classes = 10
+        num_cls = 10
         im_dim_hw = (64, 64)
 
         # Create predictor network (parameters do not matter).
-        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_classes, None, False)
+        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_cls, None, False)
 
         # Dummy input for NMS.
         N = 100
@@ -623,11 +621,11 @@ class TestSerialiseRestore:
     def test_serialise(self):
         """ Create a network and serialise its biases and weights."""
         num_layers = 7
-        num_classes = 10
+        num_cls = 10
         im_dim_hw = (512, 512)
 
         # Setup default network. Variables are random.
-        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_classes, None, False)
+        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_cls, None, False)
         self.sess.run(tf.global_variables_initializer())
 
         # Serialise the network biases and weights.
@@ -652,8 +650,8 @@ class TestSerialiseRestore:
         values are correct.
         """
         num_layers = 3
-        num_classes = 10
-        num_out = 2 + 4 + num_classes
+        num_cls = 10
+        num_out = 2 + 4 + num_cls
         im_dim_hw = (512, 512)
 
         # Create variables for first, middle and last layer. The first layer
@@ -669,7 +667,7 @@ class TestSerialiseRestore:
         bw_init['num-layers'] = 3
 
         # Create a new network and restore its weights.
-        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_classes,
+        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_cls,
                               bw_init, False)
         self.sess.run(tf.global_variables_initializer())
 
