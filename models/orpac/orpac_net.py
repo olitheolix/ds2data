@@ -158,6 +158,42 @@ class Orpac:
         else:
             self._cost_nodes, self._optimiser = {}, None
 
+    def session(self):
+        """Return Tensorflow session"""
+        return self.sess
+
+    def getBias(self, layer):
+        g = tf.get_default_graph().get_tensor_by_name
+        return self.sess.run(g(f'orpac/b{layer}:0'))
+
+    def getWeight(self, layer):
+        g = tf.get_default_graph().get_tensor_by_name
+        return self.sess.run(g(f'orpac/W{layer}:0'))
+
+    def numLayers(self):
+        return self.num_layers
+
+    def numClasses(self):
+        return self.num_classes
+
+    def featureShape(self):
+        return self.feature_shape
+
+    def featureHeightWidth(self):
+        return tuple(self.feature_shape[2:])
+
+    def imageHeightWidth(self):
+        return tuple(self._xin.shape.as_list()[2:])
+
+    def output(self):
+        return self.out
+
+    def trainable(self):
+        return self._trainable
+
+    def costNodes(self):
+        return dict(self._cost_nodes)
+
     def _addOptimiser(self):
         cost = createCostNodes(self.out)
         g = tf.get_default_graph().get_tensor_by_name
@@ -171,12 +207,6 @@ class Orpac:
         }
         return nodes, opt
 
-    def trainable(self):
-        return self._trainable
-
-    def costNodes(self):
-        return dict(self._cost_nodes)
-
     def _imageToInput(self, img):
         assert isinstance(img, np.ndarray) and img.dtype == np.uint8
         height, width = self.imageHeightWidth()
@@ -184,6 +214,47 @@ class Orpac:
 
         img = img.astype(np.float32) / 255
         return np.expand_dims(np.transpose(img, [2, 0, 1]), 0)
+
+    def _setupNetwork(self, x_in, bw_init, dtype):
+        # Convenience: shared arguments for bias, conv2d, and max-pool.
+        opts = dict(padding='SAME', data_format='NCHW')
+
+        # Add conv layers. Every second layer downsamples by 2.
+        # Examples dimensions assume 128x128 RGB images.
+        # Odd i : [-1, 3, 128, 128] ---> [-1, 64, 128, 128]
+        # Even i: [-1, 3, 128, 128] ---> [-1, 64, 64, 64]
+        # Kernel: 3x3  Features: 64
+        prev = x_in
+        for i in range(self.num_layers - 1):
+            prev_shape = tuple(prev.shape.as_list())
+            b_dim = (64, 1, 1)
+            W_dim = (3, 3, prev_shape[1], 64)
+            b, W = unpackBiasAndWeight(bw_init, b_dim, W_dim, i, dtype)
+
+            stride = [1, 1, 1, 1] if i % 2 == 0 else [1, 1, 2, 2]
+            prev = tf.nn.relu(tf.nn.conv2d(prev, W, stride, **opts) + b)
+            del i, b, W, b_dim, W_dim, stride
+
+        # Convolution layer to learn the BBoxes and class labels.
+        # Shape: [-1, 64, 64, 64] ---> [-1, num_out, 64, 64]
+        # Kernel: 33x33
+        num_out = 4 + 2 + self.num_classes
+        prev_shape = tuple(prev.shape.as_list())
+        b_dim = (num_out, 1, 1)
+        W_dim = (33, 33, prev.shape[1], num_out)
+        b, W = unpackBiasAndWeight(bw_init, b_dim, W_dim, self.num_layers - 1, dtype)
+        return tf.add(tf.nn.conv2d(prev, W, [1, 1, 1, 1], **opts), b, name='out')
+
+    def _setupNonMaxSuppression(self):
+        """Create non-maximum-suppression nodes.
+
+        These are irrelevant for training but useful in the predictor to cull
+        the flood of possible bounding boxes.
+        """
+        with tf.variable_scope('non-max-suppression'):
+            r_in = tf.placeholder(tf.float32, [None, 4], name='bb_rects')
+            s_in = tf.placeholder(tf.float32, [None], name='scores')
+            tf.image.non_max_suppression(r_in, s_in, 30, 0.2, name='op')
 
     def nonMaxSuppression(self, bb_rects, scores):
         """ Wrapper around Tensorflow's non-max-suppression function.
@@ -237,80 +308,9 @@ class Orpac:
         return self.sess.run(
             g(f'orpac/out:0'), feed_dict={self._xin: self._imageToInput(img)})
 
-    def _setupNetwork(self, x_in, bw_init, dtype):
-        # Convenience: shared arguments for bias, conv2d, and max-pool.
-        opts = dict(padding='SAME', data_format='NCHW')
-
-        # Add conv layers. Every second layer downsamples by 2.
-        # Examples dimensions assume 128x128 RGB images.
-        # Odd i : [-1, 3, 128, 128] ---> [-1, 64, 128, 128]
-        # Even i: [-1, 3, 128, 128] ---> [-1, 64, 64, 64]
-        # Kernel: 3x3  Features: 64
-        prev = x_in
-        for i in range(self.num_layers - 1):
-            prev_shape = tuple(prev.shape.as_list())
-            b_dim = (64, 1, 1)
-            W_dim = (3, 3, prev_shape[1], 64)
-            b, W = unpackBiasAndWeight(bw_init, b_dim, W_dim, i, dtype)
-
-            stride = [1, 1, 1, 1] if i % 2 == 0 else [1, 1, 2, 2]
-            prev = tf.nn.relu(tf.nn.conv2d(prev, W, stride, **opts) + b)
-            del i, b, W, b_dim, W_dim, stride
-
-        # Convolution layer to learn the BBoxes and class labels.
-        # Shape: [-1, 64, 64, 64] ---> [-1, num_out, 64, 64]
-        # Kernel: 33x33
-        num_out = 4 + 2 + self.num_classes
-        prev_shape = tuple(prev.shape.as_list())
-        b_dim = (num_out, 1, 1)
-        W_dim = (33, 33, prev.shape[1], num_out)
-        b, W = unpackBiasAndWeight(bw_init, b_dim, W_dim, self.num_layers - 1, dtype)
-        return tf.add(tf.nn.conv2d(prev, W, [1, 1, 1, 1], **opts), b, name='out')
-
-    def _setupNonMaxSuppression(self):
-        """Create non-maximum-suppression nodes.
-
-        These are irrelevant for training but useful in the predictor to cull
-        the flood of possible bounding boxes.
-        """
-        with tf.variable_scope('non-max-suppression'):
-            r_in = tf.placeholder(tf.float32, [None, 4], name='bb_rects')
-            s_in = tf.placeholder(tf.float32, [None], name='scores')
-            tf.image.non_max_suppression(r_in, s_in, 30, 0.2, name='op')
-
-    def session(self):
-        """Return Tensorflow session"""
-        return self.sess
-
     def serialise(self):
         out = {'weight': {}, 'bias': {}, 'num-layers': self.numLayers()}
         for i in range(self.num_layers):
             out['bias'][i] = self.getBias(i)
             out['weight'][i] = self.getWeight(i)
         return out
-
-    def getBias(self, layer):
-        g = tf.get_default_graph().get_tensor_by_name
-        return self.sess.run(g(f'orpac/b{layer}:0'))
-
-    def getWeight(self, layer):
-        g = tf.get_default_graph().get_tensor_by_name
-        return self.sess.run(g(f'orpac/W{layer}:0'))
-
-    def numLayers(self):
-        return self.num_layers
-
-    def numClasses(self):
-        return self.num_classes
-
-    def featureShape(self):
-        return self.feature_shape
-
-    def featureHeightWidth(self):
-        return tuple(self.feature_shape[2:])
-
-    def imageHeightWidth(self):
-        return tuple(self._xin.shape.as_list()[2:])
-
-    def output(self):
-        return self.out
