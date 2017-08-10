@@ -53,10 +53,6 @@ class ORPAC:
         if conf.seed is not None:
             np.random.seed(conf.seed)
 
-        # Backup the training/test ratio for later and sanity check it.
-        self.train = conf.train_rat if conf.train_rat is not None else 0.8
-        assert 0 <= self.train <= 1
-
         # Load the features and labels.
         x, y, dims, label2name, meta = self.loadRawData()
         assert len(x) == len(y) == len(meta)
@@ -84,39 +80,28 @@ class ORPAC:
         # Convert the images from uint8 to to floating point.
         x = np.array(x, np.float32) / 255
 
-        # Limit the number of samples for each label.
-        N = conf.samples
-
         # Store the pre-processed labels.
         self.meta = meta
         self.features = x
         self.labels = y
         self.label2name = label2name
-        p = np.random.permutation(len(y))
+        p = np.random.permutation(len(y))[:conf.samples]
 
         # Case 1: no data -> print warning, Case 2: only single file -> add
         # it to training and test set irrespective of training ratio, Case 3:
         # partition the data into test/training sets.
         if len(y) == 0:
             print('Warning: data set is empty')
-            self.handles = {'train': p, 'test': p}
-        elif len(y) == 1:
-            self.handles = {'train': p, 'test': p}
-        else:
-            N = int(self.train * len(y))
-            self.handles = {'train': p[:N], 'test': p[N:]}
-        del p, N
+        self.handles = p
 
         # Initialise the ofs in the current epoch for training/test data.
-        self.ofs = {k: 0 for k in self.handles}
+        self.epoch_ofs = 0
         self.reset()
 
     def printSummary(self):
         """Print a summary to screen."""
         print('Data Set Summary:')
-        for dset in self.handles:
-            name = dset.capitalize()
-            print(f'  {name:10}: {len(self.handles[dset]):,} samples')
+        print(f'  Samples: {len(self.handles):,}')
 
         if self.label2name is not None:
             tmp = [_[1] for _ in sorted(self.label2name.items())]
@@ -124,32 +109,24 @@ class ORPAC:
         else:
             tmp = 'None'
         d, h, w = self.image_dims
-        print(f'  Labels    : {tmp}')
-        print(f'  Dimensions: {d} x {h} x {w}')
+        print(f'  Image  : {d} x {h} x {w}')
+        print(f'  Labels : {tmp}')
 
-    def reset(self, dset=None):
-        """Reset the epoch for `dset`.
+    def reset(self):
+        """Reset the epoch.
 
         After this, a call to getNextBatch will start served images from the
         start of the epoch again.
-
-        Args:
-            dset (str): either 'test' or 'train'. If None, both will be reset.
         """
-        if dset is None:
-            self.ofs = {k: 0 for k in self.ofs}
-        else:
-            assert dset in self.handles, f'Unknown data set <{dset}>'
-            self.ofs[dset] = 0
+        self.epoch_ofs = 0
 
     def int2name(self):
         """ Return the mapping between machine/human readable labels"""
         return dict(self.label2name)
 
-    def lenOfEpoch(self, dset):
-        """Return number of `dset` images in a full epoch."""
-        assert dset in self.handles, f'Unknown data set <{dset}>'
-        return len(self.handles[dset])
+    def lenOfEpoch(self):
+        """Return number of samples in entire full epoch."""
+        return len(self.handles)
 
     def imageDimensions(self):
         """Return image dimensions, eg (3, 64, 64)"""
@@ -197,8 +174,8 @@ class ORPAC:
         # Load the compiled training data alongside each image.
         return self.loadTrainingData(fnames, width, height)
 
-    def next(self, dset):
-        """Return next image and corresponding training vectors from `dset`.
+    def next(self):
+        """Return next training image and labels.
 
         Returns:
             x: NumPy [1, chan, height, width]
@@ -209,11 +186,10 @@ class ORPAC:
             UUID: int
                 UUID to query meta information via `getMeta`.
         """
-        assert dset in self.handles, f'Unknown data set <{dset}>'
-
         try:
-            uuid = self.handles[dset][self.ofs[dset]]
-            self.ofs[dset] += 1
+            uuid = self.handles[self.epoch_ofs]
+            self.epoch_ofs += 1
+
             x = np.expand_dims(self.features[uuid], 0)
             y = self.labels[uuid]
             return x, y, uuid

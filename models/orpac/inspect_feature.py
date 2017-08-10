@@ -146,7 +146,7 @@ def main(data_path=None):
     print(f'Loaded dataset in {etime:,.1f}s')
     ds.printSummary()
 
-    _, y, uuid = ds.next('train')
+    _, y, uuid = ds.next()
     img = ds.getMeta(uuid).img
 
     plotMasksAndFeatures(img, y, ds.getMeta(uuid), ds.int2name(), conf.ft_dim)

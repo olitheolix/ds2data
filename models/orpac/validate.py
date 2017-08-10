@@ -148,8 +148,7 @@ def predictBBoxes(net, img, x, true_y, int2name, nms):
 
 def predictImagesInEpoch(net, ds, dst_path):
     # Predict the BBoxes for every image.
-    dset = 'test'
-    ds.reset(dset)
+    ds.reset()
     int2name = ds.int2name()
     fig_opts = dict(dpi=150, transparent=True, bbox_inches='tight', pad_inches=0)
 
@@ -157,12 +156,12 @@ def predictImagesInEpoch(net, ds, dst_path):
     os.makedirs(dst_path, exist_ok=True)
 
     print('\n----- Validating Images -----')
-    N = ds.lenOfEpoch(dset)
+    N = ds.lenOfEpoch()
     progbar = tqdm.tqdm(range(N), total=N, desc=f'Predicting', leave=False)
     del N
 
     for i in progbar:
-        x, true_y, uuid = ds.next(dset)
+        x, true_y, uuid = ds.next()
         assert x is not None
 
         # Extract the original file name.

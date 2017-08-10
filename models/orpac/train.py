@@ -119,14 +119,12 @@ def trainEpoch(ds, net, log, lrate):
         lrate: float
             Learning rate for this epoch.
     """
-    dset = 'train'
-
     # Train on one image at a time.
-    ds.reset(dset)
-    for batch in range(ds.lenOfEpoch(dset)):
+    ds.reset()
+    for batch in range(ds.lenOfEpoch()):
         # Get the next image or reset the data store if we have reached the
         # end of an epoch.
-        x, y, uuid = ds.next(dset)
+        x, y, uuid = ds.next()
         assert x is not None
         assert x.ndim == 4 and isinstance(y, np.ndarray)
         meta = ds.getMeta(uuid)
