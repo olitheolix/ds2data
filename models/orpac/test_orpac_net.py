@@ -411,7 +411,7 @@ class TestNetworkSetup:
         tf_dtype, np_dtype = tf.float32, np.float32
 
         x_in = tf.placeholder(tf_dtype, [1, 5, 512, 512])
-        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None)
+        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, False)
         self.sess.run(tf.global_variables_initializer())
         assert net.session() is self.sess
 
@@ -437,7 +437,7 @@ class TestNetworkSetup:
 
         # Create network with random weights.
         x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
-        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None)
+        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, False)
         self.sess.run(tf.global_variables_initializer())
 
         # First layer must be compatible with input.
@@ -465,7 +465,7 @@ class TestNetworkSetup:
 
         # Setup default network. Variables are random.
         x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
-        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None)
+        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, False)
         self.sess.run(tf.global_variables_initializer())
 
         # Serialise the network biases and weights.
@@ -510,7 +510,8 @@ class TestNetworkSetup:
         bw_init['num-layers'] = 3
 
         # Create a new network and restore its weights.
-        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, bw_init)
+        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes,
+                              bw_init, False)
         self.sess.run(tf.global_variables_initializer())
 
         # Ensure the weights are as specified.
@@ -530,7 +531,7 @@ class TestNetworkSetup:
 
         # Create a network (parameters do not matter).
         x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
-        orpac_net.Orpac(self.sess, x_in, 7, 10, None)
+        orpac_net.Orpac(self.sess, x_in, 7, 10, None, False)
 
         # All NMS nodes must now exist.
         assert g('non-max-suppression/op:0') is not None
