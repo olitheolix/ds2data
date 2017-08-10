@@ -234,7 +234,7 @@ def main():
 
     # Load the BBox training data.
     print('\n----- Data Set -----')
-    ds = data_loader.ORPAC(conf)
+    ds = data_loader.ORPAC(conf.path, conf.ft_dim, conf.seed, conf.samples)
     ds.printSummary()
     int2name = ds.int2name()
     num_classes = len(int2name)
@@ -252,7 +252,8 @@ def main():
     # Select cost function and optimiser, then initialise the TF graph.
     sess.run(tf.global_variables_initializer())
 
-    # Ensure the feature size of the network matches the feature size.
+    # Ensure the feature size of the network matches the feature size returned
+    # by the loader.
     assert net.output().shape.as_list()[2:] == list(ds.getFeatureSize())
     assert net.featureHeightWidth() == ds.getFeatureSize()
     print('Output feature map size: ', net.featureShape())
