@@ -27,9 +27,6 @@ class ORPAC:
         conf (NetConf): simulation parameters.
         conf.seed (int):
             Seed for Numpy random generator.
-        conf.train_rat (float): 0.0-1.0
-            Ratio of samples to put aside for training. For example, 0.8 means 80%
-            of all samples will be in the training set, and 20% in the test set.
         conf.samples (int):
             Number of samples to use for each label. Use all if set to None.
 
@@ -54,7 +51,8 @@ class ORPAC:
             np.random.seed(conf.seed)
 
         # Load the features and labels.
-        dims, label2name, metas = self.loadRawData()
+        self.ft_dim = conf.ft_dim
+        dims, label2name, metas = self.loadRawData(conf.ft_dim)
 
         # Images must have three dimensions. The second and third dimensions
         # correspond to the height and width, respectively, whereas the first
@@ -122,7 +120,7 @@ class ORPAC:
     def getFeatureSize(self):
         return tuple(self.ft_dim)
 
-    def loadRawData(self):
+    def loadRawData(self, ft_dim):
         """Return feature and label vector for data set of choice.
 
         Returns:
@@ -134,19 +132,16 @@ class ORPAC:
             meta: N-List[MetaData]
                 MetaData tuple for each sample.
         """
-        # Store the feature map sizes for which we have data.
-        self.ft_dim = self.conf.ft_dim
-
         # Compile a list of JPG images in the source folder. Then verify that
         # a) each is a valid JPG file and b) all images have the same size.
         fnames = self.findTrainingFiles(self.conf.samples)
         height, width = self.checkImageDimensions(fnames)
 
         # If the features have not been compiled yet, do so now.
-        self.compileMissingFeatures(fnames)
+        self.compileMissingFeatures(fnames, ft_dim)
 
         # Load the compiled training data alongside each image.
-        return self.loadTrainingData(fnames, width, height)
+        return self.loadTrainingData(fnames, width, height, ft_dim)
 
     def next(self):
         """Return next training image and labels.
@@ -192,13 +187,13 @@ class ORPAC:
             raise FileNotFoundError(self.conf.path)
         return fnames
 
-    def compileMissingFeatures(self, fnames):
+    def compileMissingFeatures(self, fnames, ft_dim):
         # Find out which images have no training output yet.
         missing = []
         for fname in fnames:
             try:
                 tmp = pickle.load(open(fname + '-compiled.pickle', 'rb'))
-                assert self.ft_dim in tmp.keys()
+                assert ft_dim in tmp.keys()
             except (pickle.UnpicklingError, FileNotFoundError, AssertionError):
                 missing.append(fname)
 
@@ -208,10 +203,10 @@ class ORPAC:
             for fname in progbar:
                 img = Image.open(fname + '.jpg').convert('RGB')
                 img = np.array(img)
-                out = compile_features.generate(fname, img, self.ft_dim)
+                out = compile_features.generate(fname, img, ft_dim)
                 pickle.dump(out, open(fname + '-compiled.pickle', 'wb'))
 
-    def loadTrainingData(self, fnames, im_width, im_height):
+    def loadTrainingData(self, fnames, im_width, im_height, ft_dim):
         im_shape = (3, im_height, im_width)
 
         num_cls = None
@@ -237,7 +232,7 @@ class ORPAC:
             assert int2name == data['int2name']
 
             # Crate the training output for the selected feature map size.
-            meta = self.compileTrainingOutput(data[self.ft_dim], img, num_cls)
+            meta = self.compileTrainingOutput(data[ft_dim], img, num_cls)
 
             # Collect the training data.
             all_meta.append(meta._replace(filename=fname))
