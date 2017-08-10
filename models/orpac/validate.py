@@ -306,12 +306,11 @@ def main():
     ds = data_loader.ORPAC(conf.path, conf.ft_dim, conf.seed, conf.samples)
     ds.printSummary()
     num_classes = len(ds.int2name())
-    im_dim = ds.imageDimensions().tolist()
+    im_dim_hw = ds.imageHeightWidth()
 
     # Build the shared layers and connect it to ORPAC.
     print('\n----- Network Setup -----')
-    x_in = tf.placeholder(tf.float32, [1, *im_dim], name='x_in')
-    net = orpac_net.Orpac(sess, x_in, conf.layers, num_classes, bw_init, False)
+    net = orpac_net.Orpac(sess, im_dim_hw, conf.layers, num_classes, bw_init, False)
     sess.run(tf.global_variables_initializer())
     print('Output feature map size: ', net.featureShape())
 

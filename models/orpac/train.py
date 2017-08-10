@@ -238,14 +238,13 @@ def main():
     ds.printSummary()
     int2name = ds.int2name()
     num_classes = len(int2name)
-    im_dim = ds.imageDimensions().tolist()
+    im_dim_hw = ds.imageHeightWidth()
 
     # Input/output/parameter tensors for network.
     print('\n----- Network Setup -----')
 
     # Create input tensor and trainable ORPAC net.
-    x_in = tf.placeholder(tf.float32, [1, *im_dim], name='x_in')
-    net = orpac_net.Orpac(sess, x_in, conf.layers, num_classes, bw_init, True)
+    net = orpac_net.Orpac(sess, im_dim_hw, conf.layers, num_classes, bw_init, True)
 
     # Select cost function and optimiser, then initialise the TF graph.
     sess.run(tf.global_variables_initializer())
