@@ -501,9 +501,9 @@ class TestOrpac:
     def test_train(self):
         """Ensure the 'train' method succeeds.
 
-        This test does not assess the numerical output of the training but
-        merely that the method works when passed parameters of the correct
-        shape and type.
+        This test does not assess the numerical output but merely ensures the
+        method works when the provided parameters have the correct shape and
+        type.
         """
         chan = 3
         num_layers = 7

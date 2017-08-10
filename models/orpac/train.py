@@ -106,12 +106,12 @@ def compileErrorStats(true_y, pred_y, mask_bbox, mask_bgfg, mask_cls):
     )
 
 
-def trainEpoch(ds, sess, log, opt, lrate):
+def trainEpoch(ds, net, log, lrate):
     """Train network for one full epoch of data in `ds`.
 
     Input:
         ds: DataStore instance
-        sess: Tensorflow sessions
+        net: Orpac network
         log: dict
             This will be populated with various statistics, eg cost, prediction
             errors, etc.
@@ -120,15 +120,6 @@ def trainEpoch(ds, sess, log, opt, lrate):
             Learning rate for this epoch.
     """
     dset = 'train'
-    g = tf.get_default_graph().get_tensor_by_name
-
-    # Cost nodes.
-    cost_nodes = {
-        'cls': g(f'orpac-cost/cls:0'),
-        'bbox': g(f'orpac-cost/bbox:0'),
-        'isFg': g(f'orpac-cost/isFg:0'),
-        'total': g(f'orpac-cost/total:0'),
-    }
 
     # Train on one image at a time.
     ds.reset(dset)
@@ -151,24 +142,17 @@ def trainEpoch(ds, sess, log, opt, lrate):
             10
         )
 
-        # Feed dictionary.
-        fd = {
-            g(f'x_in:0'): x,
-            g(f'lrate:0'): lrate,
-            g(f'orpac-cost/y_true:0'): y,
-            g(f'orpac-cost/mask_cls:0'): mask_cls,
-            g(f'orpac-cost/mask_bbox:0'): mask_bbox,
-            g(f'orpac-cost/mask_isFg:0'): mask_isFg,
-        }
-
         # Run one optimisation step and log cost and statistics.
-        all_costs, _ = sess.run([cost_nodes, opt], feed_dict=fd)
-        logTrainingStats(sess, log, x, y, meta, batch, all_costs)
+        costs = net.train(meta.img, y, lrate, mask_cls, mask_bbox, mask_isFg)
+        logTrainingStats(net, log, x, y, meta, batch, costs)
 
 
-def logTrainingStats(sess, log, x, y, meta, batch, all_costs):
+def logTrainingStats(net, log, x, y, meta, batch, all_costs):
     g = tf.get_default_graph().get_tensor_by_name
     log['cost'].append(all_costs['total'])
+
+    # fixme: remove once 'predict' method exists.
+    sess = net.session()
 
     # Predict the ORPAC outputs for the current image and compute the error
     # statistics. All statistics will be added to the log dictionary.
@@ -270,20 +254,16 @@ def main():
     assert conf.dtype in ['float32', 'float16']
     tf_dtype = tf.float32 if conf.dtype == 'float32' else tf.float16
 
-    # Create input variable and ORPAC net.
-    lrate_in = tf.placeholder(tf.float32, name='lrate')
+    # Create input tensor and trainable ORPAC net.
     x_in = tf.placeholder(tf_dtype, [1, *im_dim], name='x_in')
-    net = orpac_net.Orpac(sess, x_in, conf.layers, num_classes, bw_init)
+    net = orpac_net.Orpac(sess, x_in, conf.layers, num_classes, bw_init, True)
 
     # Select cost function and optimiser, then initialise the TF graph.
-    cost = orpac_net.cost(net.output())
-    opt = tf.train.AdamOptimizer(learning_rate=lrate_in).minimize(cost)
     sess.run(tf.global_variables_initializer())
-    del cost
 
     # Ensure the feature size of the network matches the feature size.
     assert net.output().shape.as_list()[2:] == list(ds.getFeatureSize())
-    assert net.featureShape() == ds.getFeatureSize()
+    assert net.featureHeightWidth() == ds.getFeatureSize()
     print('Output feature map size: ', net.featureShape())
 
     # Restore the network from Tensorflow's checkpoint file.
@@ -305,7 +285,7 @@ def main():
             print(f'\nEpoch {tot_epoch} ({epoch+1}/{param.N} in this training cycle)')
 
             ds.reset()
-            trainEpoch(ds, sess, log, opt, lrates[epoch])
+            trainEpoch(ds, net, log, lrates[epoch])
 
             # Save the network state and log data.
             pickle.dump(net.serialise(), open(fnames['orpac-net'], 'wb'))
