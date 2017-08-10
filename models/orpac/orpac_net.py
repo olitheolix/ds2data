@@ -192,6 +192,10 @@ class Orpac:
             s_in = tf.placeholder(tf.float32, [None], name='scores')
             tf.image.non_max_suppression(r_in, s_in, 30, 0.2, name='op')
 
+    def session(self):
+        """Return Tensorflow session"""
+        return self.sess
+
     def serialise(self):
         out = {'weight': {}, 'bias': {}, 'num-layers': self.numLayers()}
         for i in range(self.num_layers):

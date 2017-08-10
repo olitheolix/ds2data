@@ -362,6 +362,7 @@ class TestNetworkSetup:
         x_in = tf.placeholder(tf_dtype, [1, 5, 512, 512])
         net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None)
         self.sess.run(tf.global_variables_initializer())
+        assert net.session() is self.sess
 
         # The feature size must be 1/8 of the image size because the network
         # downsamples every second layer, and we specified 7 layers.
