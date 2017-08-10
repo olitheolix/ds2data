@@ -34,15 +34,12 @@ def parseCmdline():
     return param
 
 
-def plotMasksAndFeatures(img_hwc, y, meta, int2name, ft_dim):
-    assert y.ndim == 4 and y.shape[0] == 1
-    y = y[0]
-
+def plotMasksAndFeatures(meta, int2name, ft_dim):
+    y = meta.y[0]
     num_classes = len(int2name)
-    assert img_hwc.ndim == 3 and img_hwc.shape[2] == 3
 
     # Convert to HWC format for Matplotlib.
-    img = np.array(img_hwc).astype(np.float32)
+    img = np.array(meta.img).astype(np.float32)
     im_dim = img.shape[:2]
 
     # Matplotlib options for pretty visuals.
@@ -146,10 +143,9 @@ def main(data_path=None):
     print(f'Loaded dataset in {etime:,.1f}s')
     ds.printSummary()
 
-    _, y, uuid = ds.next()
-    img = ds.getMeta(uuid).img
+    meta, uuid = ds.next()
 
-    plotMasksAndFeatures(img, y, ds.getMeta(uuid), ds.int2name(), conf.ft_dim)
+    plotMasksAndFeatures(meta, ds.int2name(), conf.ft_dim)
     plt.show()
 
 

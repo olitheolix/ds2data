@@ -159,23 +159,19 @@ def predictImagesInEpoch(net, ds, dst_path):
     del N
 
     for i in progbar:
-        x, true_y, uuid = ds.next()
-        assert x is not None
-        del x
+        meta, uuid = ds.next()
+        assert meta is not None
 
         # Extract the original file name.
-        meta = ds.getMeta(uuid)
         fname = os.path.join(dst_path, os.path.split(meta.filename)[-1])
-        img = meta.img
-        del meta
 
         # Predict the BBoxes with NMS. There must be no NaNs in the output.
-        pred_nms = predictBBoxes(net, img, true_y, int2name, True)
+        pred_nms = predictBBoxes(net, meta.img, meta.y, int2name, True)
         pred_y, pred_rect, pred_cls, true_cls = pred_nms
         assert not np.any(np.isnan(pred_y))
 
         # Draw the BBoxes over the image and save it.
-        fig0 = plotBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
+        fig0 = plotBBoxes(meta.img, pred_rect, pred_cls, true_cls, int2name)
         fig0.set_size_inches(20, 11)
         fig0.savefig(f'{fname}-pred-nms.jpg', **fig_opts)
         fig0.canvas.set_window_title(fname)
@@ -184,17 +180,17 @@ def predictImagesInEpoch(net, ds, dst_path):
         # predicted BBoxes (ie without NMS), as well as a label map.
         if i == 0:
             # Plot and save the label map.
-            fig1 = plotLabelMap(img, pred_y[0], true_y[0], int2name)
+            fig1 = plotLabelMap(meta.img, pred_y[0], meta.y[0], int2name)
             fig1.canvas.set_window_title(fname)
             fig1.set_size_inches(20, 11)
             fig1.savefig(f'{fname}-lmap.jpg', **fig_opts)
 
             # Predict the BBoxes without NMS.
-            pred_all = predictBBoxes(net, img, true_y, int2name, False)
+            pred_all = predictBBoxes(net, meta.img, meta.y, int2name, False)
             _, pred_rect, pred_cls, true_cls = pred_all
 
             # Draw the BBoxes over the image and save it.
-            fig2 = plotBBoxes(img, pred_rect, pred_cls, true_cls, int2name)
+            fig2 = plotBBoxes(meta.img, pred_rect, pred_cls, true_cls, int2name)
             fig2.set_size_inches(20, 11)
             fig2.savefig(f'{fname}-pred-all.jpg', **fig_opts)
             fig2.canvas.set_window_title(fname)

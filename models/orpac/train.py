@@ -124,10 +124,8 @@ def trainEpoch(ds, net, log, lrate):
     for batch in range(ds.lenOfEpoch()):
         # Get the next image or reset the data store if we have reached the
         # end of an epoch.
-        x, y, uuid = ds.next()
-        assert x is not None
-        assert x.ndim == 4 and isinstance(y, np.ndarray)
-        meta = ds.getMeta(uuid)
+        meta, uuid = ds.next()
+        assert meta is not None
 
         # Randomly sample the masks to create a good mix of activate
         # regions for FG/BG, BBox and Class estimation.
@@ -141,15 +139,14 @@ def trainEpoch(ds, net, log, lrate):
         )
 
         # Run one optimisation step and log cost and statistics.
-        costs = net.train(meta.img, y, lrate, mask_cls, mask_bbox, mask_isFg)
-        logTrainingStats(net, log, meta.img, y, meta, batch, costs)
+        costs = net.train(meta.img, meta.y, lrate, mask_cls, mask_bbox, mask_isFg)
+        logTrainingStats(net, log, meta, batch, costs)
 
 
-def logTrainingStats(net, log, img, y, meta, batch, costs):
+def logTrainingStats(net, log, meta, batch, costs):
     # Run image through predictor network.
-    pred = net.predict(img)
+    pred = net.predict(meta.img)
     assert not np.any(np.isnan(pred))
-    del img
 
     # Determine how many locations to sample. We do not want to use every
     # valid location in the image but only a random subset. The size of
@@ -164,7 +161,7 @@ def logTrainingStats(net, log, img, y, meta, batch, costs):
         10,
     )
 
-    err = compileErrorStats(y[0], pred[0], mask_bbox, mask_isFg, mask_cls)
+    err = compileErrorStats(meta.y[0], pred[0], mask_bbox, mask_isFg, mask_cls)
 
     # Log training stats for eg the validation script.
     if 'orpac' not in log:
