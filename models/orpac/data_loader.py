@@ -135,7 +135,8 @@ class ORPAC:
         self.compileMissingFeatures(fnames, ft_dim)
 
         # Load the compiled training data alongside each image.
-        return self.loadTrainingData(fnames, width, height, ft_dim)
+        int2name, metas = self.loadTrainingData(fnames, width, height, ft_dim)
+        return (height, width), int2name, metas
 
     def next(self):
         """Return next training image and labels.
@@ -225,7 +226,7 @@ class ORPAC:
             all_meta.append(meta._replace(filename=fname))
 
         # Return image, network output, label mapping, and meta data.
-        return im_shape, int2name, all_meta
+        return int2name, all_meta
 
     def compileTrainingOutput(self, training_data, img, num_classes):
         assert img.dtype == np.uint8 and img.ndim == 3 and img.shape[2] == 3
