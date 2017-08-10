@@ -333,8 +333,7 @@ class TestCost:
             assert np.abs(np_cost - tf_cost) < 1E-3
 
 
-class TestNetworkSetup:
-    """Create, save and restore network."""
+class TestNetworkOptimisationSetup:
     @classmethod
     def setup_class(cls):
         pass
@@ -408,6 +407,26 @@ class TestNetworkSetup:
         assert net.trainable() is True
         assert set(net.costNodes().keys()) == {'cls', 'bbox', 'isFg', 'total'}
 
+
+class TestNetworkSetup:
+    @classmethod
+    def setup_class(cls):
+        pass
+
+    @classmethod
+    def teardown_class(cls):
+        pass
+
+    def setup_method(self, method):
+        # Create Tensorflow session.
+        self.sess = tf.Session()
+
+    def teardown_method(self, method):
+        # Shutdown Tensorflow session and reset graph.
+        tf.reset_default_graph()
+        self.sess.close()
+        tf.reset_default_graph()
+
     def test_basic_attributes(self):
         """Setup network and check basic parameters like TF variable names,
         number of layers, size of last feature map...
@@ -463,6 +482,45 @@ class TestNetworkSetup:
         # feature map size.
         ft_dim = net.featureShape()
         assert net.output().shape == (1, num_out, *ft_dim)
+
+    def test_non_max_suppresion_setup(self):
+        """Ensure the network creates the NMS nodes."""
+        g = tf.get_default_graph().get_tensor_by_name
+
+        # NMS nodes must not yet exist.
+        try:
+            assert g('non-max-suppression/op:0') is not None
+        except KeyError:
+            pass
+
+        # Create a network (parameters do not matter).
+        x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
+        orpac_net.Orpac(self.sess, x_in, 7, 10, None, False)
+
+        # All NMS nodes must now exist.
+        assert g('non-max-suppression/op:0') is not None
+        assert g('non-max-suppression/scores:0') is not None
+        assert g('non-max-suppression/bb_rects:0') is not None
+
+
+class TestSerialiseRestore:
+    @classmethod
+    def setup_class(cls):
+        pass
+
+    @classmethod
+    def teardown_class(cls):
+        pass
+
+    def setup_method(self, method):
+        # Create Tensorflow session.
+        self.sess = tf.Session()
+
+    def teardown_method(self, method):
+        # Shutdown Tensorflow session and reset graph.
+        tf.reset_default_graph()
+        self.sess.close()
+        tf.reset_default_graph()
 
     def test_serialise(self):
         """ Create a network and serialise its biases and weights."""
@@ -524,22 +582,3 @@ class TestNetworkSetup:
         for i in range(net.numLayers()):
             assert np.array_equal(net.getBias(i), bw_init['bias'][i])
             assert np.array_equal(net.getWeight(i), bw_init['weight'][i])
-
-    def test_non_max_suppresion_setup(self):
-        """Ensure the network creates the NMS nodes."""
-        g = tf.get_default_graph().get_tensor_by_name
-
-        # NMS nodes must not yet exist.
-        try:
-            assert g('non-max-suppression/op:0') is not None
-        except KeyError:
-            pass
-
-        # Create a network (parameters do not matter).
-        x_in = tf.placeholder(tf.float32, [1, 5, 512, 512])
-        orpac_net.Orpac(self.sess, x_in, 7, 10, None, False)
-
-        # All NMS nodes must now exist.
-        assert g('non-max-suppression/op:0') is not None
-        assert g('non-max-suppression/scores:0') is not None
-        assert g('non-max-suppression/bb_rects:0') is not None
