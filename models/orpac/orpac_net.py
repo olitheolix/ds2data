@@ -137,6 +137,7 @@ class Orpac:
             dtype = np.float32
         else:
             assert False
+        self._xin = x_in
 
         # Decide if we want to create cost nodes or not.
         assert isinstance(train, bool)
@@ -183,7 +184,29 @@ class Orpac:
 
     def train(self, img, y, lrate, mask_cls, mask_bbox, mask_isFg):
         assert self._trainable
-        raise NotImplementedError
+
+        # Sanity checks
+        assert lrate > 0
+        assert img.ndim == 3 and img.shape[2] == 3
+        assert mask_cls.shape == mask_bbox.shape == mask_isFg.shape
+        assert y.shape == self.featureShape()
+        assert y.shape[2:] == mask_cls.shape
+
+        # Feed dictionary.
+        g = tf.get_default_graph().get_tensor_by_name
+        fd = {
+            self._xin: np.expand_dims(np.transpose(img, [2, 0, 1]), 0),
+            g(f'lrate:0'): lrate,
+            g(f'orpac-cost/y_true:0'): y,
+            g(f'orpac-cost/mask_cls:0'): mask_cls,
+            g(f'orpac-cost/mask_bbox:0'): mask_bbox,
+            g(f'orpac-cost/mask_isFg:0'): mask_isFg,
+        }
+
+        # Run one optimisation step and return the costs.
+        nodes = [self._cost_nodes, self._optimiser]
+        costs, _ = self.sess.run(nodes, feed_dict=fd)
+        return costs
 
     def _setupNetwork(self, x_in, bw_init, dtype):
         # Convenience: shared arguments for bias, conv2d, and max-pool.

@@ -385,12 +385,8 @@ class TestNetworkOptimisationSetup:
         net = orpac_net.Orpac(sess, x_in, num_layers, num_classes, None, train=True)
         assert m_cost.called
 
-        # Further sanity checks.
+        # Network must consider itself trainable.
         assert net.trainable() is True
-
-        # Training must be possible.
-        with pytest.raises(NotImplementedError):
-            net.train(None, None, None, None, None, None)
 
     def test_addOptimiser(self):
         """Create an trainable network and ensure the cost nodes exist.
@@ -408,7 +404,7 @@ class TestNetworkOptimisationSetup:
         assert set(net.costNodes().keys()) == {'cls', 'bbox', 'isFg', 'total'}
 
 
-class TestNetworkSetup:
+class TestOrpac:
     @classmethod
     def setup_class(cls):
         pass
@@ -501,6 +497,44 @@ class TestNetworkSetup:
         assert g('non-max-suppression/op:0') is not None
         assert g('non-max-suppression/scores:0') is not None
         assert g('non-max-suppression/bb_rects:0') is not None
+
+    def test_train(self):
+        """Ensure the 'train' method succeeds.
+
+        This test does not assess the numerical output of the training but
+        merely that the method works when passed parameters of the correct
+        shape and type.
+        """
+        chan = 3
+        num_layers = 7
+        num_classes = 10
+
+        # Image dimensions and network input tensor shape.
+        im_dim = (64, 64)
+        x_dim = (1, chan, *im_dim)
+
+        # Create trainable network with random weights.
+        x_in = tf.placeholder(tf.float32, x_dim)
+        net = orpac_net.Orpac(self.sess, x_in, num_layers, num_classes, None, True)
+        self.sess.run(tf.global_variables_initializer())
+        assert net.trainable() is True
+
+        # Create dummy learning rate, image and training output.
+        lrate = 1E-5
+        y_dim = net.featureShape()
+        y = np.random.uniform(0, 256, y_dim).astype(np.uint8)
+        img = np.random.randint(0, 256, (*im_dim, chan)).astype(np.uint8)
+
+        # Create dummy masks.
+        ft_hw = net.featureHeightWidth()
+        mask_cls = np.random.randint(0, 2, ft_hw).astype(np.float32)
+        mask_bbox = np.random.randint(0, 2, ft_hw).astype(np.float32)
+        mask_isFg = np.random.randint(0, 2, ft_hw).astype(np.float32)
+
+        # 'Train' method must complete without error and return the costs.
+        costs = net.train(img, y, lrate, mask_cls, mask_bbox, mask_isFg)
+        assert isinstance(costs, dict)
+        assert set(costs.keys()) == {'cls', 'bbox', 'isFg', 'total'}
 
 
 class TestSerialiseRestore:
