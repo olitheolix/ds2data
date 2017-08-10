@@ -70,24 +70,6 @@ def oneHotEncoder(labels, num_classes):
     return out.reshape((num_classes, *dim))
 
 
-def getNumClassesFromY(y_dim):
-    """ Return the number of possible class that a `y_dim` tensor can hold.
-
-    This is a convenience function only to remove code duplication and hard
-    coded magic number throughout the code base.
-
-    Raise AssertionError if `y_dim` does not satisfy (>6, *, *).
-
-    Inputs:
-        y_dim: 3 Integers
-
-    Returns:
-        int: number of classes that can be one-hot encoded.
-    """
-    assert len(y_dim) == 3 and y_dim[0] > 4 + 2
-    return y_dim[0] - 6
-
-
 def sampleMasks(m_valid, m_isFg, m_bbox, m_cls, m_id, N):
     """Return binary valued masks with valid locations for each type.
 
