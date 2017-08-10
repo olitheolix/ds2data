@@ -436,6 +436,7 @@ class TestOrpac:
         # downsamples every second layer, and we specified 7 layers.
         assert num_layers == net.numLayers() == 7
         assert net.featureHeightWidth() == (64, 64)
+        assert net.imageHeightWidth() == im_dim_hw
 
         # Ensure we can query all biases and weights. Also verify the data type
         # inside the network.

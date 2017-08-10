@@ -308,5 +308,8 @@ class Orpac:
     def featureHeightWidth(self):
         return tuple(self.feature_shape[2:])
 
+    def imageHeightWidth(self):
+        return tuple(self._xin.shape.as_list()[2:])
+
     def output(self):
         return self.out
