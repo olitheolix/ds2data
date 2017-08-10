@@ -11,7 +11,7 @@ import numpy as np
 import tensorflow as tf
 
 from config import ErrorMetrics
-from feature_utils import sampleMasks, getNumClassesFromY
+from feature_utils import sampleMasks
 from feature_utils import getIsFg, getBBoxRects, getClassLabel
 
 
@@ -25,7 +25,7 @@ def parseCmdline():
     return parser.parse_args()
 
 
-def compileErrorStats(true_y, pred_y, mask_bbox, mask_bgfg, mask_cls):
+def compileErrorStats(net, true_y, pred_y, mask_bbox, mask_bgfg, mask_cls):
     """Return accuracy metrics in a named tuple.
 
     NOTE: the accuracy is always with respect to `mask_cls` and `mask_bbox`.
@@ -33,6 +33,7 @@ def compileErrorStats(true_y, pred_y, mask_bbox, mask_bgfg, mask_cls):
     statistics.
 
     Input:
+        net: Orpac network instance.
         true_y: Array [:, height, width]
             Ground truth values.
         pred_y: Array [:, height, width]
@@ -55,13 +56,12 @@ def compileErrorStats(true_y, pred_y, mask_bbox, mask_bgfg, mask_cls):
     assert pred_y.shape == true_y.shape
     assert pred_y.shape[1:] == mask_cls.shape
 
-    num_classes = getNumClassesFromY(pred_y.shape)
+    num_classes = net.numClasses()
 
     # Flattened vectors will be more convenient to work with.
     mask_bgfg_idx = np.nonzero(mask_bgfg.flatten())
     mask_bbox_idx = np.nonzero(mask_bbox.flatten())
     mask_cls_idx = np.nonzero(mask_cls.flatten())
-    num_cls = np.count_nonzero(mask_cls)
     del mask_bbox, mask_bgfg, mask_cls
 
     # Unpack and flatten the True/Predicted tensor components.
@@ -101,7 +101,7 @@ def compileErrorStats(true_y, pred_y, mask_bbox, mask_bgfg, mask_cls):
 
     return ErrorMetrics(
         bbox=bbox_err, BgFg=wrong_BgFg, label=wrong_cls,
-        num_labels=num_cls, num_Bg=num_bg, num_Fg=num_fg,
+        num_labels=num_classes, num_Bg=num_bg, num_Fg=num_fg,
         falsepos_bg=falsepos_bg, falsepos_fg=falsepos_fg
     )
 
@@ -161,7 +161,7 @@ def logTrainingStats(net, log, meta, batch, costs):
         10,
     )
 
-    err = compileErrorStats(meta.y[0], pred[0], mask_bbox, mask_isFg, mask_cls)
+    err = compileErrorStats(net, meta.y[0], pred[0], mask_bbox, mask_isFg, mask_cls)
 
     # Log training stats for eg the validation script.
     if 'orpac' not in log:
