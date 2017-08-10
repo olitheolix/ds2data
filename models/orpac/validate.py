@@ -2,6 +2,7 @@ import os
 import tqdm
 import train
 import pickle
+import textwrap
 import argparse
 import orpac_net
 import data_loader
@@ -17,13 +18,28 @@ from feature_utils import getIsFg, getBBoxRects, getClassLabel, unpackBBoxes
 def parseCmdline():
     """Parse the command line arguments."""
     # Create a parser and program description.
-    parser = argparse.ArgumentParser(description='Validate Images')
+    description = textwrap.dedent(f'''\
+        Validate one or more images.
+
+        Examples:
+          python validate.py data/3dflight/0000.jpg
+          python validate.py data/3dflight 10
+          python validate.py data/3dflight --dst /tmp/foo
+          python validate.py data/3dflight 20 --dst /tmp/foo
+    ''')
+
+    # Create a parser and program description.
+    parser = argparse.ArgumentParser(
+        description=description,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
     padd = parser.add_argument
     padd('src', metavar='src', type=str, help='Folder with labelled images')
     padd('N', metavar='N', type=int, default=None, nargs='?',
          help='Only validate the first N images')
     padd('--dst', metavar='', type=str, default='/tmp',
-         help='Folder for predicted images (default /tmp)')
+         help='Output folder with predicted images (default /tmp)')
 
     return parser.parse_args()
 
