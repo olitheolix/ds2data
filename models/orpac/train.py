@@ -3,8 +3,9 @@ import time
 import pickle
 import config
 import datetime
-import orpac_net
 import argparse
+import textwrap
+import orpac_net
 import data_loader
 import collections
 import numpy as np
@@ -17,10 +18,27 @@ from feature_utils import sampleMasks
 def parseCmdline():
     """Parse the command line arguments."""
     # Create a parser and program description.
-    parser = argparse.ArgumentParser(description='Train the network for N epochs')
-    parser.add_argument(
-        'N', metavar='N', type=int, default=1000,
-        help='Train network for an additional N epochs')
+    description = textwrap.dedent(f'''\
+        Train, or resume training of network.
+
+        Examples:
+          python train.py 10            # Train for 10 epoch
+          python train.py 10 1E-4       # Start with learning rate 1E-4
+          python train.py 10 1E-4 1E-5  # Finish with learning rate 1E-5
+    ''')
+
+    # Create a parser and program description.
+    parser = argparse.ArgumentParser(
+        description=description,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+    padd = parser.add_argument
+    padd('N', metavar='N', type=int, help='Train for another N epochs')
+    padd('lr0', metavar='lr0', type=float, default=1E-4, nargs='?',
+         help='Initial learning rate (default 1E-4)')
+    padd('lr1', metavar='lr1', type=float, default=1E-4, nargs='?',
+         help='Final learning rate (default 1E-4)')
     return parser.parse_args()
 
 
@@ -265,15 +283,15 @@ def main():
     print(f'\n----- Training for another {param.N} Epochs -----')
     try:
         epoch_ofs = conf.epochs + 1
-        lrates = np.logspace(-4.2, -4.2, param.N)
+        lrates = np.logspace(np.log10(param.lr0), np.log10(param.lr1), param.N)
         t0_all = time.time()
-        for epoch in range(param.N):
+        for epoch, lrate in enumerate(lrates):
             t0_epoch = time.time()
             tot_epoch = epoch + epoch_ofs
             print(f'\nEpoch {tot_epoch} ({epoch+1}/{param.N} in this training cycle)')
 
             ds.reset()
-            trainEpoch(ds, net, log, lrates[epoch])
+            trainEpoch(ds, net, log, lrate)
 
             # Save the network state and log data.
             pickle.dump(net.serialise(), open(fnames['orpac-net'], 'wb'))
@@ -288,7 +306,7 @@ def main():
             etime_str = f'  Training time: {et_h}h {et_m}m {et_s}s'
 
             # Print basic stats about epoch.
-            print(f'{etime_str}   Learning Rate: {lrates[epoch]:.1E}')
+            print(f'{etime_str}   Learning Rate: {lrate:.1E}')
         etime = str(datetime.timedelta(seconds=int(time.time() - t0_all)))
         et_h, et_m, et_s = etime.split(':')
         print(f'\nTotal training time: {et_h}h {et_m}m {et_s}s\n')
