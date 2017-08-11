@@ -79,6 +79,11 @@ def compileErrorStats(net, true_y, pred_y, mask_bbox, mask_bgfg, mask_cls):
     mask_bgfg_idx = np.nonzero(mask_bgfg.flatten())
     mask_bbox_idx = np.nonzero(mask_bbox.flatten())
     mask_cls_idx = np.nonzero(mask_cls.flatten())
+
+    # Determine how many classes we estimate, ie the number of pixels that are
+    # active in mask_cls. This is relevant to compute accurate statistics about
+    # how many of those locations had their label correctly predicted.
+    num_cls_active = np.count_nonzero(mask_cls)
     del mask_bbox, mask_bgfg, mask_cls
 
     # Unpack and flatten the True/Predicted tensor components.
@@ -118,7 +123,7 @@ def compileErrorStats(net, true_y, pred_y, mask_bbox, mask_bgfg, mask_cls):
 
     return ErrorMetrics(
         bbox=bbox_err, BgFg=wrong_BgFg, label=wrong_cls,
-        num_labels=num_classes, num_Bg=num_bg, num_Fg=num_fg,
+        num_labels=num_cls_active, num_Bg=num_bg, num_Fg=num_fg,
         falsepos_bg=falsepos_bg, falsepos_fg=falsepos_fg
     )
 
