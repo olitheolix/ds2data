@@ -254,6 +254,12 @@ class Orpac:
         assert y.ndim == 3
         return y[6:]
 
+    @staticmethod
+    def numPools(num_layers):
+        """Return the number of pooling layres for a given `num_layers`."""
+        assert num_layers > 0
+        return (num_layers - 1) // 2
+
     def _addOptimiser(self):
         cost = createCostNodes(self.out)
         g = tf.get_default_graph().get_tensor_by_name

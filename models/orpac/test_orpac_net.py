@@ -482,6 +482,15 @@ class TestOrpac:
         # Verify the image dimensions.
         assert net.imageHeightWidth() == im_dim_hw
 
+    def test_numPools(self):
+        """Verify the number of pooling layers."""
+        fun = orpac_net.Orpac.numPools
+        assert fun(1) == 0
+        assert fun(2) == 0
+        assert fun(3) == 1
+        assert fun(4) == 1
+        assert fun(5) == 2
+
     def test_basic_attributes(self):
         """Setup network and check basic parameters like TF variable names,
         number of layers, size of last feature map...
