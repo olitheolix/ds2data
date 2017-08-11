@@ -118,7 +118,7 @@ class TestCost:
 
         # Check tensor sizes.
         assert y_true_in.dtype == y_pred_in.dtype == tf.float32
-        assert y_pred_in.shape == self.net.featureShape()
+        assert y_pred_in.shape[1:] == self.net.featureShape()
         assert y_pred_in.shape == y_true_in.shape
 
         assert mask_isFg_in.shape == ft_dim
@@ -472,14 +472,12 @@ class TestOrpac:
 
         # Must return the output tensor shape including batch dimension.
         ft_shape = net.featureShape()
-        assert isinstance(ft_shape, tuple) and len(ft_shape) == 4
+        assert isinstance(ft_shape, tuple) and len(ft_shape) == 3
 
-        # The first dimension is the batch size, the second encodes the
-        # features channels, and the last two correspond to the feature map
-        # size.
-        assert ft_shape[0] == 1
-        assert ft_shape[1] == net.numFeatureChannels(num_cls)
-        assert ft_shape[2:] == net.featureHeightWidth()
+        # The first dimension encodes the features channels, the remaining two
+        # the feature map size.
+        assert ft_shape[0] == net.numFeatureChannels(num_cls)
+        assert ft_shape[1:] == net.featureHeightWidth()
 
         # Verify the image dimensions.
         assert net.imageHeightWidth() == im_dim_hw
@@ -531,8 +529,8 @@ class TestOrpac:
         net.getWeight(num_layers - 1).shape == (33, 33, 64, num_ft_chan)
 
         # The output layer must have the correct number of features and
-        # feature map size.
-        assert net.output().shape == net.featureShape()
+        # feature map size. This excludes the batch dimension.
+        assert net.output().shape[1:] == net.featureShape()
 
     def test_non_max_suppresion_setup(self):
         """Ensure the network creates the NMS nodes."""
@@ -764,10 +762,10 @@ class TestFeatureDecomposition:
 
     def test_getSetBBox(self):
         """Assign and retrieve BBox data."""
-        ft_hw = self.net.featureShape()[2:]
+        ft_hw = self.net.featureHeightWidth()
 
         # Allocate empty feature tensor and random BBox tensor.
-        y = np.zeros(self.net.featureShape()[1:])
+        y = np.zeros(self.net.featureShape())
         bbox = np.random.random((4, *ft_hw))
 
         # Assign BBox data. Ensure the original array was not modified.
@@ -780,10 +778,10 @@ class TestFeatureDecomposition:
 
     def test_getSetIsFg(self):
         """Assign and retrieve binary is-foreground flag."""
-        ft_hw = self.net.featureShape()[2:]
+        ft_hw = self.net.featureHeightWidth()
 
         # Allocate empty feature tensor and random BBox tensor.
-        y = np.zeros(self.net.featureShape()[1:])
+        y = np.zeros(self.net.featureShape())
         isFg = np.random.random((2, *ft_hw))
 
         # Assign the BBox data and ensure the original array was not modified.
@@ -796,10 +794,10 @@ class TestFeatureDecomposition:
 
     def test_getSetClassLabel(self):
         """Assign and retrieve foreground class labels."""
-        ft_hw = self.net.featureShape()[2:]
+        ft_hw = self.net.featureHeightWidth()
 
         # Allocate empty feature tensor and random BBox tensor.
-        y = np.zeros(self.net.featureShape()[1:])
+        y = np.zeros(self.net.featureShape())
         class_labels = np.random.random((self.net.numClasses(), *ft_hw))
 
         # Assign the BBox data and ensure the original array was not modified.
@@ -814,12 +812,12 @@ class TestFeatureDecomposition:
         """Assign invalid class labels. A label tensor is valid iff its entries
         are non-negative integers, and its dimension matches `num_classes`.
         """
-        ft_hw = self.net.featureShape()[2:]
+        ft_hw = self.net.featureHeightWidth()
         num_cls = self.net.numClasses()
-        num_ft_chan = self.net.featureShape()[1]
+        num_ft_chan = self.net.numFeatureChannels(num_cls)
 
         # Allocate empty feature tensor and random BBox tensor.
-        y = np.zeros(self.net.featureShape()[1:])
+        y = np.zeros(self.net.featureShape())
 
         # Wrong shape: too few classes.
         with pytest.raises(AssertionError):

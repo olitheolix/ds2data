@@ -149,7 +149,7 @@ class Orpac:
             self.out = self._setupNetwork(self._xin, bw_init, np.float32)
 
         # Store the output node and feature map size.
-        self.feature_shape = tuple(self.out.shape.as_list())
+        self.feature_shape = tuple(self.out.shape.as_list())[1:]
 
         # Define the cost nodes and compile them into a dictionary if this
         # network is trainable, otherwise do nothing.
@@ -177,10 +177,14 @@ class Orpac:
         return self.num_classes
 
     def featureShape(self):
+        """Return the shape of the feature exclusive the batch dimension.
+
+        For example, the output may be (18, 64, 64).
+        """
         return self.feature_shape
 
     def featureHeightWidth(self):
-        return tuple(self.feature_shape[2:])
+        return tuple(self.feature_shape[1:])
 
     def imageHeightWidth(self):
         return tuple(self._xin.shape.as_list()[2:])
@@ -200,6 +204,14 @@ class Orpac:
 
         This value specifes the number of channels that the final network layer
         will return.
+
+        Input:
+            num_classes: int
+                The number of output channels depends on the number of classes
+                in the data set. This variables specifes that number.
+
+        Returns:
+            int: number of channels in final network output layer.
         """
         return 4 + 2 + num_classes
 
@@ -332,14 +344,14 @@ class Orpac:
         assert lrate > 0
         assert mask_cls.shape == mask_bbox.shape == mask_isFg.shape
         assert y.shape == self.featureShape()
-        assert y.shape[2:] == mask_cls.shape
+        assert y.shape[1:] == mask_cls.shape
 
         # Feed dictionary.
         g = tf.get_default_graph().get_tensor_by_name
         fd = {
             self._xin: self._imageToInput(img),
             g(f'lrate:0'): lrate,
-            g(f'orpac-cost/y_true:0'): y,
+            g(f'orpac-cost/y_true:0'): np.expand_dims(y, 0),
             g(f'orpac-cost/mask_cls:0'): mask_cls,
             g(f'orpac-cost/mask_bbox:0'): mask_bbox,
             g(f'orpac-cost/mask_isFg:0'): mask_isFg,
@@ -353,8 +365,10 @@ class Orpac:
     def predict(self, img):
         # Run predictor network.
         g = tf.get_default_graph().get_tensor_by_name
-        return self.sess.run(
+        out = self.sess.run(
             g(f'orpac/out:0'), feed_dict={self._xin: self._imageToInput(img)})
+        assert out.ndim == 4 and out.shape[0] == 1
+        return out[0]
 
     def serialise(self):
         out = {'weight': {}, 'bias': {}, 'num-layers': self.numLayers()}
