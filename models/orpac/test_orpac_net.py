@@ -462,21 +462,24 @@ class TestOrpac:
 
         net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_cls, None, False)
 
+        # The network must report the correct number of classes.
+        assert num_cls == net.numClasses()
+
+        # The feature channels encode 4 BBox parameters, is-foreground (2
+        # parameters because the binary choice is hot-label encoded), and the
+        # number of classes. This convenience function must return that value.
+        assert net.numFeatureChannels(num_cls) == (4 + 2 + num_cls)
+
         # Must return the output tensor shape including batch dimension.
         ft_shape = net.featureShape()
         assert isinstance(ft_shape, tuple) and len(ft_shape) == 4
 
-        # Must have a single batch dimension.
+        # The first dimension is the batch size, the second encodes the
+        # features channels, and the last two correspond to the feature map
+        # size.
         assert ft_shape[0] == 1
-
-        # The size of the feature map are the last two dimensions.
+        assert ft_shape[1] == net.numFeatureChannels(num_cls)
         assert ft_shape[2:] == net.featureHeightWidth()
-
-        # The channels encode 4 BBox parameters, is-foreground (2 parameters
-        # because the binary choice is hot-label encoded), and the number of
-        # classes.
-        chan = ft_shape[1]
-        assert chan == (4 + 2 + net.numClasses())
 
         # Verify the image dimensions.
         assert net.imageHeightWidth() == im_dim_hw

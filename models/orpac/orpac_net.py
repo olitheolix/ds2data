@@ -195,6 +195,15 @@ class Orpac:
         return dict(self._cost_nodes)
 
     @staticmethod
+    def numFeatureChannels(num_classes: int):
+        """Return the number of feature channels when there are `num_classes`.
+
+        This value specifes the number of channels that the final network layer
+        will return.
+        """
+        return 4 + 2 + num_classes
+
+    @staticmethod
     def setBBoxRects(y, val):
         y = np.array(y)
         assert y.ndim == 3
