@@ -194,6 +194,45 @@ class Orpac:
     def costNodes(self):
         return dict(self._cost_nodes)
 
+    @staticmethod
+    def setBBoxRects(y, val):
+        y = np.array(y)
+        assert y.ndim == 3
+        assert np.array(val).shape == y[:4].shape
+        y[:4] = val
+        return y
+
+    @staticmethod
+    def getBBoxRects(y):
+        assert y.ndim == 3
+        return y[:4]
+
+    @staticmethod
+    def setIsFg(y, val):
+        y = np.array(y)
+        assert y.ndim == 3
+        assert np.array(val).shape == y[4:6].shape
+        y[4:6] = val
+        return y
+
+    @staticmethod
+    def getIsFg(y):
+        assert y.ndim == 3
+        return y[4:6]
+
+    @staticmethod
+    def setClassLabel(y, val):
+        y = np.array(y)
+        assert y.ndim == 3
+        assert np.array(val).shape == y[6:].shape
+        y[6:] = val
+        return y
+
+    @staticmethod
+    def getClassLabel(y):
+        assert y.ndim == 3
+        return y[6:]
+
     def _addOptimiser(self):
         cost = createCostNodes(self.out)
         g = tf.get_default_graph().get_tensor_by_name
