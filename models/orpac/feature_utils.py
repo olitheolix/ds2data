@@ -175,45 +175,6 @@ def sampleMasks(m_valid, m_isFg, m_bbox, m_cls, m_id, N):
     return out_bbox, out_bgfg, out_cls
 
 
-def setBBoxRects(y, val):
-    y = np.array(y)
-    assert y.ndim == 3
-    assert np.array(val).shape == y[:4].shape
-    y[:4] = val
-    return y
-
-
-def getBBoxRects(y):
-    assert y.ndim == 3
-    return y[:4]
-
-
-def setIsFg(y, val):
-    y = np.array(y)
-    assert y.ndim == 3
-    assert np.array(val).shape == y[4:6].shape
-    y[4:6] = val
-    return y
-
-
-def getIsFg(y):
-    assert y.ndim == 3
-    return y[4:6]
-
-
-def setClassLabel(y, val):
-    y = np.array(y)
-    assert y.ndim == 3
-    assert np.array(val).shape == y[6:].shape
-    y[6:] = val
-    return y
-
-
-def getClassLabel(y):
-    assert y.ndim == 3
-    return y[6:]
-
-
 def unpackBBoxes(im_dim, bb_rects, bb_labels):
     ft_dim = bb_labels.shape[:2]
     assert np.array(bb_labels).ndim == 2
