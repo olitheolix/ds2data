@@ -576,11 +576,8 @@ class TestOrpac:
         method works when the provided parameters have the correct shape and
         type.
         """
-        num_layers = 7
-        num_cls = 10
-
-        # Image dimensions and network input tensor shape.
         im_dim_hw = (64, 64)
+        num_cls, num_layers = 10, 7
 
         # Create trainable network with random weights.
         net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_cls, None, True)
@@ -612,11 +609,8 @@ class TestOrpac:
         type.
 
         """
-        num_layers = 7
-        num_cls = 10
-
-        # Image dimensions and network input tensor shape.
         im_dim_hw = (64, 64)
+        num_cls, num_layers = 10, 7
 
         # Create predictor-only network with random weights.
         net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_cls, None, False)
@@ -637,9 +631,8 @@ class TestOrpac:
         This test does not assess the numerical output but merely ensures the
         method works when provided with valid parameters shapes and types.
         """
-        num_layers = 7
-        num_cls = 10
         im_dim_hw = (64, 64)
+        num_cls, num_layers = 10, 7
 
         # Create predictor network (parameters do not matter).
         net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_cls, None, False)
