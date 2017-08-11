@@ -300,22 +300,18 @@ def main():
 
     # Overwrite the number of samples to load, and put all of them into the
     # 'test' set.
-    conf = conf._replace(
-        path=param.src,
-        samples=param.N,
-        train_rat=0.0,
-    )
+    conf = conf._replace(path=param.src, num_samples=param.N)
 
     # Load the BBox training data.
     print('\n----- Data Set -----')
-    ds = data_loader.ORPAC(conf.path, conf.ft_dim, conf.seed, conf.samples)
+    ds = data_loader.ORPAC(conf.path, conf.ft_dim, conf.seed, conf.num_samples)
     ds.printSummary()
     num_classes = len(ds.int2name())
     im_dim_hw = ds.imageHeightWidth()
 
     # Build the shared layers and connect it to ORPAC.
     print('\n----- Network Setup -----')
-    net = orpac_net.Orpac(sess, im_dim_hw, conf.layers, num_classes, bw_init, False)
+    net = orpac_net.Orpac(sess, im_dim_hw, conf.num_layers, num_classes, bw_init, False)
     sess.run(tf.global_variables_initializer())
     print('Output feature map size: ', net.featureShape())
 

@@ -136,14 +136,13 @@ def main(data_path=None):
 
     # Dummy Net configuration. We only fill in the values for the Loader.
     conf = config.NetConf(
-        seed=0, dtype='float32', path=data_path, train_rat=0.8,
-        layers=None, ft_dim=(64, 64),
-        filter_size=None, epochs=None, samples=None
+        seed=0, epoch=None, num_layers=None, ft_dim=(64, 64),
+        filter_size=None, path=data_path, num_samples=None
     )
 
     # Load the data set and request a sample.
     t0 = time.time()
-    ds = data_loader.ORPAC(conf.path, conf.ft_dim, conf.seed, conf.samples)
+    ds = data_loader.ORPAC(conf.path, conf.ft_dim, conf.seed, conf.num_samples)
     etime = time.time() - t0
     print(f'Loaded dataset in {etime:,.1f}s')
     ds.printSummary()

@@ -245,10 +245,9 @@ def main():
     else:
         log = collections.defaultdict(list)
         conf = config.NetConf(
-            seed=0, dtype='float32', train_rat=0.8,
-            path=os.path.join('data', '3dflight'),
-            ft_dim=(64, 64), filter_size=31, layers=7,
-            epochs=0, samples=None
+            seed=0, epoch=0, num_layers=7, ft_dim=(64, 64),
+            filter_size=31, path=os.path.join('data', '3dflight'),
+            num_samples=None
         )
         bw_init = None
         print(f'Restored from <{None}>')
@@ -256,7 +255,7 @@ def main():
 
     # Load the BBox training data.
     print('\n----- Data Set -----')
-    ds = data_loader.ORPAC(conf.path, conf.ft_dim, conf.seed, conf.samples)
+    ds = data_loader.ORPAC(conf.path, conf.ft_dim, conf.seed, conf.num_samples)
     ds.printSummary()
     int2name = ds.int2name()
     num_classes = len(int2name)
@@ -266,7 +265,7 @@ def main():
     print('\n----- Network Setup -----')
 
     # Create input tensor and trainable ORPAC net.
-    net = orpac_net.Orpac(sess, im_dim_hw, conf.layers, num_classes, bw_init, True)
+    net = orpac_net.Orpac(sess, im_dim_hw, conf.num_layers, num_classes, bw_init, True)
 
     # Select cost function and optimiser, then initialise the TF graph.
     sess.run(tf.global_variables_initializer())
@@ -287,7 +286,7 @@ def main():
 
     print(f'\n----- Training for another {param.N} Epochs -----')
     try:
-        epoch_ofs = conf.epochs + 1
+        epoch_ofs = conf.epoch + 1
         lrates = np.logspace(np.log10(param.lr0), np.log10(param.lr1), param.N)
         t0_all = time.time()
         for epoch, lrate in enumerate(lrates):
@@ -300,7 +299,7 @@ def main():
 
             # Save the network state and log data.
             pickle.dump(net.serialise(), open(fnames['orpac-net'], 'wb'))
-            conf = conf._replace(epochs=epoch + epoch_ofs)
+            conf = conf._replace(epoch=epoch + epoch_ofs)
             meta = {'conf': conf, 'int2name': int2name, 'log': log}
             pickle.dump(meta, open(fnames['meta'], 'wb'))
             saver.save(sess, fnames['checkpt'])

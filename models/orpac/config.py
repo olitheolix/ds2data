@@ -3,7 +3,7 @@ import collections
 
 NetConf = collections.namedtuple(
     'NetConf',
-    'seed dtype layers ft_dim filter_size train_rat epochs samples path'
+    'seed epoch num_layers num_samples ft_dim filter_size path'
 )
 
 ErrorMetrics = collections.namedtuple(
