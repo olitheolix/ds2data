@@ -114,12 +114,11 @@ class TestCost:
         assert cost_total.shape == tuple()
 
         # Convenience.
-        num_cls = self.net.numClasses()
         ft_dim = self.net.featureHeightWidth()
 
         # Check tensor sizes.
         assert y_true_in.dtype == y_pred_in.dtype == tf.float32
-        assert y_pred_in.shape == [1, 2 + 4 + num_cls, *ft_dim]
+        assert y_pred_in.shape == self.net.featureShape()
         assert y_pred_in.shape == y_true_in.shape
 
         assert mask_isFg_in.shape == ft_dim
@@ -521,19 +520,16 @@ class TestOrpac:
         assert net.getBias(0).shape == (64, 1, 1)
         assert net.getWeight(0).shape == (3, 3, net._xin.shape[1], 64)
 
-        # Number of output features to encode BBox, isFg, and Class.
-        num_out = 4 + 2 + num_cls
-
         # The last filter is responsible for creating the various features we
         # train the network on. Its dimension must be 33x33 to achieve a large
         # receptive field on the input image.
-        net.getBias(num_layers - 1).shape == (num_out, 1, 1)
-        net.getWeight(num_layers - 1).shape == (33, 33, 64, num_out)
+        num_ft_chan = net.featureShape()[1]
+        net.getBias(num_layers - 1).shape == (num_ft_chan, 1, 1)
+        net.getWeight(num_layers - 1).shape == (33, 33, 64, num_ft_chan)
 
         # The output layer must have the correct number of features and
         # feature map size.
-        ft_dim = net.featureHeightWidth()
-        assert net.output().shape == net.featureShape() == (1, num_out, *ft_dim)
+        assert net.output().shape == net.featureShape()
 
     def test_non_max_suppresion_setup(self):
         """Ensure the network creates the NMS nodes."""
@@ -711,10 +707,15 @@ class TestSerialiseRestore:
         dummy values for three layers, pass them to the Ctor, and verify the
         values are correct.
         """
-        num_layers = 3
-        num_cls = 10
-        num_out = 2 + 4 + num_cls
+        sess = self.sess
+        num_cls, num_layers = 10, 3
         im_dim_hw = (512, 512)
+
+        # We must manually compute the number of channels in the final network
+        # output because we cannot query without creating a network and we
+        # cannot create/restore a network without the already correctly shaped
+        # weights and bias variables.
+        num_ft_chan = 2 + 4 + num_cls
 
         # Create variables for first, middle and last layer. The first layer
         # must be adapted to the input, the middle layer is always fixed, and
@@ -724,14 +725,13 @@ class TestSerialiseRestore:
         bw_init['weight'][0] = 0 * np.ones((3, 3, 3, 64), np.float32)
         bw_init['bias'][1] = 1 * np.ones((64, 1, 1), np.float32)
         bw_init['weight'][1] = 1 * np.ones((3, 3, 64, 64), np.float32)
-        bw_init['bias'][2] = 2 * np.ones((num_out, 1, 1), np.float32)
-        bw_init['weight'][2] = 2 * np.ones((33, 33, 64, num_out), np.float32)
+        bw_init['bias'][2] = 2 * np.ones((num_ft_chan, 1, 1), np.float32)
+        bw_init['weight'][2] = 2 * np.ones((33, 33, 64, num_ft_chan), np.float32)
         bw_init['num-layers'] = 3
 
         # Create a new network and restore its weights.
-        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_cls,
-                              bw_init, False)
-        self.sess.run(tf.global_variables_initializer())
+        net = orpac_net.Orpac(sess, im_dim_hw, num_layers, num_cls, bw_init, False)
+        sess.run(tf.global_variables_initializer())
 
         # Ensure the weights are as specified.
         for i in range(net.numLayers()):
@@ -820,6 +820,7 @@ class TestFeatureDecomposition:
         """
         ft_hw = self.net.featureShape()[2:]
         num_cls = self.net.numClasses()
+        num_ft_chan = self.net.featureShape()[1]
 
         # Allocate empty feature tensor and random BBox tensor.
         y = np.zeros(self.net.featureShape()[1:])
@@ -842,9 +843,9 @@ class TestFeatureDecomposition:
         # The feature vector must have four dimensions and the first one (ie
         # batch dimension) must be One.
         false_dims = [
-            (0, 4 + 2 + num_cls, *ft_hw),
-            (2, 4 + 2 + num_cls, *ft_hw),
-            (4 + 2 + num_cls, 10),
+            (0, num_ft_chan, *ft_hw),
+            (2, num_ft_chan, *ft_hw),
+            (num_ft_chan, 10),
         ]
         class_labels = np.random.random((num_cls, *ft_hw))
         for false_dim in false_dims:
