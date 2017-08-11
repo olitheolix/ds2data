@@ -11,7 +11,12 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-from feature_utils import getIsFg, getBBoxRects, getClassLabel, unpackBBoxes
+from feature_utils import unpackBBoxes
+
+# Convenience shortcuts to static methods.
+getIsFg = orpac_net.Orpac.getIsFg
+getBBoxRects = orpac_net.Orpac.getBBoxRects
+getClassLabel = orpac_net.Orpac.getClassLabel
 
 
 def parseCmdline():

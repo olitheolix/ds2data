@@ -11,12 +11,18 @@ import sys
 import time
 import config
 import argparse
+import orpac_net
 import data_loader
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-from feature_utils import getBBoxRects, getClassLabel, unpackBBoxes, sampleMasks
+from feature_utils import unpackBBoxes, sampleMasks
+
+# Convenience shortcuts to static methods.
+getIsFg = orpac_net.Orpac.getIsFg
+getBBoxRects = orpac_net.Orpac.getBBoxRects
+getClassLabel = orpac_net.Orpac.getClassLabel
 
 
 def parseCmdline():

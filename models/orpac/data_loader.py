@@ -4,12 +4,13 @@ import copy
 import glob
 import tqdm
 import pickle
+import orpac_net
 import compile_features
 import numpy as np
 
 from PIL import Image
 from collections import namedtuple
-from feature_utils import setIsFg, setBBoxRects, setClassLabel, oneHotEncoder
+from feature_utils import oneHotEncoder
 
 
 class ORPAC:
@@ -245,9 +246,9 @@ class ORPAC:
         isFg[np.nonzero(label_ap)] = 1
 
         # Insert BBox parameter and hot-labels into the feature tensor.
-        y[0] = setBBoxRects(y[0], bbox_rects)
-        y[0] = setIsFg(y[0], oneHotEncoder(isFg, 2))
-        y[0] = setClassLabel(y[0], oneHotEncoder(label_ap, num_classes))
+        y[0] = orpac_net.Orpac.setBBoxRects(y[0], bbox_rects)
+        y[0] = orpac_net.Orpac.setIsFg(y[0], oneHotEncoder(isFg, 2))
+        y[0] = orpac_net.Orpac.setClassLabel(y[0], oneHotEncoder(label_ap, num_classes))
 
         meta = self.MetaData(
             img=img,

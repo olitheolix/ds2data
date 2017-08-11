@@ -12,7 +12,6 @@ import tensorflow as tf
 
 from config import ErrorMetrics
 from feature_utils import sampleMasks
-from feature_utils import getIsFg, getBBoxRects, getClassLabel
 
 
 def parseCmdline():
@@ -65,12 +64,12 @@ def compileErrorStats(net, true_y, pred_y, mask_bbox, mask_bgfg, mask_cls):
     del mask_bbox, mask_bgfg, mask_cls
 
     # Unpack and flatten the True/Predicted tensor components.
-    true_bbox = getBBoxRects(true_y).reshape([4, -1])
-    pred_bbox = getBBoxRects(pred_y).reshape([4, -1])
-    true_isFg = getIsFg(true_y).reshape([2, -1])
-    pred_isFg = getIsFg(pred_y).reshape([2, -1])
-    true_label = getClassLabel(true_y).reshape([num_classes, -1])
-    pred_label = getClassLabel(pred_y).reshape([num_classes, -1])
+    true_bbox = net.getBBoxRects(true_y).reshape([4, -1])
+    pred_bbox = net.getBBoxRects(pred_y).reshape([4, -1])
+    true_isFg = net.getIsFg(true_y).reshape([2, -1])
+    pred_isFg = net.getIsFg(pred_y).reshape([2, -1])
+    true_label = net.getClassLabel(true_y).reshape([num_classes, -1])
+    pred_label = net.getClassLabel(pred_y).reshape([num_classes, -1])
     del pred_y, true_y
 
     # Make decision: Background/Foreground for each valid location.
