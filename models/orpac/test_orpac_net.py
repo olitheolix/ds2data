@@ -718,7 +718,7 @@ class TestSerialiseRestore:
         # output because we cannot query without creating a network and we
         # cannot create/restore a network without the already correctly shaped
         # weights and bias variables.
-        num_ft_chan = 2 + 4 + num_cls
+        num_ft_chan = orpac_net.Orpac.numFeatureChannels(num_cls)
 
         # Create variables for first, middle and last layer. The first layer
         # must be adapted to the input, the middle layer is always fixed, and

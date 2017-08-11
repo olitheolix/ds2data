@@ -286,10 +286,10 @@ class Orpac:
         # Convolution layer to learn the BBoxes and class labels.
         # Shape: [-1, 64, 64, 64] ---> [-1, num_out, 64, 64]
         # Kernel: 33x33
-        num_out = 4 + 2 + self.num_classes
+        num_ft_chan = self.numFeatureChannels(self.num_classes)
         prev_shape = tuple(prev.shape.as_list())
-        b_dim = (num_out, 1, 1)
-        W_dim = (33, 33, prev.shape[1], num_out)
+        b_dim = (num_ft_chan, 1, 1)
+        W_dim = (33, 33, prev.shape[1], num_ft_chan)
         b, W = unpackBiasAndWeight(bw_init, b_dim, W_dim, self.num_layers - 1, dtype)
         return tf.add(tf.nn.conv2d(prev, W, [1, 1, 1, 1], **opts), b, name='out')
 

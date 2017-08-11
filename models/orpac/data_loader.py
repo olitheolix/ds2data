@@ -237,9 +237,9 @@ class ORPAC:
 
         # Allocate the array for the expected network outputs (one for each
         # feature dimension size).
-        # fixme: remove hard coded numbers
         ft_dim = label_ap.shape
-        y = np.zeros((1, 4 + 2 + num_classes, *ft_dim))
+        num_ft_chan = orpac_net.Orpac.numFeatureChannels(num_classes)
+        y = np.zeros((1, num_ft_chan, *ft_dim))
 
         # Compute binary mask that is 1 at every foreground pixel.
         isFg = np.zeros(ft_dim)
