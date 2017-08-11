@@ -456,6 +456,32 @@ class TestOrpac:
         self.sess.close()
         tf.reset_default_graph()
 
+    def test_feature_sizes(self):
+        """Ensure all the various size getters agree."""
+        im_dim_hw = (512, 512)
+        num_cls, num_layers = 10, 7
+
+        net = orpac_net.Orpac(self.sess, im_dim_hw, num_layers, num_cls, None, False)
+
+        # Must return the output tensor shape including batch dimension.
+        ft_shape = net.featureShape()
+        assert isinstance(ft_shape, tuple) and len(ft_shape) == 4
+
+        # Must have a single batch dimension.
+        assert ft_shape[0] == 1
+
+        # The size of the feature map are the last two dimensions.
+        assert ft_shape[2:] == net.featureHeightWidth()
+
+        # The channels encode 4 BBox parameters, is-foreground (2 parameters
+        # because the binary choice is hot-label encoded), and the number of
+        # classes.
+        chan = ft_shape[1]
+        assert chan == (4 + 2 + net.numClasses())
+
+        # Verify the image dimensions.
+        assert net.imageHeightWidth() == im_dim_hw
+
     def test_basic_attributes(self):
         """Setup network and check basic parameters like TF variable names,
         number of layers, size of last feature map...
@@ -471,7 +497,6 @@ class TestOrpac:
         # downsamples every second layer, and we specified 7 layers.
         assert num_layers == net.numLayers() == 7
         assert net.featureHeightWidth() == (64, 64)
-        assert net.imageHeightWidth() == im_dim_hw
 
         # Ensure we can query all biases and weights. Also verify the data type
         # inside the network.
