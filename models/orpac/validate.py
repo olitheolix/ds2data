@@ -54,14 +54,14 @@ def predictBBoxes(net, img, true_y, int2name, nms):
     Input:
         net: Orpac network
         img: HWC image [height, width, 3]
-        true_y: Tensor[1, ?, ft_height, ft_width]
+        true_y: Tensor[?, ft_height, ft_width]
             Ground truth, or *None* if unavailable.
         nms: Bool
             Use non-maximum-suppression to filter BBoxes if True, otherwise do
             not filter and use all BBoxes.
 
     Returns:
-        pred_y: Array[1, ?, ft_height, ft_width]
+        pred_y: Array[?, ft_height, ft_width]
             Raw network output. Same dimension as `true_y`.
         bb_rects_out: Int16 Array[N, 4]
             BBox parameters (x0, y0, x1, y1).
@@ -72,22 +72,22 @@ def predictBBoxes(net, img, true_y, int2name, nms):
     """
     # Predict BBoxes and labels.
     assert true_y is None or isinstance(true_y, np.ndarray)
+    assert true_y.ndim == 3
     assert img.ndim == 3 and img.shape[2] == 3
-    assert true_y.ndim == 4 and true_y.shape[0] == 1
     im_dim = img.shape[:2]
 
     # Analyse the image and unpack true class labels. If the caller did not
     # provide any then use the predicted ones instead.
     pred_y = net.predict(img)
     if true_y is None:
-        true_labels = getClassLabel(pred_y[0])
+        true_labels = getClassLabel(pred_y)
     else:
-        true_labels = getClassLabel(true_y[0])
+        true_labels = getClassLabel(true_y)
 
     # Unpack the tensors.
-    isFg = getIsFg(pred_y[0])
-    bboxes = getBBoxRects(pred_y[0])
-    pred_labels = getClassLabel(pred_y[0])
+    isFg = getIsFg(pred_y)
+    bboxes = getBBoxRects(pred_y)
+    pred_labels = getClassLabel(pred_y)
 
     # Determine all locations where the network thinks it sees background
     # and mask those locations. This is tantamount to setting the
@@ -185,7 +185,7 @@ def predictImagesInEpoch(net, ds, dst_path):
         # predicted BBoxes (ie without NMS), as well as a label map.
         if i == 0:
             # Plot and save the label map.
-            fig1 = plotLabelMap(meta.img, pred_y[0], meta.y[0], int2name)
+            fig1 = plotLabelMap(meta.img, pred_y, meta.y, int2name)
             fig1.canvas.set_window_title(fname)
             fig1.set_size_inches(20, 11)
             fig1.savefig(f'{fname}-lmap.jpg', **fig_opts)

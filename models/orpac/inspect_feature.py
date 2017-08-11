@@ -41,7 +41,6 @@ def parseCmdline():
 
 
 def plotMasksAndFeatures(meta, int2name, ft_dim):
-    y = meta.y[0]
     num_classes = len(int2name)
 
     # Convert to HWC format for Matplotlib.
@@ -59,7 +58,7 @@ def plotMasksAndFeatures(meta, int2name, ft_dim):
     num_rows, num_cols = 3, 5
 
     # Unpack the true foreground class labels and make hard decision.
-    true_labels = getClassLabel(y)
+    true_labels = getClassLabel(meta.y)
     true_labels = np.argmax(true_labels, axis=0)
 
     # New figure window and title.
@@ -90,8 +89,8 @@ def plotMasksAndFeatures(meta, int2name, ft_dim):
     ax = plt.subplot(num_rows, num_cols, 6)
     plt.imshow(img)
 
-    hard = np.argmax(getClassLabel(y), axis=0)
-    bb_rects, pick_yx = unpackBBoxes(im_dim, getBBoxRects(y), hard)
+    hard = np.argmax(getClassLabel(meta.y), axis=0)
+    bb_rects, pick_yx = unpackBBoxes(im_dim, getBBoxRects(meta.y), hard)
     label = hard[pick_yx]
     for label, (x0, y0, x1, y1) in zip(label, bb_rects):
         w = x1 - x0

@@ -239,16 +239,16 @@ class ORPAC:
         # feature dimension size).
         ft_dim = label_ap.shape
         num_ft_chan = orpac_net.Orpac.numFeatureChannels(num_classes)
-        y = np.zeros((1, num_ft_chan, *ft_dim))
+        y = np.zeros((num_ft_chan, *ft_dim))
 
         # Compute binary mask that is 1 at every foreground pixel.
         isFg = np.zeros(ft_dim)
         isFg[np.nonzero(label_ap)] = 1
 
         # Insert BBox parameter and hot-labels into the feature tensor.
-        y[0] = orpac_net.Orpac.setBBoxRects(y[0], bbox_rects)
-        y[0] = orpac_net.Orpac.setIsFg(y[0], oneHotEncoder(isFg, 2))
-        y[0] = orpac_net.Orpac.setClassLabel(y[0], oneHotEncoder(label_ap, num_classes))
+        y = orpac_net.Orpac.setBBoxRects(y, bbox_rects)
+        y = orpac_net.Orpac.setIsFg(y, oneHotEncoder(isFg, 2))
+        y = orpac_net.Orpac.setClassLabel(y, oneHotEncoder(label_ap, num_classes))
 
         meta = self.MetaData(
             img=img,

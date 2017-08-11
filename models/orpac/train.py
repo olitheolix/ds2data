@@ -160,7 +160,7 @@ def logTrainingStats(net, log, meta, batch, costs):
         10,
     )
 
-    err = compileErrorStats(net, meta.y[0], pred[0], mask_bbox, mask_isFg, mask_cls)
+    err = compileErrorStats(net, meta.y, pred, mask_bbox, mask_isFg, mask_cls)
 
     # Log training stats for eg the validation script.
     if 'orpac' not in log:
