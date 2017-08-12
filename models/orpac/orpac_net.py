@@ -1,12 +1,17 @@
-"""Region Proposal and Classification Network (ORPAC)
+"""Oli's Region Proposal and Classification Network (ORPAC)
 
-Each ORPAC comprises two conv-layer. The first one acts as another hidden layer
-and the second one predicts BBoxes and object label at each location.
+The ORPAC contains only convolution layers with ReLU activation - no dense
+layers, no dropout layers and no pooling layers.
 
-A network may have more than one ORPAC. In that case, their only difference is
-the size of the input feature map. The idea is that smaller feature map
-correspond to a larger receptive field (the filter sizes are identical in all
-ORPAC layers)
+The network expects RGB input images. These must be square and the side length
+must be a power of 2. This is a necessary requirement (for now) because the
+network will first decompose the input image with a 2D Wavelet transform and
+stack the four quadrants in the channel dimension. This typically happens three
+times and for each of the three colour channels. For example a 512x512x3 image
+will become a 192x64x64 network input. The total number of values stays the
+same but reduction of the map makes pooling layers redundant. Furthermore, the
+Wavelet transform is reversible, which means no information is lost - it is
+merely stacked along the 192 channel/feature dimensions.
 """
 import pywt
 import numpy as np
@@ -145,7 +150,6 @@ def createCostNodes(y_pred):
 
 def unpackBiasAndWeight(bw_init, b_dim, W_dim, layer, dtype):
     """
-
     Input:
         bw_init: {'weight': {1: w1, 2: w2, ..}, 'bias': {0:, b0, 4: b4, ...}}
             Initial values. If the required variable does not exist then
