@@ -348,36 +348,75 @@ class Orpac:
         return nodes, opt
 
     def _imageToInput(self, img):
-        # fixme: clean up method
-        height, width = self.imageShape().hw()
-        assert height == width
+        """Return Wavelet decomposed `img`
 
-        # Check and normalise image.
+        The returned tensor is compatible with this class' `_xin` placeholder.
+
+        The image dimensions must match those returned by `imageShape`, ie.
+        it must be square, RGB and all its dimension must be powers of 2.
+
+        Each colour channel will be decomposed self._NUM_WAVELET_DECOMPOSITIONS
+        times.
+
+        Inputs:
+            img: UInt8 Array[height, width, 3]
+
+        Output:
+            Array[1, *imageToWaveletDim(img_shape)]
+                The output dimension depends on the number of decompositions
+                and the input size. For a 512x512x3 image with 3 decompositions
+                the output would have Shape(chan=192, height=64, width=64).
+        """
+        # Sanity check.
         assert isinstance(img, np.ndarray) and img.dtype == np.uint8
-        assert img.shape == (height, width, 3)
+
+        im_dim = self.imageShape()
+        assert img.shape == im_dim.hwc()
+        assert im_dim.isSquare() and im_dim.isPow2()
+
+        # Normalise the image and put each colour channels as a separate image
+        # into a work list.
         img = img.astype(np.float32) / 255
+        src = list(img.transpose([2, 0, 1]))
 
-        # Decompose the image.
-        N = width
-        img = img.transpose([2, 0, 1])
-        src = [img[0], img[1], img[2]]
-
+        # Decompose the each channel.
         for i in range(self._NUM_WAVELET_DECOMPOSITIONS):
+            N = im_dim.width >> (i + 1)
+
+            # Apply wavelet transform to every image in the worklist and place
+            # the results in an output list.
             dst = []
-            assert N % 2 == 0
-            N = N // 2
             while len(src) > 0:
-                tmp = src.pop()
-                cA, (cH, cV, cD) = pywt.dwt2(tmp, 'db2', mode='symmetric')
-                dst.append(cA[:N, :N])
-                dst.append(cH[:N, :N])
-                dst.append(cV[:N, :N])
-                dst.append(cD[:N, :N])
+                cA, (cH, cV, cD) = pywt.dwt2(src.pop(), 'db2', mode='symmetric')
+
+                # All coefficients must be square and have identical dimensions.
+                assert cA.shape == cH.shape == cV.shape == cD.shape
+                assert cA.ndim == 2 and cA.shape[0] == cA.shape[1]
+
+                # The wavelet decomposition reduces dimension by roughly 2.
+                # However, due to transients the outputs are a bit larger than
+                # that which is why we must trim them. Here we compute the
+                # start/stop indices for the trimming.
+                excess = cA.shape[0] - N
+                assert excess >= 0
+                a = excess // 2
+                b = a + N
+                assert b <= cA.shape[0]
+
+                # Trim the coefficients.
+                dst.append(cA[a:b, a:b])
+                dst.append(cH[a:b, a:b])
+                dst.append(cV[a:b, a:b])
+                dst.append(cD[a:b, a:b])
+
+            # Copy the output into the new work list and repeat the process.
             src = dst
 
+        # Convert the Python list to Numpy and verify its shape.
         data = np.array(src, np.float32)
-        assert np.prod(data.shape) == np.prod(img.shape)
-        assert data.shape == (3 * 4 ** 3, N, N), N
+        assert data.shape == imageToWaveletDim(im_dim).chw()
+
+        # Return the decomposed image with the leading batch dimension.
         return np.expand_dims(data, 0)
 
     def _setupNetwork(self, x_in, bw_init, dtype):
