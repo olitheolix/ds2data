@@ -98,17 +98,17 @@ class ORPAC:
         """Return number of samples in entire full epoch."""
         return len(self.uuids)
 
-    def imageHeightWidth(self):
+    def imageShape(self):
         """Return image dimensions as (height, width), eg (64, 64)"""
-        return self.im_dim.hw()
+        return self.im_dim.copy()
+
+    def featureShape(self):
+        return self.ft_dim.copy()
 
     def getMeta(self, uuid: int):
         if not (0 <= uuid < len(self.meta)):
             return None
         return copy.deepcopy(self.meta[uuid])
-
-    def featureHeightWidth(self):
-        return self.ft_dim.hw()
 
     def loadRawData(self, path, ft_dim, num_samples):
         """Return feature and label vector for data set of choice.
