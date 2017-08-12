@@ -130,6 +130,9 @@ def unpackBiasAndWeight(bw_init, b_dim, W_dim, layer, dtype):
 
 
 class Orpac:
+    # Specify how many times the decompose the input image with Wavelets.
+    _NUM_WAVELET_DECOMPOSITIONS = 3
+
     def __init__(self, sess, im_dim_hw, num_layers, num_classes, bw_init, train):
         # Decide if we want to create cost nodes or not.
         assert isinstance(train, bool)
@@ -263,10 +266,10 @@ class Orpac:
 
     @classmethod
     def imageDimToInputShape(cls, height: int, width: int):
-        num_decomp = cls.numPools(0)
-        h = height // (2 ** num_decomp)
-        w = width // (2 ** num_decomp)
-        c = 3 * (4 ** num_decomp)
+        N = cls._NUM_WAVELET_DECOMPOSITIONS
+        h = height // (2 ** N)
+        w = width // (2 ** N)
+        c = 3 * (4 ** N)
         return (c, h, w)
 
     def _createInputTensor(self, im_dim):
@@ -304,7 +307,7 @@ class Orpac:
         img = img.transpose([2, 0, 1])
         src = [img[0], img[1], img[2]]
 
-        for i in range(3):
+        for i in range(self._NUM_WAVELET_DECOMPOSITIONS):
             dst = []
             assert N % 2 == 0
             N = N // 2
