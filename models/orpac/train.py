@@ -152,28 +152,28 @@ def trainEpoch(ds, net, log, lrate):
     for batch in range(ds.lenOfEpoch()):
         # Get the next image or reset the data store if we have reached the
         # end of an epoch.
-        meta, uuid = ds.next()
-        assert meta is not None
+        train, _ = ds.next()
+        assert train is not None
 
         # Randomly sample the masks to create a good mix of activate
         # regions for FG/BG, BBox and Class estimation.
         mask_bbox, mask_isFg, mask_cls = sampleMasks(
-            meta.mask_valid,
-            meta.mask_fg,
-            meta.mask_bbox,
-            meta.mask_cls,
-            meta.mask_objid_at_pix,
+            train.mask_valid,
+            train.mask_fg,
+            train.mask_bbox,
+            train.mask_cls,
+            train.mask_objid_at_pix,
             10
         )
 
         # Run one optimisation step and log cost and statistics.
-        costs = net.train(meta.img, meta.y, lrate, mask_cls, mask_bbox, mask_isFg)
-        logTrainingStats(net, log, meta, batch, costs)
+        costs = net.train(train.img, train.y, lrate, mask_cls, mask_bbox, mask_isFg)
+        logTrainingStats(net, log, train, batch, costs)
 
 
-def logTrainingStats(net, log, meta, batch, costs):
+def logTrainingStats(net, log, train, batch, costs):
     # Run image through predictor network.
-    pred = net.predict(meta.img)
+    pred = net.predict(train.img)
     assert not np.any(np.isnan(pred))
 
     # Determine how many locations to sample. We do not want to use every
@@ -181,15 +181,15 @@ def logTrainingStats(net, log, meta, batch, costs):
     # that subset, in this case, is 25% of the number of suitable BBox
     # esitmation locations or 100, whichever is larger.
     mask_bbox, mask_isFg, mask_cls = sampleMasks(
-        meta.mask_valid,
-        meta.mask_fg,
-        meta.mask_bbox,
-        meta.mask_cls,
-        meta.mask_objid_at_pix,
+        train.mask_valid,
+        train.mask_fg,
+        train.mask_bbox,
+        train.mask_cls,
+        train.mask_objid_at_pix,
         10,
     )
 
-    err = compileErrorStats(net, meta.y, pred, mask_bbox, mask_isFg, mask_cls)
+    err = compileErrorStats(net, train.y, pred, mask_bbox, mask_isFg, mask_cls)
 
     # Log training stats for eg the validation script.
     if 'orpac' not in log:
@@ -223,7 +223,7 @@ def logTrainingStats(net, log, meta, batch, costs):
     s3 = 'BBox=  None' if bb50p is None else f'BBox=({bb50p:2.0f}, {bb90p:2.0f})'
     s_err = str.join('  ', [s1, s2, s3])
 
-    fname = os.path.split(meta.filename)[-1]
+    fname = os.path.split(train.filename)[-1]
     print(f'  {batch:,} | {fname} | ' + s_cost + ' | ' + s_err)
 
 
