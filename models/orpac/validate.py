@@ -304,7 +304,7 @@ def main():
 
     # Load the BBox training data.
     print('\n----- Data Set -----')
-    ds = data_loader.ORPAC(conf.path, conf.ft_dim, conf.seed, conf.num_samples)
+    ds = data_loader.ORPAC(conf.path, conf.ft_dim, conf.num_samples, conf.seed)
     ds.printSummary()
     num_classes = len(ds.int2name())
     im_dim = ds.imageShape()

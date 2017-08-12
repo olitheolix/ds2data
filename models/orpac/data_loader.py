@@ -24,14 +24,13 @@ class ORPAC:
         path: str
             Path to image- and m files and corresponding '*-compiled.pickle'
             file produced by 'compile_features.py' script.
-        ft_dim: Tuple(Int, Int)
-            Height and width of training feature map (ie the size of the last
-            network output layer).
-        seed: int
-            Seed for NumPy random generator.
+        ft_dim: Shape
+            Height and width of output map (ie the size of the last network
+            output layer).
         num_samples: int
             Number of images to load.
-
+        seed: int
+            Seed for NumPy random generator.
     """
     # Define the MetaData container for this data set.
     MetaData = namedtuple(
@@ -39,9 +38,8 @@ class ORPAC:
         'img y filename mask_fg mask_bbox mask_cls mask_valid mask_objid_at_pix'
     )
 
-    def __init__(self, path: str, ft_dim, seed: int, num_samples: int):
-        # fixme: ft_dim must become a Shape instance.
-        ft_dim = Shape(chan=None, height=ft_dim[0], width=ft_dim[1])
+    def __init__(self, path: str, ft_dim: Shape, num_samples: int, seed: int):
+        assert isinstance(ft_dim, Shape)
 
         # Seed the random number generator.
         if seed is not None:

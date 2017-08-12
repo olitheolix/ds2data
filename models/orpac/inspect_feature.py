@@ -17,6 +17,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
+from containers import Shape
 from feature_utils import unpackBBoxes, sampleMasks
 
 # Convenience shortcuts to static methods.
@@ -63,7 +64,7 @@ def plotMasksAndFeatures(meta, int2name, ft_dim):
 
     # New figure window and title.
     fig = plt.figure()
-    fig.canvas.set_window_title(f'{ft_dim[0]}x{ft_dim[1]}: {meta.filename}')
+    fig.canvas.set_window_title(f'{ft_dim.height}x{ft_dim.width}: {meta.filename}')
 
     plt.subplot(num_rows, num_cols, 1)
     plt.imshow(img)
@@ -128,7 +129,7 @@ def plotMasksAndFeatures(meta, int2name, ft_dim):
     plt.imshow(m_fg, cmap='gray', clim=[0, 1])
     plt.title('Sampled Fg/Bg Locations')
 
-    plt.suptitle(f'Feature Map Size: {ft_dim[0]}x{ft_dim[1]}')
+    plt.suptitle(f'Feature Map Size: {ft_dim.height}x{ft_dim.width}')
 
 
 def main(data_path=None):
@@ -136,13 +137,13 @@ def main(data_path=None):
 
     # Dummy Net configuration. We only fill in the values for the Loader.
     conf = config.NetConf(
-        seed=0, epoch=None, num_layers=None, ft_dim=(64, 64),
+        seed=0, epoch=None, num_layers=None, ft_dim=Shape(None, 64, 64),
         filter_size=None, path=data_path, num_samples=None
     )
 
     # Load the data set and request a sample.
     t0 = time.time()
-    ds = data_loader.ORPAC(conf.path, conf.ft_dim, conf.seed, conf.num_samples)
+    ds = data_loader.ORPAC(conf.path, conf.ft_dim, conf.num_samples, conf.seed)
     etime = time.time() - t0
     print(f'Loaded dataset in {etime:,.1f}s')
     ds.printSummary()

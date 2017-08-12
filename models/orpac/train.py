@@ -11,6 +11,7 @@ import collections
 import numpy as np
 import tensorflow as tf
 
+from containers import Shape
 from config import ErrorMetrics
 from feature_utils import sampleMasks
 
@@ -250,7 +251,7 @@ def main():
     else:
         log = collections.defaultdict(list)
         conf = config.NetConf(
-            seed=0, epoch=0, num_layers=7, ft_dim=(64, 64),
+            seed=0, epoch=0, num_layers=7, ft_dim=Shape(None, 64, 64),
             filter_size=31, path=os.path.join('data', '3dflight'),
             num_samples=None
         )
@@ -260,7 +261,7 @@ def main():
 
     # Load the BBox training data.
     print('\n----- Data Set -----')
-    ds = data_loader.ORPAC(conf.path, conf.ft_dim, conf.seed, conf.num_samples)
+    ds = data_loader.ORPAC(conf.path, conf.ft_dim, conf.num_samples, conf.seed)
     ds.printSummary()
     int2name = ds.int2name()
     num_classes = len(int2name)
