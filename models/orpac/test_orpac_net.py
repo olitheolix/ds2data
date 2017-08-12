@@ -484,14 +484,23 @@ class TestOrpac:
         # Verify the image dimensions.
         assert net.imageHeightWidth() == im_dim_hw
 
+        # The input tensor shape differs from the image shape because it must
+        # hold the Wavelet transformed image, not the original image itself.
+        assert net._xin.shape == (1, *net.imageDimToInputShape(*im_dim_hw))
+
+        # The feature map size must derive from the size of the input image and
+        # the number of Wavelet transforms. Each WL transform halves the
+        # dimensions.
+        ft_dim = np.array(im_dim_hw) // 2 ** net.numPools(num_layers)
+        assert net.featureHeightWidth() == tuple(ft_dim)
+
+        # fixme: also check the size of _xin.
+
     def test_numPools(self):
         """Verify the number of pooling layers."""
-        fun = orpac_net.Orpac.numPools
-        assert fun(1) == 0
-        assert fun(2) == 0
-        assert fun(3) == 1
-        assert fun(4) == 1
-        assert fun(5) == 2
+        # fixme: redundant
+        for i in range(10):
+            assert orpac_net.Orpac.numPools(i) == 3
 
     def test_basic_attributes(self):
         """Setup network and check basic parameters like TF variable names,
@@ -567,20 +576,21 @@ class TestOrpac:
         assert g('non-max-suppression/bb_rects:0') is not None
 
     def test_imageToInput(self):
-        """Pass uint8 image and verify that it becomes a valid network input.
-        """
-        height, width = (64, 64)
-        img = 100 * np.ones((height, width, 3), np.uint8)
+        """Uint8 image must becomes a valid network input."""
+        num_layers = 7
+        im_dim = (512, 512)
+        img = 100 * np.ones((*im_dim, 3), np.uint8)
 
         # Create a network (parameters do not matter).
-        net = orpac_net.Orpac(self.sess, (height, width), 7, 10, None, False)
+        net = orpac_net.Orpac(self.sess, im_dim, num_layers, 10, None, False)
 
         # Image must be converted to float32 CHW image with leading
         # batch dimension of 1. All values must have been divided by 255.
-        out = net._imageToInput(img)
-        assert out.dtype == np.float32
-        assert out.shape == (1, 3, height, width)
-        assert np.array_equal(out, 100 * np.ones_like(out) / 255)
+        img_wl = net._imageToInput(img)
+        num_chan = int(net._xin.shape[1])
+        assert img_wl.dtype == np.float32
+        assert img_wl.shape == (1, num_chan, *net.featureHeightWidth())
+        assert img_wl.shape[2:] == net.featureHeightWidth()
 
     def test_train(self):
         """Ensure the 'train' method succeeds.
@@ -724,14 +734,16 @@ class TestSerialiseRestore:
         # output because we cannot query without creating a network and we
         # cannot create/restore a network without the already correctly shaped
         # weights and bias variables.
+        # fixme: would be good if that were not manual
         num_ft_chan = orpac_net.Orpac.numFeatureChannels(num_cls)
+        num_in_chan, _, _ = orpac_net.Orpac.imageDimToInputShape(*im_dim_hw)
 
         # Create variables for first, middle and last layer. The first layer
-        # must be adapted to the input, the middle layer is always fixed, and
-        # the last layer must encode the features (ie BBox, isFg, Class).
+        # must be adapted to the input, the middle layer is fixed and the last
+        # layer must encode the features (ie BBox, isFg, Class).
         bw_init = {'bias': {}, 'weight': {}}
         bw_init['bias'][0] = 0 * np.ones((64, 1, 1), np.float32)
-        bw_init['weight'][0] = 0 * np.ones((3, 3, 3, 64), np.float32)
+        bw_init['weight'][0] = 0 * np.ones((3, 3, num_in_chan, 64), np.float32)
         bw_init['bias'][1] = 1 * np.ones((64, 1, 1), np.float32)
         bw_init['weight'][1] = 1 * np.ones((3, 3, 64, 64), np.float32)
         bw_init['bias'][2] = 2 * np.ones((num_ft_chan, 1, 1), np.float32)

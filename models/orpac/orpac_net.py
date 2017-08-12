@@ -8,6 +8,7 @@ the size of the input feature map. The idea is that smaller feature map
 correspond to a larger receptive field (the filter sizes are identical in all
 ORPAC layers)
 """
+import pywt
 import numpy as np
 import tensorflow as tf
 
@@ -130,18 +131,18 @@ def unpackBiasAndWeight(bw_init, b_dim, W_dim, layer, dtype):
 
 class Orpac:
     def __init__(self, sess, im_dim_hw, num_layers, num_classes, bw_init, train):
-        # Create input tensor.
-        width, height = im_dim_hw
-        self._xin = tf.placeholder(tf.float32, [1, 3, height, width], name='x_in')
-
         # Decide if we want to create cost nodes or not.
         assert isinstance(train, bool)
-        self._trainable = train
 
         # Backup basic variables.
+        self._trainable = train
         self.sess = sess
         self.num_layers = num_layers
         self.num_classes = num_classes
+        self.img_height_width = im_dim_hw
+
+        # Create placeholder variable for Wavelet decomposed image.
+        self._xin = self._createInputTensor(im_dim_hw)
 
         # Setup the NMS nodes and Orpac network.
         self._setupNonMaxSuppression()
@@ -187,7 +188,7 @@ class Orpac:
         return tuple(self.feature_shape[1:])
 
     def imageHeightWidth(self):
-        return tuple(self._xin.shape.as_list()[2:])
+        return tuple(self.img_height_width)
 
     def output(self):
         return self.out
@@ -256,9 +257,25 @@ class Orpac:
 
     @staticmethod
     def numPools(num_layers):
-        """Return the number of pooling layres for a given `num_layers`."""
-        assert num_layers > 0
-        return (num_layers - 1) // 2
+        """Return the number of pooling layers for a given `num_layers`."""
+        # fixme: remove method in favour of a class variable
+        return 3
+
+    @classmethod
+    def imageDimToInputShape(cls, height: int, width: int):
+        num_decomp = cls.numPools(0)
+        h = height // (2 ** num_decomp)
+        w = width // (2 ** num_decomp)
+        c = 3 * (4 ** num_decomp)
+        return (c, h, w)
+
+    def _createInputTensor(self, im_dim):
+        im_dim = np.array(im_dim) / (2 ** 3)
+        width, height = im_dim.astype(np.int32).tolist()
+        # fixme: use 'imageDimToInputShape' method instead of hardcoded value
+        num_chan = 3 * (4 ** 3)
+        x_dim = (1, num_chan, height, width)
+        return tf.placeholder(tf.float32, x_dim, name='x_in')
 
     def _addOptimiser(self):
         cost = createCostNodes(self.out)
@@ -274,21 +291,44 @@ class Orpac:
         return nodes, opt
 
     def _imageToInput(self, img):
-        assert isinstance(img, np.ndarray) and img.dtype == np.uint8
         height, width = self.imageHeightWidth()
-        assert img.shape == (height, width, 3)
+        assert height == width
 
+        # Check and normalise image.
+        assert isinstance(img, np.ndarray) and img.dtype == np.uint8
+        assert img.shape == (height, width, 3)
         img = img.astype(np.float32) / 255
-        return np.expand_dims(np.transpose(img, [2, 0, 1]), 0)
+
+        # Decompose the image.
+        N = width
+        img = img.transpose([2, 0, 1])
+        src = [img[0], img[1], img[2]]
+
+        for i in range(3):
+            dst = []
+            assert N % 2 == 0
+            N = N // 2
+            while len(src) > 0:
+                tmp = src.pop()
+                cA, (cH, cV, cD) = pywt.dwt2(tmp, 'db2', mode='symmetric')
+                dst.append(cA[:N, :N])
+                dst.append(cH[:N, :N])
+                dst.append(cV[:N, :N])
+                dst.append(cD[:N, :N])
+            src = dst
+
+        data = np.array(src, np.float32)
+        assert np.prod(data.shape) == np.prod(img.shape)
+        assert data.shape == (3 * 4 ** 3, N, N), N
+        return np.expand_dims(data, 0)
 
     def _setupNetwork(self, x_in, bw_init, dtype):
-        # Convenience: shared arguments for bias, conv2d, and max-pool.
-        opts = dict(padding='SAME', data_format='NCHW')
+        # Convenience: shared arguments conv2d.
+        opts = dict(padding='SAME', data_format='NCHW', strides=[1, 1, 1, 1])
 
-        # Add conv layers. Every second layer downsamples by 2.
+        # Hidden conv layers.
         # Examples dimensions assume 128x128 RGB images.
-        # Odd i : [-1, 3, 128, 128] ---> [-1, 64, 128, 128]
-        # Even i: [-1, 3, 128, 128] ---> [-1, 64, 64, 64]
+        # Input : [-1, 3, 128, 128] ---> [-1, 64, 128, 128]
         # Kernel: 3x3  Features: 64
         prev = x_in
         for i in range(self.num_layers - 1):
@@ -297,11 +337,10 @@ class Orpac:
             W_dim = (3, 3, prev_shape[1], 64)
             b, W = unpackBiasAndWeight(bw_init, b_dim, W_dim, i, dtype)
 
-            stride = [1, 1, 1, 1] if i % 2 == 0 else [1, 1, 2, 2]
-            prev = tf.nn.relu(tf.nn.conv2d(prev, W, stride, **opts) + b)
-            del i, b, W, b_dim, W_dim, stride
+            prev = tf.nn.relu(tf.nn.conv2d(prev, W, **opts) + b)
+            del i, b, W, b_dim, W_dim
 
-        # Convolution layer to learn the BBoxes and class labels.
+        # Conv output layer to learn the BBoxes and class labels.
         # Shape: [-1, 64, 64, 64] ---> [-1, num_out, 64, 64]
         # Kernel: 33x33
         num_ft_chan = self.numFeatureChannels(self.num_classes)
@@ -309,7 +348,7 @@ class Orpac:
         b_dim = (num_ft_chan, 1, 1)
         W_dim = (33, 33, prev.shape[1], num_ft_chan)
         b, W = unpackBiasAndWeight(bw_init, b_dim, W_dim, self.num_layers - 1, dtype)
-        return tf.add(tf.nn.conv2d(prev, W, [1, 1, 1, 1], **opts), b, name='out')
+        return tf.add(tf.nn.conv2d(prev, W, **opts), b, name='out')
 
     def _setupNonMaxSuppression(self):
         """Create non-maximum-suppression nodes.
