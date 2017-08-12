@@ -123,13 +123,26 @@ class ORPAC:
         # Compile a list of JPG images in the source folder. Then verify that
         # a) each is a valid JPG file and b) all images have the same size.
         fnames = self.findTrainingFiles(path, num_samples)
-        im_dim = self.checkImageDimensions(fnames)
 
-        # If the features have not been compiled yet, do so now.
+        # Load and verify that the pickled meta for each JPG file specifies the
+        # same set of class labels.
+        int2name = self.getLabelData(fnames)
+        num_cls = len(int2name)
+
+        # Compute the height and width that input images must have to be
+        # compatible with the selected output feature size.
+        im_dim = orpac_net.waveletToImageDim(Shape(None, *ft_dim.hw()))
+
+        # Fill in channel information: Images must always be RGB and the
+        # feature output channels are available via a utility method.
+        im_dim.chan = 3
+        ft_dim.chan = orpac_net.Orpac.numOutputChannels(num_cls)
+
+        # Compile all the features that have not been compiled already.
         self.compileMissingFeatures(fnames, ft_dim)
 
         # Load the compiled training data alongside each image.
-        ft_dim, int2name, metas = self.loadTrainingData(fnames, im_dim, ft_dim)
+        metas = self.loadTrainingData(fnames, im_dim, ft_dim, num_cls)
         return im_dim, ft_dim, int2name, metas
 
     def next(self):
@@ -148,14 +161,30 @@ class ORPAC:
         except IndexError:
             return None, None, None
 
-    def checkImageDimensions(self, fnames):
-        dims = {Image.open(fname + '.jpg').size for fname in fnames}
-        if len(dims) == 1:
-            width, height = dims.pop()
-            return Shape(3, height, width)
+    def getLabelData(self, fnames):
+        """ Return set of class labels in `fnames`.
 
-        print('\nError: found different images sizes: ', dims)
-        assert False, 'Images do not all have the same size'
+        Load the pre-compiled feature data for each file and ensure they all
+        use the same set of class labels. Return that set if they all match,
+        or abort with an AssertionError if not.
+
+        Inputs:
+            fnames: List
+                List of file names.
+
+        Returns:
+            Dict[int:str]: mapping from machine readable class names to human
+            readable class names.
+        """
+        int2name = None
+        for i, fname in enumerate(fnames):
+            data = pickle.load(open(fname + '-compiled.pickle', 'rb'))
+
+            int2name = int2name or data['int2name']
+            if int2name != data['int2name']:
+                print('\nError: {fname} specifies a different set of class labels')
+                assert False, 'All class label sets must be identical'
+        return int2name
 
     def findTrainingFiles(self, path, num_samples):
         # Find all training images and strip off the '.jpg' extension. Abort if
@@ -195,9 +224,8 @@ class ORPAC:
                 out = compile_features.generate(fname, img, ft_dim)
                 pickle.dump(out, open(fname + '-compiled.pickle', 'wb'))
 
-    def loadTrainingData(self, fnames, im_dim, ft_dim):
+    def loadTrainingData(self, fnames, im_dim, ft_dim, num_cls):
         all_meta = []
-        num_cls = None
 
         # Load each image and associated features.
         for i, fname in enumerate(fnames):
@@ -208,23 +236,18 @@ class ORPAC:
 
             # All pre-compiled features must use the same label map.
             data = pickle.load(open(fname + '-compiled.pickle', 'rb'))
-            if num_cls is None:
-                int2name = data['int2name']
-                num_cls = len(int2name)
-                ft_dim.chan = orpac_net.Orpac.numOutputChannels(num_cls)
-            assert int2name == data['int2name']
 
             # Crate the training output for the selected feature map size.
-            meta = self.compileTrainingOutput(data[ft_dim.hw()], img, num_cls)
+            meta = self.compileTrainingOutput(data[ft_dim.hw()], img, ft_dim, num_cls)
             assert meta.y.shape == ft_dim.chw()
 
             # Collect the training data.
             all_meta.append(meta._replace(filename=fname))
 
         # Return image, network output, label mapping, and meta data.
-        return ft_dim, int2name, all_meta
+        return all_meta
 
-    def compileTrainingOutput(self, training_data, img, num_classes):
+    def compileTrainingOutput(self, training_data, img, ft_dim, num_classes):
         assert img.dtype == np.uint8 and img.ndim == 3 and img.shape[2] == 3
 
         # Populate the training output with the BBox data and one-hot-label.
@@ -235,10 +258,7 @@ class ORPAC:
         assert label_ap.dtype == np.int32 and label_ap.ndim == 2
         assert 0 <= np.amin(label_ap) <= np.amax(label_ap) < num_classes
 
-        # Allocate the array for the expected network outputs (one for each
-        # feature dimension size).
-        num_ft_chan = orpac_net.Orpac.numOutputChannels(num_classes)
-        ft_dim = Shape(num_ft_chan, *label_ap.shape)
+        # Allocate training network output tensor.
         y = np.zeros(ft_dim.chw())
 
         # Compute binary mask that is 1 at every foreground pixel.
