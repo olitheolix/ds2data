@@ -264,22 +264,20 @@ def main():
     ds.printSummary()
     int2name = ds.int2name()
     num_classes = len(int2name)
-    im_dim_hw = ds.imageHeightWidth()
+    im_dim = ds.imageShape()
 
     # Input/output/parameter tensors for network.
     print('\n----- Network Setup -----')
 
     # Create input tensor and trainable ORPAC net.
-    net = orpac_net.Orpac(sess, im_dim_hw, conf.num_layers, num_classes, bw_init, True)
+    net = orpac_net.Orpac(sess, im_dim, conf.num_layers, num_classes, bw_init, True)
 
     # Select cost function and optimiser, then initialise the TF graph.
     sess.run(tf.global_variables_initializer())
 
-    # Ensure the feature size of the network matches the feature size returned
-    # by the loader.
-    assert net.output().shape.as_list()[2:] == list(ds.featureHeightWidth())
-    assert net.featureHeightWidth() == ds.featureHeightWidth()
-    print('Output feature map size: ', net.featureShape())
+    # Ensure the network output shape matches the training output.
+    assert net.outputShape() == ds.featureShape()
+    print('Output feature map size: ', net.outputShape())
 
     # Restore the network from Tensorflow's checkpoint file.
     saver = tf.train.Saver()

@@ -307,13 +307,13 @@ def main():
     ds = data_loader.ORPAC(conf.path, conf.ft_dim, conf.seed, conf.num_samples)
     ds.printSummary()
     num_classes = len(ds.int2name())
-    im_dim_hw = ds.imageHeightWidth()
+    im_dim = ds.imageShape()
 
     # Build the shared layers and connect it to ORPAC.
     print('\n----- Network Setup -----')
-    net = orpac_net.Orpac(sess, im_dim_hw, conf.num_layers, num_classes, bw_init, False)
+    net = orpac_net.Orpac(sess, im_dim, conf.num_layers, num_classes, bw_init, False)
     sess.run(tf.global_variables_initializer())
-    print('Output feature map size: ', net.featureShape())
+    print('Output feature map size: ', net.outputShape())
 
     # Predict each image and produce a new image with BBoxes and labels in it.
     try:
