@@ -38,11 +38,11 @@ def parseCmdline():
     return param
 
 
-def plotMasksAndFeatures(meta, int2name, ft_dim):
+def plotMasksAndFeatures(train, int2name, ft_dim):
     num_classes = len(int2name)
 
     # Convert to HWC format for Matplotlib.
-    img = np.array(meta.img).astype(np.float32)
+    img = np.array(train.img).astype(np.float32)
     im_dim = img.shape[:2]
 
     # Matplotlib options for pretty visuals.
@@ -56,39 +56,39 @@ def plotMasksAndFeatures(meta, int2name, ft_dim):
     num_rows, num_cols = 3, 5
 
     # Unpack the true foreground class labels and make hard decision.
-    true_labels = getClassLabel(meta.y)
+    true_labels = getClassLabel(train.y)
     true_labels = np.argmax(true_labels, axis=0)
 
     # New figure window and title.
     fig = plt.figure()
-    fig.canvas.set_window_title(f'{ft_dim.height}x{ft_dim.width}: {meta.filename}')
+    fig.canvas.set_window_title(f'{ft_dim.height}x{ft_dim.width}: {train.filename}')
 
     plt.subplot(num_rows, num_cols, 1)
     plt.imshow(img)
     plt.title('Input Image')
 
     plt.subplot(num_rows, num_cols, 2)
-    plt.imshow(meta.mask_fg, cmap='gray', clim=[0, 1])
+    plt.imshow(train.mask_fg, cmap='gray', clim=[0, 1])
     plt.title('Foreground')
 
     plt.subplot(num_rows, num_cols, 3)
-    plt.imshow(meta.mask_bbox, cmap='gray', clim=[0, 1])
+    plt.imshow(train.mask_bbox, cmap='gray', clim=[0, 1])
     plt.title('BBox Estimation Possible')
 
     plt.subplot(num_rows, num_cols, 4)
-    plt.imshow(meta.mask_cls, cmap='gray', clim=[0, 1])
+    plt.imshow(train.mask_cls, cmap='gray', clim=[0, 1])
     plt.title('Label Estimation Possible')
 
     plt.subplot(num_rows, num_cols, 5)
-    plt.imshow(meta.mask_valid, cmap='gray', clim=[0, 1])
+    plt.imshow(train.mask_valid, cmap='gray', clim=[0, 1])
     plt.title('Valid')
 
     # BBoxes over original image.
     ax = plt.subplot(num_rows, num_cols, 6)
     plt.imshow(img)
 
-    hard = np.argmax(getClassLabel(meta.y), axis=0)
-    bb_rects, pick_yx = unpackBBoxes(im_dim, getBBoxRects(meta.y), hard)
+    hard = np.argmax(getClassLabel(train.y), axis=0)
+    bb_rects, pick_yx = unpackBBoxes(im_dim, getBBoxRects(train.y), hard)
     label = hard[pick_yx]
     for label, (x0, y0, x1, y1) in zip(label, bb_rects):
         w = x1 - x0
@@ -103,12 +103,12 @@ def plotMasksAndFeatures(meta, int2name, ft_dim):
 
     # Densly sample the masks.
     m_bbox, m_fg, m_cls = sampleMasks(
-        meta.mask_valid, meta.mask_fg, meta.mask_bbox,
-        meta.mask_cls, meta.mask_objid_at_pix, 10)
+        train.mask_valid, train.mask_fg, train.mask_bbox,
+        train.mask_cls, train.mask_objid_at_pix, 10)
 
     # Object ID inside rendering engine at each pixel.
     plt.subplot(num_rows, num_cols, 8)
-    plt.imshow(meta.mask_objid_at_pix)
+    plt.imshow(train.mask_objid_at_pix)
     plt.title('Object ID at Pixel')
 
     # Sampled locations to estimate BBox dimensions.
@@ -145,9 +145,9 @@ def main(data_path=None):
     print(f'Loaded dataset in {etime:,.1f}s')
     ds.printSummary()
 
-    meta, uuid = ds.next()
+    train, uuid = ds.next()
 
-    plotMasksAndFeatures(meta, ds.int2name(), conf.ft_dim)
+    plotMasksAndFeatures(train, ds.int2name(), conf.ft_dim)
     plt.show()
 
 
