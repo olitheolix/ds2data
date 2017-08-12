@@ -76,3 +76,26 @@ class TestSize:
 
     def test_print(self):
         print(containers.Shape(chan=1, height=2, width=3))
+
+    def test_isSquare(self):
+        Shape = containers.Shape
+        assert Shape(1, 2, 3).isSquare() is False
+        assert Shape(1, 3, 2).isSquare() is False
+        assert Shape(1, 3, 3).isSquare() is True
+        assert Shape(1, 0, 0).isSquare() is True
+
+    def test_isPow2(self):
+        Shape = containers.Shape
+
+        # Powers of 2.
+        assert Shape(1, 2, 2).isPow2() is True
+        assert Shape(1, 2, 4).isPow2() is True
+        assert Shape(1, 4, 8).isPow2() is True
+
+        # Special cases: dimensions of 0 and 1 do not count as power of 2.
+        assert Shape(1, 0, 0).isPow2() is False
+        assert Shape(1, 1, 1).isPow2() is False
+
+        # Not all dimensions are powers of 2.
+        assert Shape(1, 2, 3).isPow2() is False
+        assert Shape(1, 3, 2).isPow2() is False

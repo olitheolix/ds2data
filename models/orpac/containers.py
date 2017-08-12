@@ -1,3 +1,5 @@
+import math
+
 class Shape:
     """Container to store 3D Image/array/feature/tensor sizes.
 
@@ -44,6 +46,19 @@ class Shape:
 
     def copy(self):
         return Shape(self.chan, self.height, self.width)
+
+    def isSquare(self):
+        return self.width == self.height
+
+    def isPow2(self):
+        try:
+            assert self.height > 1
+            assert self.width > 1
+            assert 2 ** int(math.log2(self.height)) == self.height
+            assert 2 ** int(math.log2(self.width)) == self.width
+            return True
+        except AssertionError:
+            return False
 
     def chw(self):
         return (self.chan, self.height, self.width)
