@@ -504,28 +504,24 @@ class TestOrpac:
         # number of classes. This convenience function must return that value.
         assert net.numFeatureChannels(num_cls) == (4 + 2 + num_cls)
 
-        # Must return the output tensor shape including batch dimension.
+        # Must return the output tensor shape excluding batch dimension.
         ft_shape = net.featureShape()
         assert isinstance(ft_shape, Shape)
-
-        # The first dimension encodes the features channels, the remaining two
-        # the feature map size.
         assert ft_shape.chan == net.numFeatureChannels(num_cls)
-        assert ft_shape == net.featureShape()
 
-        # Verify the image dimensions.
+        # Verify the image shape expected by the class for eg `pred` and `train`.
         assert net.imageShape() == im_dim
 
-        # The input tensor shape differs from the image shape because it must
-        # hold the Wavelet transformed image, not the original image itself.
-        assert net._xin.shape == (1, *net.imageDimToInputShape(im_dim))
+        # The input tensor shape for the network differs from the image shape
+        # passed to the eg `train` and `predict` methods because it holds
+        # the Wavelet transformed image, not the original image itself.
+        wl_dim = orpac_net.imageToWaveletDim(im_dim)
+        assert net._xin.shape == (1, *wl_dim.chw())
 
         # The feature map size must derive from the size of the input image and
         # the number of Wavelet transforms. Each WL transform halves the
         # dimensions.
-        assert net.featureShape().hw() == orpac_net.imageToWaveletDim(im_dim).hw()
-
-        # fixme: also check the size of _xin.
+        assert net.featureShape().hw() == wl_dim.hw()
 
     def test_numPools(self):
         """Verify the number of pooling layers."""

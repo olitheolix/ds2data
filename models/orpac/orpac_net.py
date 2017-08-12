@@ -330,14 +330,6 @@ class Orpac:
         # fixme: remove method in favour of a class variable
         return 3
 
-    @classmethod
-    def imageDimToInputShape(cls, im_dim: Shape):
-        N = cls._NUM_WAVELET_DECOMPOSITIONS
-        h = im_dim.height // (2 ** N)
-        w = im_dim.width // (2 ** N)
-        c = 3 * (4 ** N)
-        return (c, h, w)
-
     def _createInputTensor(self, im_dim):
         N = self._NUM_WAVELET_DECOMPOSITIONS
 
