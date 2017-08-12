@@ -502,12 +502,12 @@ class TestOrpac:
         # The feature channels encode 4 BBox parameters, is-foreground (2
         # parameters because the binary choice is hot-label encoded), and the
         # number of classes. This convenience function must return that value.
-        assert net.numFeatureChannels(num_cls) == (4 + 2 + num_cls)
+        assert net.numOutputChannels(num_cls) == (4 + 2 + num_cls)
 
         # Must return the output tensor shape excluding batch dimension.
         ft_shape = net.outputShape()
         assert isinstance(ft_shape, Shape)
-        assert ft_shape.chan == net.numFeatureChannels(num_cls)
+        assert ft_shape.chan == net.numOutputChannels(num_cls)
 
         # Verify the image shape expected by the class for eg `pred` and `train`.
         assert net.imageShape() == im_dim
@@ -750,7 +750,7 @@ class TestSerialiseRestore:
 
         # Use utility functions to determine the number channels of the network
         # output layer. Also determine the number of ...
-        num_ft_chan = orpac_net.Orpac.numFeatureChannels(num_cls)
+        num_ft_chan = orpac_net.Orpac.numOutputChannels(num_cls)
         dim_xin = orpac_net.imageToWaveletDim(im_dim)
 
         # Create variables for first, middle and last layer. The first layer
@@ -857,7 +857,7 @@ class TestFeatureDecomposition:
         """
         ft_dim = self.net.outputShape()
         num_cls = self.net.numClasses()
-        num_ft_chan = self.net.numFeatureChannels(num_cls)
+        num_ft_chan = self.net.numOutputChannels(num_cls)
 
         # Allocate empty feature tensor and random BBox tensor.
         y = np.zeros(self.net.outputShape().chw())

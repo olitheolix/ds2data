@@ -249,8 +249,8 @@ class Orpac:
         For example, the output may be Shape(chan=18, height=64, width=64).
         """
         # Sanity check: the number of output channels must match the value
-        # returned by `numFeatureChannels`.
-        assert self.ft_dim.chan == self.numFeatureChannels(self.numClasses())
+        # returned by `numOutputChannels`.
+        assert self.ft_dim.chan == self.numOutputChannels(self.numClasses())
         return self.ft_dim.copy()
 
     def imageShape(self):
@@ -266,7 +266,7 @@ class Orpac:
         return dict(self._cost_nodes)
 
     @staticmethod
-    def numFeatureChannels(num_classes: int):
+    def numOutputChannels(num_classes: int):
         """Return the number of feature channels when there are `num_classes`.
 
         This value specifes the number of channels that the final network layer
@@ -401,7 +401,7 @@ class Orpac:
         # Conv output layer to learn the BBoxes and class labels.
         # Shape: [-1, 64, 64, 64] ---> [-1, num_out, 64, 64]
         # Kernel: 33x33
-        num_ft_chan = self.numFeatureChannels(self.num_classes)
+        num_ft_chan = self.numOutputChannels(self.num_classes)
         prev_shape = tuple(prev.shape.as_list())
         b_dim = (num_ft_chan, 1, 1)
         W_dim = (33, 33, prev.shape[1], num_ft_chan)
