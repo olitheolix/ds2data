@@ -523,12 +523,6 @@ class TestOrpac:
         # dimensions.
         assert net.featureShape().hw() == wl_dim.hw()
 
-    def test_numPools(self):
-        """Verify the number of pooling layers."""
-        # fixme: redundant
-        for i in range(10):
-            assert orpac_net.Orpac.numPools(i) == 3
-
     def test_basic_attributes(self):
         """Setup network and check basic parameters like TF variable names,
         number of layers, size of last feature map...

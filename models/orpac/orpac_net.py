@@ -324,19 +324,12 @@ class Orpac:
         assert y.ndim == 3
         return y[6:]
 
-    @staticmethod
-    def numPools(num_layers):
-        """Return the number of pooling layers for a given `num_layers`."""
-        # fixme: remove method in favour of a class variable
-        return 3
-
     def _createInputTensor(self, im_dim):
         N = self._NUM_WAVELET_DECOMPOSITIONS
 
         im_dim = np.array(im_dim.hw()) / (2 ** N)
         width, height = im_dim.astype(np.int32).tolist()
 
-        # fixme: use 'imageDimToInputShape' method instead of hardcoded value
         num_chan = 3 * (4 ** N)
         x_dim = (1, num_chan, height, width)
         return tf.placeholder(tf.float32, x_dim, name='x_in')
