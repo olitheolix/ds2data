@@ -22,6 +22,8 @@ _SCALE_CLS = 1000
 def imageToFeatureDim(shape):
     """Return the image Shape for a given feature shape.
 
+    fixme: rename to imageToWaveletDim
+
     If the `shape.chan` is None then the returned Shape will have its `chan`
     attribute set to None as well. If it is not None then it must be 3 since
     the Orpac class only accepts RGB images.
@@ -196,7 +198,7 @@ class Orpac:
     # Specify how many times the decompose the input image with Wavelets.
     _NUM_WAVELET_DECOMPOSITIONS = 3
 
-    def __init__(self, sess, im_dim_hw, num_layers, num_classes, bw_init, train):
+    def __init__(self, sess, im_dim, num_layers, num_classes, bw_init, train):
         # Decide if we want to create cost nodes or not.
         assert isinstance(train, bool)
 
@@ -205,10 +207,10 @@ class Orpac:
         self.sess = sess
         self.num_layers = num_layers
         self.num_classes = num_classes
-        self.img_height_width = im_dim_hw
+        self.im_dim = im_dim
 
         # Create placeholder variable for Wavelet decomposed image.
-        self._xin = self._createInputTensor(im_dim_hw)
+        self._xin = self._createInputTensor(im_dim)
 
         # Setup the NMS nodes and Orpac network.
         self._setupNonMaxSuppression()
@@ -216,7 +218,7 @@ class Orpac:
             self.out = self._setupNetwork(self._xin, bw_init, np.float32)
 
         # Store the output node and feature map size.
-        self.feature_shape = tuple(self.out.shape.as_list())[1:]
+        self.ft_dim = Shape(*self.out.shape.as_list()[1:])
 
         # Define the cost nodes and compile them into a dictionary if this
         # network is trainable, otherwise do nothing.
@@ -248,13 +250,13 @@ class Orpac:
 
         For example, the output may be (18, 64, 64).
         """
-        return self.feature_shape
+        return self.ft_dim.copy()
 
     def featureHeightWidth(self):
-        return tuple(self.feature_shape[1:])
+        return self.ft_dim.hw()
 
     def imageHeightWidth(self):
-        return tuple(self.img_height_width)
+        return self.im_dim.hw()
 
     def output(self):
         return self.out
@@ -328,18 +330,21 @@ class Orpac:
         return 3
 
     @classmethod
-    def imageDimToInputShape(cls, height: int, width: int):
+    def imageDimToInputShape(cls, im_dim: Shape):
         N = cls._NUM_WAVELET_DECOMPOSITIONS
-        h = height // (2 ** N)
-        w = width // (2 ** N)
+        h = im_dim.height // (2 ** N)
+        w = im_dim.width // (2 ** N)
         c = 3 * (4 ** N)
         return (c, h, w)
 
     def _createInputTensor(self, im_dim):
-        im_dim = np.array(im_dim) / (2 ** 3)
+        N = self._NUM_WAVELET_DECOMPOSITIONS
+
+        im_dim = np.array(im_dim.hw()) / (2 ** N)
         width, height = im_dim.astype(np.int32).tolist()
+
         # fixme: use 'imageDimToInputShape' method instead of hardcoded value
-        num_chan = 3 * (4 ** 3)
+        num_chan = 3 * (4 ** N)
         x_dim = (1, num_chan, height, width)
         return tf.placeholder(tf.float32, x_dim, name='x_in')
 
@@ -357,6 +362,7 @@ class Orpac:
         return nodes, opt
 
     def _imageToInput(self, img):
+        # fixme: clean up method
         height, width = self.imageHeightWidth()
         assert height == width
 
@@ -454,7 +460,7 @@ class Orpac:
         # Sanity checks
         assert lrate > 0
         assert mask_cls.shape == mask_bbox.shape == mask_isFg.shape
-        assert y.shape == self.featureShape()
+        assert y.shape == self.ft_dim.chw()
         assert y.shape[1:] == mask_cls.shape
 
         # Feed dictionary.
