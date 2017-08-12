@@ -23,8 +23,8 @@ def parseCmdline():
 
         Examples:
           python train.py 10            # Train for 10 epoch
-          python train.py 10 1E-4       # Start with learning rate 1E-4
-          python train.py 10 1E-4 1E-5  # Finish with learning rate 1E-5
+          python train.py 10 1E-4       # Constant learning rate 1E-4
+          python train.py 10 1E-4 1E-5  # Reduce learning rate from 1E-4 to 1E-5
     ''')
 
     # Create a parser and program description.
@@ -33,13 +33,18 @@ def parseCmdline():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
+    default_lrate = 5E-5
     padd = parser.add_argument
     padd('N', metavar='N', type=int, help='Train for another N epochs')
-    padd('lr0', metavar='lr0', type=float, default=1E-4, nargs='?',
-         help='Initial learning rate (default 1E-4)')
-    padd('lr1', metavar='lr1', type=float, default=1E-4, nargs='?',
-         help='Final learning rate (default 1E-4)')
-    return parser.parse_args()
+    padd('lr0', metavar='lr0', type=float, default=None, nargs='?',
+         help=f'Initial learning rate (default {default_lrate})')
+    padd('lr1', metavar='lr1', type=float, default=None, nargs='?',
+         help=f'Final learning rate (default None)')
+
+    param = parser.parse_args()
+    param.lr0 = param.lr0 or default_lrate
+    param.lr1 = param.lr1 or param.lr0
+    return param
 
 
 def compileErrorStats(net, true_y, pred_y, mask_bbox, mask_bgfg, mask_cls):
