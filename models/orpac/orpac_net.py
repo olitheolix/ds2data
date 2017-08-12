@@ -19,10 +19,8 @@ _SCALE_ISFG = 3000
 _SCALE_CLS = 1000
 
 
-def imageToFeatureDim(shape):
-    """Return the image Shape for a given feature shape.
-
-    fixme: rename to imageToWaveletDim
+def imageToWaveletDim(shape):
+    """Return the image shape that resulted in a given wavelet feature map.
 
     If the `shape.chan` is None then the returned Shape will have its `chan`
     attribute set to None as well. If it is not None then it must be 3 since
@@ -30,10 +28,10 @@ def imageToFeatureDim(shape):
 
     Input:
         shape: Shape
-            Shape of feature tensor.
+            Shape: shape of input image.
 
     Return:
-        Shape: shape of input image.
+        Shape of wavelet decomposed tensor.
     """
     N = Orpac._NUM_WAVELET_DECOMPOSITIONS
 
@@ -52,8 +50,8 @@ def imageToFeatureDim(shape):
     return Shape(chan=chan, height=height, width=width)
 
 
-def featureToImageDim(shape):
-    """Return the feature Shape for a given image shape.
+def waveletToImageDim(shape):
+    """Return the wavelet feature shape for a given image shape.
 
     If the `shape.chan` is None then the returned Shape will have its `chan`
     attribute set to None as well. If it is not None then it must have the
@@ -62,7 +60,7 @@ def featureToImageDim(shape):
 
     Input:
         shape: Shape
-            Shape of feature tensor.
+            Shape of wavelet decomposed tensor.
 
     Return:
         Shape: shape of input image.

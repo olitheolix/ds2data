@@ -37,8 +37,8 @@ class TestUtilityFunctions:
         ft_dim = Shape(chan=None, height=2, width=2)
 
         # The two methods must be inverses of each other.
-        im_dim = orpac_net.featureToImageDim(ft_dim)
-        assert orpac_net.imageToFeatureDim(im_dim) == ft_dim
+        im_dim = orpac_net.waveletToImageDim(ft_dim)
+        assert orpac_net.imageToWaveletDim(im_dim) == ft_dim
 
         # Manually check the value as well. For each Wavelet decomposition of
         # the original input image the dimensions must have been halved.
@@ -57,7 +57,7 @@ class TestCost:
         num_cls, num_layers = 10, 7
 
         # Compute the image dimensions required for a 2x2 feature size.
-        im_dim = orpac_net.featureToImageDim(ft_dim)
+        im_dim = orpac_net.waveletToImageDim(ft_dim)
 
         # Create Tensorflow session and dummy network. The network is such that
         # the feature size is only 2x2 because this makes testing easier.
@@ -524,7 +524,7 @@ class TestOrpac:
         # the number of Wavelet transforms. Each WL transform halves the
         # dimensions.
         # fixme: the auxiliary Shape instance must become redundant.
-        ft_dim = orpac_net.imageToFeatureDim(im_dim)
+        ft_dim = orpac_net.imageToWaveletDim(im_dim)
         assert net.featureHeightWidth() == ft_dim.hw()
 
         # fixme: also check the size of _xin.
@@ -543,7 +543,7 @@ class TestOrpac:
         num_cls, num_layers = 10, 7
 
         # Compute the image dimensions required for a 2x2 feature size.
-        im_dim = orpac_net.featureToImageDim(ft_dim)
+        im_dim = orpac_net.waveletToImageDim(ft_dim)
 
         net = orpac_net.Orpac(self.sess, im_dim, num_layers, num_cls, None, False)
         self.sess.run(tf.global_variables_initializer())
@@ -764,7 +764,7 @@ class TestSerialiseRestore:
         # Use utility functions to determine the number channels of the network
         # output layer. Also determine the number of ...
         num_ft_chan = orpac_net.Orpac.numFeatureChannels(num_cls)
-        dim_xin = orpac_net.imageToFeatureDim(im_dim)
+        dim_xin = orpac_net.imageToWaveletDim(im_dim)
 
         # Create variables for first, middle and last layer. The first layer
         # must be adapted to the input, the middle layer is fixed and the last
@@ -795,7 +795,7 @@ class TestFeatureDecomposition:
         num_cls, num_layers = 10, 7
 
         # Compute the image dimensions required for a 2x2 feature size.
-        im_dim = orpac_net.featureToImageDim(ft_dim)
+        im_dim = orpac_net.waveletToImageDim(ft_dim)
 
         # Create Tensorflow session and dummy network. The network is such that
         # the feature size is only 2x2 because this makes testing easier.
