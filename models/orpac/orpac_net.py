@@ -248,6 +248,9 @@ class Orpac:
 
         For example, the output may be Shape(chan=18, height=64, width=64).
         """
+        # Sanity check: the number of output channels must match the value
+        # returned by `numFeatureChannels`.
+        assert self.ft_dim.chan == self.numFeatureChannels(self.numClasses())
         return self.ft_dim.copy()
 
     def imageShape(self):
@@ -268,6 +271,9 @@ class Orpac:
 
         This value specifes the number of channels that the final network layer
         will return.
+
+        NOTE: this returns the same value as `featureShape.chan` but does not
+        require an Orpac instance since it is a class method.
 
         Input:
             num_classes: int
