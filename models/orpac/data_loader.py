@@ -9,6 +9,7 @@ import compile_features
 import numpy as np
 
 from PIL import Image
+from containers import Shape
 from collections import namedtuple
 from feature_utils import oneHotEncoder
 
@@ -39,16 +40,15 @@ class ORPAC:
     )
 
     def __init__(self, path: str, ft_dim, seed: int, num_samples: int):
-        # Sanity checks.
-        assert isinstance(ft_dim, tuple) and len(ft_dim) == 2
-        assert isinstance(ft_dim[0], int) and isinstance(ft_dim[1], int)
+        # fixme: ft_dim must become a Shape instance.
+        ft_dim = Shape(chan=None, height=ft_dim[0], width=ft_dim[1])
 
         # Seed the random number generator.
         if seed is not None:
             np.random.seed(seed)
 
         # Load images and training output.
-        im_dim_hw, label2name, metas = self.loadRawData(path, ft_dim, num_samples)
+        im_dim, label2name, metas = self.loadRawData(path, ft_dim, num_samples)
 
         # Cull the list of samples, if necessary.
         if num_samples is not None:
@@ -58,7 +58,7 @@ class ORPAC:
 
         # Admin state.
         self.ft_dim = ft_dim
-        self.im_dim_hw = im_dim_hw
+        self.im_dim = im_dim
         self.label2name = label2name
 
         # The MetaData samples and their retrieval order.
@@ -78,7 +78,7 @@ class ORPAC:
             tmp = str.join(', ', tmp)
         else:
             tmp = 'None'
-        h, w = self.im_dim_hw
+        h, w = self.im_dim.hw()
         print(f'  Image  : {h} x {w}')
         print(f'  Labels : {tmp}')
 
@@ -100,7 +100,7 @@ class ORPAC:
 
     def imageHeightWidth(self):
         """Return image dimensions as (height, width), eg (64, 64)"""
-        return tuple(self.im_dim_hw)
+        return self.im_dim.hw()
 
     def getMeta(self, uuid: int):
         if not (0 <= uuid < len(self.meta)):
@@ -108,7 +108,7 @@ class ORPAC:
         return copy.deepcopy(self.meta[uuid])
 
     def featureHeightWidth(self):
-        return tuple(self.ft_dim)
+        return self.ft_dim.hw()
 
     def loadRawData(self, path, ft_dim, num_samples):
         """Return feature and label vector for data set of choice.
@@ -125,14 +125,14 @@ class ORPAC:
         # Compile a list of JPG images in the source folder. Then verify that
         # a) each is a valid JPG file and b) all images have the same size.
         fnames = self.findTrainingFiles(path, num_samples)
-        height, width = self.checkImageDimensions(fnames)
+        im_dim = self.checkImageDimensions(fnames)
 
         # If the features have not been compiled yet, do so now.
         self.compileMissingFeatures(fnames, ft_dim)
 
         # Load the compiled training data alongside each image.
-        int2name, metas = self.loadTrainingData(fnames, width, height, ft_dim)
-        return (height, width), int2name, metas
+        int2name, metas = self.loadTrainingData(fnames, im_dim, ft_dim)
+        return im_dim, int2name, metas
 
     def next(self):
         """Return next training image and labels.
@@ -154,7 +154,7 @@ class ORPAC:
         dims = {Image.open(fname + '.jpg').size for fname in fnames}
         if len(dims) == 1:
             width, height = dims.pop()
-            return height, width
+            return Shape(3, height, width)
 
         print('\nError: found different images sizes: ', dims)
         assert False, 'Images do not all have the same size'
@@ -184,7 +184,7 @@ class ORPAC:
         for fname in fnames:
             try:
                 tmp = pickle.load(open(fname + '-compiled.pickle', 'rb'))
-                assert ft_dim in tmp.keys()
+                assert ft_dim.hw() in tmp.keys()
             except (pickle.UnpicklingError, FileNotFoundError, AssertionError):
                 missing.append(fname)
 
@@ -197,7 +197,7 @@ class ORPAC:
                 out = compile_features.generate(fname, img, ft_dim)
                 pickle.dump(out, open(fname + '-compiled.pickle', 'wb'))
 
-    def loadTrainingData(self, fnames, im_width, im_height, ft_dim):
+    def loadTrainingData(self, fnames, im_dim, ft_dim):
         all_meta = []
         num_cls = None
 
@@ -206,7 +206,7 @@ class ORPAC:
             # Load image as RGB and convert to Numpy.
             img = np.array(Image.open(fname + '.jpg').convert('RGB'), np.uint8)
             img_chw = np.transpose(img, [2, 0, 1])
-            assert img_chw.shape == (3, im_height, im_width)
+            assert img_chw.shape == im_dim.chw()
 
             # All pre-compiled features must use the same label map.
             data = pickle.load(open(fname + '-compiled.pickle', 'rb'))
@@ -216,7 +216,7 @@ class ORPAC:
             assert int2name == data['int2name']
 
             # Crate the training output for the selected feature map size.
-            meta = self.compileTrainingOutput(data[ft_dim], img, num_cls)
+            meta = self.compileTrainingOutput(data[ft_dim.hw()], img, num_cls)
 
             # Collect the training data.
             all_meta.append(meta._replace(filename=fname))
@@ -237,12 +237,12 @@ class ORPAC:
 
         # Allocate the array for the expected network outputs (one for each
         # feature dimension size).
-        ft_dim = label_ap.shape
         num_ft_chan = orpac_net.Orpac.numFeatureChannels(num_classes)
-        y = np.zeros((num_ft_chan, *ft_dim))
+        ft_dim = Shape(num_ft_chan, *label_ap.shape)
+        y = np.zeros(ft_dim.chw())
 
         # Compute binary mask that is 1 at every foreground pixel.
-        isFg = np.zeros(ft_dim)
+        isFg = np.zeros(ft_dim.hw())
         isFg[np.nonzero(label_ap)] = 1
 
         # Insert BBox parameter and hot-labels into the feature tensor.
@@ -264,7 +264,7 @@ class ORPAC:
         # Sanity check: masks must be binary with correct shape.
         for field in ['fg', 'bbox', 'cls', 'valid']:
             tmp = getattr(meta, 'mask_' + field)
-            assert tmp.dtype == np.uint8, field
-            assert tmp.shape == ft_dim, field
+            assert tmp.dtype == np.uint8
+            assert tmp.shape == ft_dim.hw()
             assert set(np.unique(tmp)).issubset({0, 1}), field
         return meta
