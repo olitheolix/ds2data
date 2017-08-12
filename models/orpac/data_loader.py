@@ -48,7 +48,7 @@ class ORPAC:
             np.random.seed(seed)
 
         # Load images and training output.
-        im_dim, label2name, metas = self.loadRawData(path, ft_dim, num_samples)
+        im_dim, ft_dim, label2name, metas = self.loadRawData(path, ft_dim, num_samples)
 
         # Cull the list of samples, if necessary.
         if num_samples is not None:
@@ -131,8 +131,8 @@ class ORPAC:
         self.compileMissingFeatures(fnames, ft_dim)
 
         # Load the compiled training data alongside each image.
-        int2name, metas = self.loadTrainingData(fnames, im_dim, ft_dim)
-        return im_dim, int2name, metas
+        ft_dim, int2name, metas = self.loadTrainingData(fnames, im_dim, ft_dim)
+        return im_dim, ft_dim, int2name, metas
 
     def next(self):
         """Return next training image and labels.
@@ -213,16 +213,18 @@ class ORPAC:
             if num_cls is None:
                 int2name = data['int2name']
                 num_cls = len(int2name)
+                ft_dim.chan = orpac_net.Orpac.numOutputChannels(num_cls)
             assert int2name == data['int2name']
 
             # Crate the training output for the selected feature map size.
             meta = self.compileTrainingOutput(data[ft_dim.hw()], img, num_cls)
+            assert meta.y.shape == ft_dim.chw()
 
             # Collect the training data.
             all_meta.append(meta._replace(filename=fname))
 
         # Return image, network output, label mapping, and meta data.
-        return int2name, all_meta
+        return ft_dim, int2name, all_meta
 
     def compileTrainingOutput(self, training_data, img, num_classes):
         assert img.dtype == np.uint8 and img.ndim == 3 and img.shape[2] == 3
