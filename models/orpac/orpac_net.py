@@ -12,10 +12,73 @@ import pywt
 import numpy as np
 import tensorflow as tf
 
+from containers import Shape
 
 _SCALE_BBOX = 10
 _SCALE_ISFG = 3000
 _SCALE_CLS = 1000
+
+
+def imageToFeatureDim(shape):
+    """Return the image Shape for a given feature shape.
+
+    If the `shape.chan` is None then the returned Shape will have its `chan`
+    attribute set to None as well. If it is not None then it must be 3 since
+    the Orpac class only accepts RGB images.
+
+    Input:
+        shape: Shape
+            Shape of feature tensor.
+
+    Return:
+        Shape: shape of input image.
+    """
+    N = Orpac._NUM_WAVELET_DECOMPOSITIONS
+
+    width = shape.width // (2 ** N)
+    height = shape.height // (2 ** N)
+
+    if shape.chan is not None:
+        assert shape.chan == 3
+
+        # Every decomposition yields 4 images -> 4 ** N images. Since we have to
+        # repeat the decomposition for each of the three RGB channels we get a
+        # total of 3 * (4 ** N) channels.
+        chan = 3 * (4 ** N)
+    else:
+        chan = None
+    return Shape(chan=chan, height=height, width=width)
+
+
+def featureToImageDim(shape):
+    """Return the feature Shape for a given image shape.
+
+    If the `shape.chan` is None then the returned Shape will have its `chan`
+    attribute set to None as well. If it is not None then it must have the
+    correct value based on the number of Wavelet decompositions specified in
+    the class variables of `Orpac`.
+
+    Input:
+        shape: Shape
+            Shape of feature tensor.
+
+    Return:
+        Shape: shape of input image.
+    """
+    N = Orpac._NUM_WAVELET_DECOMPOSITIONS
+
+    # The number of Wavelet decomposed channels is constant for a given
+    # number of Wavelet decompositions and colour channels. Here we ensure that
+    # the input does indeed make sense if it was specified.
+    if shape.chan is not None:
+        assert shape.chan == 3 * (4 ** N)
+        chan = 3
+    else:
+        chan = None
+
+    width = shape.width * (2 ** N)
+    height = shape.height * (2 ** N)
+    return Shape(chan=chan, height=height, width=width)
 
 
 def _crossEnt(logits, labels, name=None):

@@ -4,7 +4,9 @@ import numpy as np
 import tensorflow as tf
 import unittest.mock as mock
 
+from containers import Shape
 from feature_utils import oneHotEncoder
+
 
 # Convenience shortcuts to static methods.
 setIsFg = orpac_net.Orpac.setIsFg
@@ -15,17 +17,47 @@ setClassLabel = orpac_net.Orpac.setClassLabel
 getClassLabel = orpac_net.Orpac.getClassLabel
 
 
+class TestUtilityFunctions:
+    """Test the various cost components."""
+    @classmethod
+    def setup_class(cls):
+        pass
+
+    @classmethod
+    def teardown_class(cls):
+        pass
+
+    def setup_method(self, method):
+        pass
+
+    def teardown_method(self, method):
+        pass
+
+    def test_feature_to_image_conversions(self):
+        ft_dim = Shape(chan=None, height=2, width=2)
+
+        # The two methods must be inverses of each other.
+        im_dim = orpac_net.featureToImageDim(ft_dim)
+        assert orpac_net.imageToFeatureDim(im_dim) == ft_dim
+
+        # Manually check the value as well. For each Wavelet decomposition of
+        # the original input image the dimensions must have been halved.
+        # Conversely, for any given feature map size, the corresponding image
+        # size must be 2 ** num_decompositions in each dimension.
+        rat = 2 ** orpac_net.Orpac._NUM_WAVELET_DECOMPOSITIONS
+        assert im_dim.chw() == (None, ft_dim.height * rat, ft_dim.width * rat)
+
+
 class TestCost:
     """Test the various cost components."""
     @classmethod
     def setup_class(cls):
         # Feature dimension will only be 2x2 to simplify testing and debugging.
-        ft_dim = (2, 2)
+        ft_dim = Shape(None, 2, 2)
         num_cls, num_layers = 10, 7
 
-        # Compute the image dimensions required for the 2x2 feature size.
-        im_dim = np.array(ft_dim) * (2 ** orpac_net.Orpac.numPools(num_layers))
-        im_dim = im_dim.tolist()
+        # Compute the image dimensions required for a 2x2 feature size.
+        im_dim = orpac_net.featureToImageDim(ft_dim).hw()
 
         # Create Tensorflow session and dummy network. The network is such that
         # the feature size is only 2x2 because this makes testing easier.
@@ -491,8 +523,10 @@ class TestOrpac:
         # The feature map size must derive from the size of the input image and
         # the number of Wavelet transforms. Each WL transform halves the
         # dimensions.
-        ft_dim = np.array(im_dim_hw) // 2 ** net.numPools(num_layers)
-        assert net.featureHeightWidth() == tuple(ft_dim)
+        # fixme: the auxiliary Shape instance must become redundant.
+        ft_dim = orpac_net.imageToFeatureDim(
+            Shape(chan=None, height=im_dim_hw[0], width=im_dim_hw[1]))
+        assert net.featureHeightWidth() == ft_dim.hw()
 
         # fixme: also check the size of _xin.
 
@@ -506,12 +540,11 @@ class TestOrpac:
         """Setup network and check basic parameters like TF variable names,
         number of layers, size of last feature map...
         """
-        ft_dim = (64, 64)
+        ft_dim = Shape(None, 64, 64)
         num_cls, num_layers = 10, 7
 
-        # Compute the image dimensions required for the 2x2 feature size.
-        im_dim = np.array(ft_dim) * (2 ** orpac_net.Orpac.numPools(num_layers))
-        im_dim = im_dim.tolist()
+        # Compute the image dimensions required for a 2x2 feature size.
+        im_dim = orpac_net.featureToImageDim(ft_dim).hw()
 
         net = orpac_net.Orpac(self.sess, im_dim, num_layers, num_cls, None, False)
         self.sess.run(tf.global_variables_initializer())
@@ -520,7 +553,7 @@ class TestOrpac:
         # The feature size must be 1/8 of the image size because the network
         # downsamples every second layer, and we specified 7 layers.
         assert num_layers == net.numLayers() == 7
-        assert net.featureHeightWidth() == ft_dim
+        assert net.featureHeightWidth() == ft_dim.hw()
 
         # Ensure we can query all biases and weights. Also verify the data type
         # inside the network.
@@ -763,19 +796,18 @@ class TestSerialiseRestore:
 class TestFeatureDecomposition:
     def setup_class(cls):
         # Feature dimension will only be 2x2 to simplify testing and debugging.
-        ft_dim = (64, 64)
+        ft_dim = Shape(None, 64, 64)
         num_cls, num_layers = 10, 7
 
-        # Compute the image dimensions required for the 2x2 feature size.
-        im_dim = np.array(ft_dim) * (2 ** orpac_net.Orpac.numPools(num_layers))
-        im_dim = im_dim.tolist()
+        # Compute the image dimensions required for a 2x2 feature size.
+        im_dim = orpac_net.featureToImageDim(ft_dim).hw()
 
         # Create Tensorflow session and dummy network. The network is such that
         # the feature size is only 2x2 because this makes testing easier.
         cls.sess = tf.Session()
         cls.net = orpac_net.Orpac(
             cls.sess, im_dim, num_layers, num_cls, None, train=False)
-        assert cls.net.featureHeightWidth() == ft_dim
+        assert cls.net.featureHeightWidth() == ft_dim.hw()
 
     @classmethod
     def teardown_class(cls):
