@@ -64,7 +64,7 @@ class TestCost:
         cls.sess = tf.Session()
         cls.net = orpac_net.Orpac(
             cls.sess, im_dim, num_layers, num_cls, None, train=False)
-        assert cls.net.featureShape().hw() == (2, 2)
+        assert cls.net.outputShape().hw() == (2, 2)
 
         # A dummy feature tensor that we will populate it with our own data to
         # simulate the network output. To create it we simply "clone" the
@@ -148,11 +148,11 @@ class TestCost:
         assert cost_total.shape == tuple()
 
         # Convenience.
-        ft_dim = self.net.featureShape()
+        ft_dim = self.net.outputShape()
 
         # Check tensor sizes.
         assert y_true_in.dtype == y_pred_in.dtype == tf.float32
-        assert y_pred_in.shape[1:] == self.net.featureShape().chw()
+        assert y_pred_in.shape[1:] == self.net.outputShape().chw()
         assert y_pred_in.shape == y_true_in.shape
 
         assert mask_isFg_in.shape == ft_dim.hw()
@@ -176,7 +176,7 @@ class TestCost:
         The cost function for the is-foreground label is the cross-entropy.
         """
         # Convenience.
-        ft_dim = self.net.featureShape()
+        ft_dim = self.net.outputShape()
         g = tf.get_default_graph().get_tensor_by_name
         cost = g('orpac-cost/isFg:0')
         cost_full = g('orpac-cost/isFg_full:0')
@@ -201,7 +201,7 @@ class TestCost:
     def test_cost_isForeground(self):
         """Cost function for binary is-foreground label."""
         # Convenience.
-        ft_dim = self.net.featureShape()
+        ft_dim = self.net.outputShape()
 
         # Activate two locations in 2x2 mask.
         mask = np.zeros(ft_dim.hw(), np.float32)
@@ -232,7 +232,7 @@ class TestCost:
         The cost function for the is-foreground label is the cross-entropy.
         """
         # Convenience.
-        ft_dim = self.net.featureShape()
+        ft_dim = self.net.outputShape()
         g = tf.get_default_graph().get_tensor_by_name
 
         cost = g('orpac-cost/cls:0')
@@ -259,7 +259,7 @@ class TestCost:
         """Cost function for the num_cls possible class labels."""
         # Convenience.
         num_cls = self.net.numClasses()
-        ft_dim = self.net.featureShape()
+        ft_dim = self.net.outputShape()
 
         # Activate two locations in 2x2 mask.
         mask = np.zeros(ft_dim.hw(), np.float32)
@@ -289,7 +289,7 @@ class TestCost:
         tensor has shape [4, height, width] and the output [height, width].
         """
         # Convenience.
-        ft_dim = self.net.featureShape()
+        ft_dim = self.net.outputShape()
         g = tf.get_default_graph().get_tensor_by_name
 
         cost = g('orpac-cost/bbox:0')
@@ -316,7 +316,7 @@ class TestCost:
     def test_cost_BBox(self):
         """Verify the cost function for BBox parameters."""
         # Convenience.
-        ft_dim = self.net.featureShape()
+        ft_dim = self.net.outputShape()
 
         # Activate two locations in 2x2 mask.
         mask = np.zeros(ft_dim.hw(), np.float32)
@@ -342,7 +342,7 @@ class TestCost:
         """Final cost function to minimise"""
         # Convenience
         num_cls = self.net.numClasses()
-        ft_dim = self.net.featureShape()
+        ft_dim = self.net.outputShape()
 
         # Allocate output tensor. We will fill it with test values below.
         y_pred = np.zeros(self.y_true_in.shape, np.float32)
@@ -505,7 +505,7 @@ class TestOrpac:
         assert net.numFeatureChannels(num_cls) == (4 + 2 + num_cls)
 
         # Must return the output tensor shape excluding batch dimension.
-        ft_shape = net.featureShape()
+        ft_shape = net.outputShape()
         assert isinstance(ft_shape, Shape)
         assert ft_shape.chan == net.numFeatureChannels(num_cls)
 
@@ -521,7 +521,7 @@ class TestOrpac:
         # The feature map size must derive from the size of the input image and
         # the number of Wavelet transforms. Each WL transform halves the
         # dimensions.
-        assert net.featureShape().hw() == wl_dim.hw()
+        assert net.outputShape().hw() == wl_dim.hw()
 
     def test_basic_attributes(self):
         """Setup network and check basic parameters like TF variable names,
@@ -540,7 +540,7 @@ class TestOrpac:
         # The feature size must be 1/8 of the image size because the network
         # downsamples every second layer, and we specified 7 layers.
         assert num_layers == net.numLayers() == 7
-        assert net.featureShape().hw() == ft_dim.hw()
+        assert net.outputShape().hw() == ft_dim.hw()
 
         # Ensure we can query all biases and weights. Also verify the data type
         # inside the network.
@@ -568,13 +568,13 @@ class TestOrpac:
         # The last filter is responsible for creating the various features we
         # train the network on. Its dimension must be 33x33 to achieve a large
         # receptive field on the input image.
-        num_ft_chan = net.featureShape().chan
+        num_ft_chan = net.outputShape().chan
         net.getBias(num_layers - 1).shape == (num_ft_chan, 1, 1)
         net.getWeight(num_layers - 1).shape == (33, 33, 64, num_ft_chan)
 
         # The output layer must have the correct number of features and
         # feature map size. This excludes the batch dimension.
-        assert net.output().shape[1:] == net.featureShape().chw()
+        assert net.output().shape[1:] == net.outputShape().chw()
 
     def test_non_max_suppresion_setup(self):
         """Ensure the network creates the NMS nodes."""
@@ -607,7 +607,7 @@ class TestOrpac:
         # Image must be converted to float32 CHW image with leading
         # batch dimension of 1. All values must have been divided by 255.
         img_wl = net._imageToInput(img)
-        dim_xin = Shape(int(net._xin.shape[1]), *net.featureShape().hw())
+        dim_xin = Shape(int(net._xin.shape[1]), *net.outputShape().hw())
         assert img_wl.dtype == np.float32
         assert img_wl.shape == (1, *dim_xin.chw())
 
@@ -628,7 +628,7 @@ class TestOrpac:
 
         # Create dummy learning rate, image and training output.
         lrate = 1E-5
-        ft_dim = net.featureShape()
+        ft_dim = net.outputShape()
         y = np.random.uniform(0, 256, ft_dim.chw()).astype(np.uint8)
         img = np.random.randint(0, 256, im_dim.hwc()).astype(np.uint8)
 
@@ -664,7 +664,7 @@ class TestOrpac:
         # 'Train' method must complete without error and return the costs.
         y = net.predict(img)
         assert isinstance(y, np.ndarray) and y.dtype == np.float32
-        assert y.shape == net.featureShape().chw()
+        assert y.shape == net.outputShape().chw()
 
     def test_nonMaxSuppression(self):
         """Ensure the 'nonMaxSuppression' method succeeds.
@@ -789,7 +789,7 @@ class TestFeatureDecomposition:
         cls.sess = tf.Session()
         cls.net = orpac_net.Orpac(
             cls.sess, im_dim, num_layers, num_cls, None, train=False)
-        assert cls.net.featureShape().hw() == ft_dim.hw()
+        assert cls.net.outputShape().hw() == ft_dim.hw()
 
     @classmethod
     def teardown_class(cls):
@@ -805,10 +805,10 @@ class TestFeatureDecomposition:
 
     def test_getSetBBox(self):
         """Assign and retrieve BBox data."""
-        ft_dim = self.net.featureShape()
+        ft_dim = self.net.outputShape()
 
         # Allocate empty feature tensor and random BBox tensor.
-        y = np.zeros(self.net.featureShape().chw())
+        y = np.zeros(self.net.outputShape().chw())
         bbox = np.random.random((4, *ft_dim.hw()))
 
         # Assign BBox data. Ensure the original array was not modified.
@@ -821,10 +821,10 @@ class TestFeatureDecomposition:
 
     def test_getSetIsFg(self):
         """Assign and retrieve binary is-foreground flag."""
-        ft_dim = self.net.featureShape()
+        ft_dim = self.net.outputShape()
 
         # Allocate empty feature tensor and random BBox tensor.
-        y = np.zeros(self.net.featureShape().chw())
+        y = np.zeros(self.net.outputShape().chw())
         isFg = np.random.random((2, *ft_dim.hw()))
 
         # Assign the BBox data and ensure the original array was not modified.
@@ -837,10 +837,10 @@ class TestFeatureDecomposition:
 
     def test_getSetClassLabel(self):
         """Assign and retrieve foreground class labels."""
-        ft_dim = self.net.featureShape()
+        ft_dim = self.net.outputShape()
 
         # Allocate empty feature tensor and random BBox tensor.
-        y = np.zeros(self.net.featureShape().chw())
+        y = np.zeros(self.net.outputShape().chw())
         class_labels = np.random.random((self.net.numClasses(), *ft_dim.hw()))
 
         # Assign the BBox data and ensure the original array was not modified.
@@ -855,12 +855,12 @@ class TestFeatureDecomposition:
         """Assign invalid class labels. A label tensor is valid iff its entries
         are non-negative integers, and its dimension matches `num_classes`.
         """
-        ft_dim = self.net.featureShape()
+        ft_dim = self.net.outputShape()
         num_cls = self.net.numClasses()
         num_ft_chan = self.net.numFeatureChannels(num_cls)
 
         # Allocate empty feature tensor and random BBox tensor.
-        y = np.zeros(self.net.featureShape().chw())
+        y = np.zeros(self.net.outputShape().chw())
 
         # Wrong shape: too few classes.
         with pytest.raises(AssertionError):

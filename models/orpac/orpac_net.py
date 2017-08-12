@@ -243,7 +243,7 @@ class Orpac:
     def numClasses(self):
         return self.num_classes
 
-    def featureShape(self):
+    def outputShape(self):
         """Return the shape of the network output (exclusive Batch dimension).
 
         For example, the output may be Shape(chan=18, height=64, width=64).
