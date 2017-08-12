@@ -251,9 +251,8 @@ def main():
     else:
         log = collections.defaultdict(list)
         conf = config.NetConf(
-            seed=0, epoch=0, num_layers=7, ft_dim=Shape(None, 64, 64),
-            filter_size=31, path=os.path.join('data', '3dflight'),
-            num_samples=None
+            seed=0, epoch=0, num_layers=7, path=os.path.join('data', '3dflight'),
+            ft_dim=Shape(None, 64, 64), num_samples=None
         )
         bw_init = None
         print(f'Restored from <{None}>')

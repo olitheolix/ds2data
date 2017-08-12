@@ -134,8 +134,8 @@ def main(data_path=None):
 
     # Dummy Net configuration. We only fill in the values for the Loader.
     conf = config.NetConf(
-        seed=0, epoch=None, num_layers=None, ft_dim=Shape(None, 64, 64),
-        filter_size=None, path=data_path, num_samples=None
+        seed=0, epoch=None, num_layers=None, path=data_path,
+        ft_dim=Shape(None, 64, 64), num_samples=None
     )
 
     # Load the data set and request a sample.
