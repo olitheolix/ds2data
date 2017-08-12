@@ -514,7 +514,7 @@ class TestOrpac:
         assert ft_shape == net.featureShape()
 
         # Verify the image dimensions.
-        assert net.imageHeightWidth() == im_dim.hw()
+        assert net.imageShape() == im_dim
 
         # The input tensor shape differs from the image shape because it must
         # hold the Wavelet transformed image, not the original image itself.

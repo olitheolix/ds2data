@@ -250,8 +250,8 @@ class Orpac:
         """
         return self.ft_dim.copy()
 
-    def imageHeightWidth(self):
-        return self.im_dim.hw()
+    def imageShape(self):
+        return self.im_dim.copy()
 
     def output(self):
         return self.out
@@ -358,7 +358,7 @@ class Orpac:
 
     def _imageToInput(self, img):
         # fixme: clean up method
-        height, width = self.imageHeightWidth()
+        height, width = self.imageShape().hw()
         assert height == width
 
         # Check and normalise image.
