@@ -215,7 +215,7 @@ class Orpac:
         with tf.variable_scope('orpac'):
             self.out = self._setupNetwork(self._xin, bw_init, np.float32)
 
-        # Store the output node and feature map size.
+        # Store shape of the output tensor.
         self.ft_dim = Shape(*self.out.shape.as_list()[1:])
 
         # Define the cost nodes and compile them into a dictionary if this
@@ -244,14 +244,11 @@ class Orpac:
         return self.num_classes
 
     def featureShape(self):
-        """Return the shape of the feature exclusive the batch dimension.
+        """Return the shape of the network output (exclusive Batch dimension).
 
-        For example, the output may be (18, 64, 64).
+        For example, the output may be Shape(chan=18, height=64, width=64).
         """
         return self.ft_dim.copy()
-
-    def featureHeightWidth(self):
-        return self.ft_dim.hw()
 
     def imageHeightWidth(self):
         return self.im_dim.hw()
