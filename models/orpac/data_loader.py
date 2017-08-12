@@ -237,7 +237,7 @@ class ORPAC:
 
         # Allocate the array for the expected network outputs (one for each
         # feature dimension size).
-        num_ft_chan = orpac_net.Orpac.numFeatureChannels(num_classes)
+        num_ft_chan = orpac_net.Orpac.numOutputChannels(num_classes)
         ft_dim = Shape(num_ft_chan, *label_ap.shape)
         y = np.zeros(ft_dim.chw())
 
