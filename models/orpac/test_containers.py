@@ -67,3 +67,12 @@ class TestSize:
 
         # Comparison to an arbitrary object (eg string) must return False.
         assert s1 != 'foo'
+
+    def test_copy(self):
+        s1 = containers.Shape(chan=1, height=2, width=3)
+        s2 = s1.copy()
+        assert s2 is not s1
+        assert s1 == s2
+
+    def test_print(self):
+        print(containers.Shape(chan=1, height=2, width=3))

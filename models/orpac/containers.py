@@ -29,6 +29,9 @@ class Shape:
         self.height = height
         self.width = width
 
+    def __repr__(self):
+        return f'Shape(chan={self.chan}, height={self.height}, width={self.width})'
+
     def __eq__(self, ref):
         try:
             assert isinstance(ref, Shape)
@@ -38,6 +41,9 @@ class Shape:
             return True
         except AssertionError:
             return False
+
+    def copy(self):
+        return Shape(self.chan, self.height, self.width)
 
     def chw(self):
         return (self.chan, self.height, self.width)
