@@ -1,10 +1,7 @@
-"""Compile BBox position from meta file into training vector.
+"""Load the compiled feature and display them.
 
-The training output `y` is a feature map with 5 features: label, BBox centre
-relative to anchor, and BBox absolute width/height.
-
-The label values, ie the entries in y[0, :, :], are non-negative integers. A
-label of zero always means background.
+Among the features are the various mask, foreground/background information and
+label maps.
 """
 import os
 import sys
