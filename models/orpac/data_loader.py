@@ -112,13 +112,15 @@ class ORPAC:
         """Return feature and label vector for data set of choice.
 
         Returns:
-            dims: Array[3]
-                Image shape in CHW format, eg (3, 512, 512).
-            int: dict[int:str]
+            im_dim: Shape
+                Image shape
+            ft_dim: Shape
+                Dimensions of training data.
+            int2name: dict[int:str]
                 A LUT to translate machine labels to human readable strings.
                 For instance {0: 'None', 1: 'Cube 0', 2: 'Cube 1'}.
             train: N-List[TrainingSample]
-                TrainingSample tuple for each sample.
+                Training data.
         """
         # Compile a list of JPG images in the source folder. Then verify that
         # a) each is a valid JPG file and b) all images have the same size.
@@ -219,36 +221,29 @@ class ORPAC:
         if len(missing) > 0:
             progbar = tqdm.tqdm(missing, desc=f'Compiling Features', leave=False)
             for fname in progbar:
-                img = Image.open(fname + '.jpg').convert('RGB')
-                img = np.array(img)
+                img = np.array(Image.open(fname + '.jpg').convert('RGB'))
                 out = compile_features.generate(fname, img, ft_dim)
                 pickle.dump(out, open(fname + '-compiled.pickle', 'wb'))
 
     def loadTrainingData(self, fnames, im_dim, ft_dim, num_cls):
+        # Load each image and compile the associated features.
         all_train = []
-
-        # Load each image and associated features.
-        for i, fname in enumerate(fnames):
-            # Load image as RGB and convert to Numpy.
+        for fname in fnames:
+            # Load image as RGB, convert to Numpy, and verify its dimensions.
             img = np.array(Image.open(fname + '.jpg').convert('RGB'), np.uint8)
-            img_chw = np.transpose(img, [2, 0, 1])
-            assert img_chw.shape == im_dim.chw()
+            assert img.shape == im_dim.hwc(), f'Invalid image dimension {img.shape}'
 
-            # All pre-compiled features must use the same label map.
-            data = pickle.load(open(fname + '-compiled.pickle', 'rb'))
-
-            # Crate the training output for the selected feature map size.
-            train = self.compileTrainingOutput(data[ft_dim.hw()], img, ft_dim, num_cls)
-            assert train.y.shape == ft_dim.chw()
-
-            # Collect the training data.
+            # Crate the training output for the current image.
+            train = self.compileTrainingSample(fname, img, ft_dim, num_cls)
             all_train.append(train._replace(filename=fname))
-
-        # Return image, network output, label mapping, and training data.
         return all_train
 
-    def compileTrainingOutput(self, training_data, img, ft_dim, num_classes):
+    def compileTrainingSample(self, fname, img, ft_dim, num_cls):
         assert img.dtype == np.uint8 and img.ndim == 3 and img.shape[2] == 3
+
+        # All pre-compiled features must use the same label map.
+        data = pickle.load(open(fname + '-compiled.pickle', 'rb'))
+        training_data = data[ft_dim.hw()]
 
         # Populate the training output with the BBox data and one-hot-label.
         # Unpack pixel labels.
@@ -256,7 +251,7 @@ class ORPAC:
         objID_ap = training_data['objID_at_pixel']
         bbox_rects = training_data['bboxes']
         assert label_ap.dtype == np.int32 and label_ap.ndim == 2
-        assert 0 <= np.amin(label_ap) <= np.amax(label_ap) < num_classes
+        assert 0 <= np.amin(label_ap) <= np.amax(label_ap) < num_cls
 
         # Allocate training network output tensor.
         y = np.zeros(ft_dim.chw())
@@ -268,7 +263,7 @@ class ORPAC:
         # Insert BBox parameter and hot-labels into the feature tensor.
         y = orpac_net.Orpac.setBBoxRects(y, bbox_rects)
         y = orpac_net.Orpac.setIsFg(y, oneHotEncoder(isFg, 2))
-        y = orpac_net.Orpac.setClassLabel(y, oneHotEncoder(label_ap, num_classes))
+        y = orpac_net.Orpac.setClassLabel(y, oneHotEncoder(label_ap, num_cls))
 
         train = self.TrainingSample(
             img=img,
