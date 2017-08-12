@@ -29,8 +29,8 @@ def parseCmdline():
     parser = argparse.ArgumentParser(description='Compile training data')
     parser.add_argument(
         'path', nargs='?', type=str,
-        metavar='File or Path with training images and *-meta.json.bz2',
-        help='')
+        metavar='path',
+        help='File or Path with training images and *-meta.json.bz2')
     parser.add_argument(
         '--debug', action='store_true', default=False,
         help='Create debug plots for instant inspection')
