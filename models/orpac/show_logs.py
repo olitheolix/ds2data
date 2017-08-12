@@ -168,7 +168,7 @@ def plotTrainingProgress(log, conf):
     plt.ylim(min_cost, max_cost)
     plt.grid()
     plt.legend(loc='best')
-    plt.title(f'Costs (Feature Size: {conf.ft_dim[0]}x{conf.ft_dim[1]})')
+    plt.title(f'Costs (Feature Size: {conf.ft_dim.width}x{conf.ft_dim.height})')
 
     # Classification error rate.
     plt.subplot(num_rows, num_cols, 2)
